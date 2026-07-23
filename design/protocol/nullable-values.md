@@ -1,6 +1,11 @@
 # Nullable values and default-value presence (issue #843)
 
-**Status:** proposal — design agreed, not yet implemented (revised 2026-07-23).
+**Status:** in progress (as of 2026-07-23). Phases 1–5 implemented — protocol schema, core
+server + enforcement, TestService fixtures, the Python client and shared krpctools path, and
+the SpaceCenter services audit + workaround revert. Phase 6 (the remaining clients: C#, C++,
+cnano, Java, Lua) and the final changelog commit are pending. Tracked by
+[issue #843](https://github.com/krpc/krpc/issues/843); each phase's implementation notes are
+inline under [Implementation phases](#implementation-phases).
 
 ## Context
 
@@ -482,7 +487,7 @@ the tree is intentionally broken for clients from the moment the protocol change
 until each client's phase lands. Each phase carries its own tests, which should pass at the
 end of that phase.
 
-**Phase 1 — protobuf schema.** `protobuf/krpc.proto` (the `is_null`, `has_default_value` and
+**Phase 1 — protobuf schema.** ✅ *Done.* `protobuf/krpc.proto` (the `is_null`, `has_default_value` and
 `default_value_is_null` fields) plus the matching protocol docs
 (`doc/src/communication-protocols/messages.rst`, per the Documentation section). Fields are
 additive and unused, so the schema regenerates at build time. (One cnano encoder golden test
@@ -490,7 +495,7 @@ does start failing here — cnano builds its `Argument` on an un-zeroed struct, 
 `is_null` bool serializes uninitialized memory — but per the phasing that break is expected
 and is fixed when cnano lands in phase 6c.)
 
-**Phase 2 — core server + core tests.** All `core/` changes (Server changes items 1–9):
+**Phase 2 — core server + core tests.** ✅ *Done.* All `core/` changes (Server changes items 1–9):
 Encoder, `MessageExtensions`, `Services.cs` validation, property-setter nullability
 (`ServiceSignature.cs` / `ClassMethodHandler.cs` / `ProcedureParameter.cs`), signature JSON.
 Core tests (`ScannerTest`, `Services`, `MessageExtensions`, `Encode(null)` throws). At the end
@@ -527,7 +532,7 @@ broken until its phase lands.**
 >   null-default params (TestService `OptionalArguments`, SpaceCenter `[KRPCNullable] … = null`),
 >   breaking every client's codegen until the shared krpctools fix in phase 4.
 
-**Phase 3 — TestService.** The new test procedures (Tests section): empty-collection
+**Phase 3 — TestService.** ✅ *Done.* The new test procedures (Tests section): empty-collection
 default, nullable string/list/value-type returns, nullable non-class and class parameters,
 and the null-accepting vs null-rejecting property setters. No client exercises them yet.
 
@@ -552,7 +557,7 @@ and the null-accepting vs null-rejecting property setters. No client exercises t
 > Verified by building TestServer and inspecting the generated service definition; the client
 > suites that exercise these land in phases 4 and 6.
 
-**Phase 4 — Python client + shared krpctools path.** Python client decode/encode/default
+**Phase 4 — Python client + shared krpctools path.** ✅ *Done.* Python client decode/encode/default
 rules; the shared krpctools JSON-`null`-default handling (`generator.py` / `utils.py`) and
 `.pyi` value-type-nullable stubs. Tests: Python client suite plus the websockets/serialio
 conformance suites (they read `results[0].value` directly). First end-to-end validation of
@@ -581,7 +586,7 @@ the protocol against the phase-2 server via `TestServer`.
 >   `ValueError`. Tests updated; the obsolete id-0 sentinel unit tests were removed.
 > - Golden `clientgen-*`/`docgen-*` fixtures regenerated for all languages.
 
-**Phase 5 — services audit + revert workarounds** (`service/*`, Server changes items 10–11;
+**Phase 5 — services audit + revert workarounds** ✅ *Done.* (`service/*`, Server changes items 10–11;
 depends only on phase 2). Confirm every null-accepting parameter is nullable (Target*
 covered by the property flag, existing `[KRPCNullable]` params); delete the ~58 redundant
 manual null guards, keeping the load-bearing `Camera.Focussed*` two; revert the nullability
@@ -610,16 +615,18 @@ None` errors).
 > - Verified in-game: `test_clear_target`, `test_target_body`, `test_target_vessel` (nullable
 >   setters clear the target) and a new `test_focussed_rejects_null` all pass against a live game.
 
-**Phase 6 — remaining clients, one sub-phase each.** Each sub-phase updates that client's
+**Phase 6 — remaining clients, one sub-phase each.** ⏳ *Pending.* Each sub-phase updates that client's
 decode/encode/default handling together with its clientgen generator and golden fixtures,
-and passes its comms suite against the phase-2 server:
+and passes its comms suite against the phase-2 server. (The phase-4 golden regeneration already
+added the new procedures to every language's fixtures; each sub-phase below is the value-type
+nullable *signature* work plus that client's runtime encode/decode changes.)
   - 6a — C# (`T?` value-type nullables)
   - 6b — C++ (`std::optional`)
   - 6c — cnano (nullable-return out-parameter — Open question 1)
   - 6d — Java (boxed `Integer`/`Double`/… value-type nullables)
   - 6e — Lua
 
-**Final commit — changelogs.** Per-component `CHANGELOG.md` entries (repo convention), as the
+**Final commit — changelogs.** ⏳ *Pending.* Per-component `CHANGELOG.md` entries (repo convention), as the
 dedicated final commit before merging the PR.
 
 ## Open questions
