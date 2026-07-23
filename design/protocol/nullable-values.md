@@ -531,6 +531,19 @@ broken until its phase lands.**
 default, nullable string/list/value-type returns, nullable non-class and class parameters,
 and the null-accepting vs null-rejecting property setters. No client exercises them yet.
 
+> Implemented in `tools/TestServer/src/TestService.cs`: `EmptyListDefault`
+> (`[KRPCDefaultValue]` empty list — the #824 regression; serializes with the `default_value`
+> key present and empty, i.e. `has_default_value` set on the wire), `EchoNullableString`,
+> `EchoNullableList` (nullable `IList<int>`), `EchoNullableInt` (`int?`, which serializes as
+> `SINT32` with `nullable`/`return_is_nullable` set — confirming the `Nullable<T>` unwrapping
+> end-to-end), `NotNullableObject` (non-nullable class parameter — null rejected), and the
+> `FocussedObject` property (nullable, but its setter manually guards against null, mirroring
+> `Camera.FocussedVessel`). Existing procedures already cover the rest: `EchoTestObject`
+> (nullable class parameter + return), `ObjectProperty` (nullable setter accepts null),
+> `ReturnNullWhenNotAllowed`, `StringProperty` (non-nullable setter), and `OptionalArguments`
+> (class parameter nullable via a null default). Verified by building TestServer and inspecting
+> the generated service definition; the client suites that exercise these land in phases 4 and 6.
+
 **Phase 4 — Python client + shared krpctools path.** Python client decode/encode/default
 rules; the shared krpctools JSON-`null`-default handling (`generator.py` / `utils.py`) and
 `.pyi` value-type-nullable stubs. Tests: Python client suite plus the websockets/serialio
