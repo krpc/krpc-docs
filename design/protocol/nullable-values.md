@@ -81,6 +81,33 @@ Python 7.35.1, nanopb 0.4.9.1) support `optional`.
     property setters `SpaceCenter.Target*` (handled by the property flag, below) and the
     existing `[KRPCNullable]` method parameters. **Breaking** for any script that passed
     null to a parameter now treated as non-null.
+- **A null default implies nullable.** A parameter whose default value is `null` (`X x = null`
+  or `[KRPCDefaultValue(null)]`) is nullable whether or not it also carries `[KRPCNullable]`:
+  `ProcedureParameter.Nullable = HasAttribute<KRPCNullable> || (HasDefaultValue && DefaultValue
+  == null)`. A null default is itself a declaration that null is a valid value, so the two are
+  not independent — without this rule such a parameter could be null by omission yet reject an
+  explicit null, which is incoherent, and its generated client type (`Optional[T] = None`) would
+  contradict a non-nullable declaration. This also *shrinks* the breaking surface above: the
+  many existing `X x = null` optional parameters stay nullable with no annotation, so only
+  null-accepting parameters that have **no** default need marking.
+- **Inference applies to parameter defaults only — returns and properties stay explicit.**
+  The rule above is a purely *static* read of the declared default: `= null` is visible in the
+  signature. Whether a method ever *returns* null is a property of its body, not its signature,
+  and is not statically decidable — so **return nullability is never inferred**. It must be
+  declared (`Nullable = true` on the procedure), and a null return from a procedure not so
+  marked throws (`CheckReturnValue`). Properties have **no declared default value** in the kRPC
+  model (there is no `[KRPCProperty(Default = …)]`), so the null-default rule cannot apply to a
+  property either:
+  - A property **getter is a return** — it requires explicit `[KRPCProperty(Nullable = true)]`
+    exactly like a procedure return, and a null read from a non-nullable property throws. A C#
+    auto-property that happens to hold `null` does not make it nullable; that would be inferring
+    from runtime state, which is exactly what returns disallow.
+  - A property **setter**'s synthesized `value` parameter takes its nullability solely from the
+    same property flag (item 6); it can carry neither `[KRPCNullable]` nor a default.
+
+  So a property is nullable — for reads and for writes — iff `Nullable = true` is set on it;
+  there is no implicit path. This keeps property nullability symmetric between getter and setter
+  and consistent with the explicit-return rule.
 - **All types nullable.** `is_null` is type-agnostic, so value types (`int`, `float`,
   `bool`, enums) are nullable when marked, not just reference/class types; generated client
   signatures reflect this per language (see Client changes).
@@ -220,23 +247,35 @@ collection elements, which needs a new source-level annotation and is out of #84
      `value == null && !IsAClassType(type)` check with `value == null && !parameter.Nullable`
      — null accepted iff the parameter is nullable, for every type; the class special case
      is dropped.
-   - Expression API (`core/src/Service/KRPC/Expression.cs:340`) gates
-     `nullAllowed = ReturnIsNullable && IsAClassType(returnType)`, so a nullable non-class
-     return would hit the non-null check path. Drop the `&& IsAClassType` so a
-     marked-nullable return of any reference type flows through; confirm how a nullable
-     value-type return behaves here (the `returnType.IsValueType` branch already skips the
-     check) during implementation.
-6. **Property setter nullability** (`core/src/Service/Scanner/ServiceSignature.cs:255`,
-   `AddClassProperty`): the setter is currently registered with `nullable = false`
-   unconditionally. Derive the setter's `value`-parameter nullability from the property's
-   `Nullable` flag instead (the getter already uses `GetNullable(property)`), so a
-   `[KRPCProperty(Nullable = true)]` setter accepts null and a plain one rejects it. This
-   is the only way to mark a setter argument nullable — the `value` parameter is
-   synthesized and cannot carry `[KRPCNullable]`.
+   - Expression API: the design expected a separate `nullAllowed = ReturnIsNullable &&
+     IsAClassType` gate in `Expression.cs`, but no such gate exists — `Expression.Call`
+     executes the RPC through `ExecuteCall` → `CheckReturnValue`, so removing the
+     `IsAClassType` gate in `CheckReturnValue` (above) already lets a marked-nullable return
+     of any reference type flow through the expression path. No `Expression.cs` change was
+     needed. Value-type nullable returns through expressions remain Open question 2,
+     unexercised in phase 2.
+6. **Property setter nullability** (`core/src/Service/Scanner/ServiceSignature.cs`): the
+   setter's synthesized `value` parameter is registered non-nullable. Derive its nullability
+   from the property's `Nullable` flag instead (the getter already uses `GetNullable(property)`),
+   so a `[KRPCProperty(Nullable = true)]` setter accepts null and a plain one rejects it. This
+   is the only way to mark a setter argument nullable — the `value` parameter is synthesized
+   and cannot carry `[KRPCNullable]`. **This spans both kinds of property**, each with its own
+   handler and scan path: **class** properties (`AddClassProperty` → `ClassMethodHandler`) and
+   **service-level** properties (`AddProperty` → `ProcedureHandler`). Both handlers gained a
+   `SetValueParameterNullable()` that the setter path calls when the property is nullable.
+
+   > The original design named only `AddClassProperty`, assuming the null-clearing
+   > `SpaceCenter.Target*` setters were class properties. They are **service-level** static
+   > properties (`SpaceCenter` is the service class), so they scan through `AddProperty` /
+   > `ProcedureHandler`; without the service-property fix the server would reject
+   > `TargetVessel = null` (their setters' `value` parameter would stay non-nullable). Both
+   > paths are fixed in phase 2.
 7. **`KRPCNullableAttribute`** (`core/src/Service/Attributes/KRPCNullableAttribute.cs`)
-   is already type-agnostic and `ProcedureParameter.cs:44-53` already supports null
-   defaults (`DBNull.Value` marks *no* default, so `null` is a valid default) — the scanner
-   changes are limited to the setter-nullability plumbing (item 6).
+   is already type-agnostic and `ProcedureParameter.cs` already supports null defaults
+   (`DBNull.Value` marks *no* default, so `null` is a valid default). The scanner changes are:
+   the setter-nullability plumbing (item 6) and deriving `Nullable` from a null default in the
+   `ProcedureParameter(ParameterInfo)` constructor (the null-default-implies-nullable rule
+   above).
 8. **Serialized signature / ServiceDefinitions JSON**
    (`core/src/Service/Scanner/ParameterSignature.cs:62-63`, `GetObjectData`): emit
    `default_value` as JSON `null` when the default is null (today it round-trips the
@@ -416,10 +455,36 @@ does start failing here — cnano builds its `Argument` on an un-zeroed struct, 
 and is fixed when cnano lands in phase 6c.)
 
 **Phase 2 — core server + core tests.** All `core/` changes (Server changes items 1–9):
-Encoder, `MessageExtensions`, `Services.cs` validation, `Expression.cs`, property-setter
-nullability (`ServiceSignature.cs`), signature JSON. Core tests (`ScannerTest`, `Services`,
-`Encode(null)` throws). At the end the server speaks the new protocol and enforces explicit
-nullability — **every client is now broken until its phase lands.**
+Encoder, `MessageExtensions`, `Services.cs` validation, property-setter nullability
+(`ServiceSignature.cs` / `ClassMethodHandler.cs` / `ProcedureParameter.cs`), signature JSON.
+Core tests (`ScannerTest`, `Services`, `MessageExtensions`, `Encode(null)` throws). At the end
+the server speaks the new protocol and enforces explicit nullability — **every client is now
+broken until its phase lands.**
+
+> Implementation notes:
+> - No `Expression.cs` change was needed (see item 5) — the expression path routes through
+>   `CheckReturnValue`.
+> - Property-setter nullability was plumbed by making `ProcedureParameter.Nullable` settable
+>   within the assembly and adding `SetValueParameterNullable()` to **both** handlers —
+>   `ClassMethodHandler` (class properties) and `ProcedureHandler` (service-level properties) —
+>   called from the setter path in `AddClassPropertyMethod` / `AddPropertyProcedure`. The
+>   service-property path is the design correction noted in item 6 (covers `SpaceCenter.Target*`).
+> - Core-test coverage exercises the nullability change across every member kind and combination:
+>   nullable service procedure param+return (`EchoNullableString`, `EchoTestObject`), nullable
+>   class **instance** method (`EchoNullableObject`), nullable class **static** method
+>   (`StaticNullableMethod`), nullable **service-level** (static) property (`NullableProperty`,
+>   getter return + setter accepting null), nullable **class** property setter (`ObjectProperty`),
+>   and a parameter made nullable **implicitly by a null default** (`ProcedureOptionalNullArg`,
+>   `X x = null` — omit → default null, or pass null explicitly), plus null-rejection tests for
+>   the non-nullable counterparts. `EchoTestObject`'s param was marked `[KRPCNullable]` (it relied
+>   on the dropped implicit class-nullability). `MessageAssert` gained `HasNullableParameter` and
+>   `HasNullableParameterWithDefaultValue`; `HasParameter` now also asserts *not* nullable.
+>   (There is no "static class property" form to cover — kRPC class properties must be non-static
+>   and service properties must be static, so `NullableProperty` is the static-property case.)
+> - The expected client-toolchain break lands here, not only in the clients: `clientgen`'s
+>   `decode_default_value` faults on the JSON `null` default now emitted for existing
+>   null-default params (TestService `OptionalArguments`, SpaceCenter `[KRPCNullable] … = null`),
+>   breaking every client's codegen until the shared krpctools fix in phase 4.
 
 **Phase 3 — TestService.** The new test procedures (Tests section): empty-collection
 default, nullable string/list/value-type returns, nullable non-class and class parameters,
@@ -455,7 +520,9 @@ dedicated final commit before merging the PR.
 
 1. **cnano nullable-return API shape**: extra out-parameter vs. a new error code — settle
    when implementing phase 6c.
-2. **Nullable value-type returns in the expression API**: confirm a marked-nullable
-   value-type return (e.g. nullable `int`) flows correctly through `Expression.cs` — the
-   `returnType.IsValueType` branch skips the null check, so verify null actually reaches
-   the client rather than faulting the compiled expression (settle in phase 2).
+2. **Nullable value-type returns in the expression API**: phase 2 confirmed reference-type
+   nullable returns flow through the expression path (via `CheckReturnValue`), but no
+   value-type nullable return exists in `core` yet to exercise. `Expression.Call` builds
+   `LinqExpression.Convert(result.Value, returnType)`, which would fault converting a null
+   `Value` to a value type — revisit when a nullable value-type return is first added
+   (phase 3 TestService / phase 6).
