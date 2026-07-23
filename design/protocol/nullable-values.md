@@ -90,27 +90,40 @@ Python 7.35.1, nanopb 0.4.9.1) support `optional`.
   contradict a non-nullable declaration. This also *shrinks* the breaking surface above: the
   many existing `X x = null` optional parameters stay nullable with no annotation, so only
   null-accepting parameters that have **no** default need marking.
-- **Inference applies to parameter defaults only — returns and properties stay explicit.**
-  The rule above is a purely *static* read of the declared default: `= null` is visible in the
-  signature. Whether a method ever *returns* null is a property of its body, not its signature,
-  and is not statically decidable — so **return nullability is never inferred**. It must be
-  declared (`Nullable = true` on the procedure), and a null return from a procedure not so
-  marked throws (`CheckReturnValue`). Properties have **no declared default value** in the kRPC
-  model (there is no `[KRPCProperty(Default = …)]`), so the null-default rule cannot apply to a
-  property either:
-  - A property **getter is a return** — it requires explicit `[KRPCProperty(Nullable = true)]`
-    exactly like a procedure return, and a null read from a non-nullable property throws. A C#
-    auto-property that happens to hold `null` does not make it nullable; that would be inferring
-    from runtime state, which is exactly what returns disallow.
-  - A property **setter**'s synthesized `value` parameter takes its nullability solely from the
-    same property flag (item 6); it can carry neither `[KRPCNullable]` nor a default.
-
-  So a property is nullable — for reads and for writes — iff `Nullable = true` is set on it;
-  there is no implicit path. This keeps property nullability symmetric between getter and setter
-  and consistent with the explicit-return rule.
+- **Nullability is inferred from static signature facts, never from body behavior.** Two
+  signature-level declarations imply nullable without an explicit marker: a **null default**
+  (`= null`, params only) and a **`Nullable<T>` value type** (`int?`, both params and returns).
+  Both are visible in the signature. What *cannot* be inferred is whether a method's *body*
+  ever returns null — that is not statically decidable — and C# reference types (`string`,
+  class types) carry no nullability in the type. So:
+  - A **`Nullable<T>` parameter or return** (`int?`, `TestEnum?`, …) is nullable implicitly; no
+    `[KRPCNullable]` / `Nullable = true` needed (see the `Nullable<T>` handling below).
+  - A **reference-type return** (`string`, class) must be declared `Nullable = true`; a null
+    return from a procedure not so marked throws (`CheckReturnValue`).
+  - Properties have **no declared default** in the kRPC model (there is no
+    `[KRPCProperty(Default = …)]`), so only the `Nullable<T>` / explicit-flag paths apply. A
+    property **getter is a return** — a reference-typed getter needs explicit
+    `[KRPCProperty(Nullable = true)]`, and a null read from a non-nullable property throws (a C#
+    auto-property that merely holds `null` is runtime state, not a signature fact). A property
+    **setter**'s synthesized `value` parameter takes its nullability from the same property flag
+    (item 6) or from a `Nullable<T>` value type; it can carry neither `[KRPCNullable]` nor a
+    default.
+- **`Nullable<T>` value types.** A parameter or return declared `Nullable<T>` (e.g. `int?`,
+  `float?`, `bool?`, `TestEnum?`) is unwrapped at the scanner: it appears on the wire as its
+  underlying type `T` with `nullable = true` / `return_is_nullable = true`. This is done in
+  `ProcedureParameter(ParameterInfo)` (params) and `ProcedureSignature` (returns) via
+  `System.Nullable.GetUnderlyingType`. Because everything downstream sees `T`, and a boxed
+  `Nullable<T>` is either a boxed `T` or `null` (boxing erases `Nullable<>`), the encoder,
+  decoder, wire-type mapping and value validation need **no** `Nullable<T>`-specific handling —
+  they operate on `T` as usual, and null is carried by `is_null`. The compiled method invoker
+  converts the decoded `T`/`null` back to `Nullable<T>` for the call. The expression API
+  (`Expression.Call`) evaluates a nullable value-type return as `Nullable<T>` so the null is
+  representable (resolving Open question 2). Nested element nullability (`List<int?>`) is out of
+  scope — only top-level parameter/return `Nullable<T>` is unwrapped.
 - **All types nullable.** `is_null` is type-agnostic, so value types (`int`, `float`,
-  `bool`, enums) are nullable when marked, not just reference/class types; generated client
-  signatures reflect this per language (see Client changes).
+  `bool`, enums) are nullable when marked (`[KRPCNullable]`, `Nullable = true`, or a
+  `Nullable<T>` declaration), not just reference/class types; generated client signatures
+  reflect this per language (see Client changes).
 - **Property nullability spans getter and setter.** A `[KRPCProperty(Nullable = true)]`
   makes both the getter's return *and* the setter's argument nullable — the setter's
   synthesized `value` parameter cannot carry `[KRPCNullable]`, so the property flag is its
@@ -250,10 +263,10 @@ collection elements, which needs a new source-level annotation and is out of #84
    - Expression API: the design expected a separate `nullAllowed = ReturnIsNullable &&
      IsAClassType` gate in `Expression.cs`, but no such gate exists — `Expression.Call`
      executes the RPC through `ExecuteCall` → `CheckReturnValue`, so removing the
-     `IsAClassType` gate in `CheckReturnValue` (above) already lets a marked-nullable return
-     of any reference type flow through the expression path. No `Expression.cs` change was
-     needed. Value-type nullable returns through expressions remain Open question 2,
-     unexercised in phase 2.
+     `IsAClassType` gate in `CheckReturnValue` (above) already lets a marked-nullable
+     *reference-type* return flow through the expression path. The one `Expression.cs` change
+     is for nullable *value-type* returns: `Expression.Call` converts the result to
+     `Nullable<T>` so a null value is representable rather than faulting (Open question 2).
 6. **Property setter nullability** (`core/src/Service/Scanner/ServiceSignature.cs`): the
    setter's synthesized `value` parameter is registered non-nullable. Derive its nullability
    from the property's `Nullable` flag instead (the getter already uses `GetNullable(property)`),
@@ -273,9 +286,11 @@ collection elements, which needs a new source-level annotation and is out of #84
 7. **`KRPCNullableAttribute`** (`core/src/Service/Attributes/KRPCNullableAttribute.cs`)
    is already type-agnostic and `ProcedureParameter.cs` already supports null defaults
    (`DBNull.Value` marks *no* default, so `null` is a valid default). The scanner changes are:
-   the setter-nullability plumbing (item 6) and deriving `Nullable` from a null default in the
+   the setter-nullability plumbing (item 6); deriving `Nullable` from a null default in the
    `ProcedureParameter(ParameterInfo)` constructor (the null-default-implies-nullable rule
-   above).
+   above); and unwrapping `Nullable<T>` value-type parameters/returns to their underlying `T`
+   with `nullable`/`return_is_nullable` set, in `ProcedureParameter` and `ProcedureSignature`
+   (the `Nullable<T>` rule above).
 8. **Serialized signature / ServiceDefinitions JSON**
    (`core/src/Service/Scanner/ParameterSignature.cs:62-63`, `GetObjectData`): emit
    `default_value` as JSON `null` when the default is null (today it round-trips the
@@ -462,8 +477,9 @@ the server speaks the new protocol and enforces explicit nullability — **every
 broken until its phase lands.**
 
 > Implementation notes:
-> - No `Expression.cs` change was needed (see item 5) — the expression path routes through
->   `CheckReturnValue`.
+> - The expression path routes reference-type null returns through `CheckReturnValue` (no gate
+>   change needed), and the one `Expression.cs` change makes a nullable value-type return
+>   evaluate as `Nullable<T>` (see item 5, resolves Open question 2).
 > - Property-setter nullability was plumbed by making `ProcedureParameter.Nullable` settable
 >   within the assembly and adding `SetValueParameterNullable()` to **both** handlers —
 >   `ClassMethodHandler` (class properties) and `ProcedureHandler` (service-level properties) —
@@ -475,8 +491,10 @@ broken until its phase lands.**
 >   (`StaticNullableMethod`), nullable **service-level** (static) property (`NullableProperty`,
 >   getter return + setter accepting null), nullable **class** property setter (`ObjectProperty`),
 >   and a parameter made nullable **implicitly by a null default** (`ProcedureOptionalNullArg`,
->   `X x = null` — omit → default null, or pass null explicitly), plus null-rejection tests for
->   the non-nullable counterparts. `EchoTestObject`'s param was marked `[KRPCNullable]` (it relied
+>   `X x = null` — omit → default null, or pass null explicitly), and **`Nullable<T>` value-type**
+>   params+returns implicitly nullable with no marker (`EchoNullableInt` for `int?`,
+>   `EchoNullableEnum` for `TestEnum?` — covering both encoder branches, numeric and enum), plus
+>   null-rejection tests for the non-nullable counterparts. `EchoTestObject`'s param was marked `[KRPCNullable]` (it relied
 >   on the dropped implicit class-nullability). `MessageAssert` gained `HasNullableParameter` and
 >   `HasNullableParameterWithDefaultValue`; `HasParameter` now also asserts *not* nullable.
 >   (There is no "static class property" form to cover — kRPC class properties must be non-static
@@ -520,9 +538,8 @@ dedicated final commit before merging the PR.
 
 1. **cnano nullable-return API shape**: extra out-parameter vs. a new error code — settle
    when implementing phase 6c.
-2. **Nullable value-type returns in the expression API**: phase 2 confirmed reference-type
-   nullable returns flow through the expression path (via `CheckReturnValue`), but no
-   value-type nullable return exists in `core` yet to exercise. `Expression.Call` builds
-   `LinqExpression.Convert(result.Value, returnType)`, which would fault converting a null
-   `Value` to a value type — revisit when a nullable value-type return is first added
-   (phase 3 TestService / phase 6).
+2. **Nullable value-type returns in the expression API** — *resolved (phase 2)*.
+   `Expression.Call` builds `LinqExpression.Convert(result.Value, returnType)`, which would
+   fault converting a null `Value` to a value type; it now converts to `Nullable<T>` when the
+   return is a nullable value type, so the null is representable. Exercised by `EchoNullableInt`
+   / `EchoNullableEnum`.
