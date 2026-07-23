@@ -558,6 +558,29 @@ rules; the shared krpctools JSON-`null`-default handling (`generator.py` / `util
 conformance suites (they read `results[0].value` directly). First end-to-end validation of
 the protocol against the phase-2 server via `TestServer`.
 
+> Implementation notes:
+> - **Shared krpctools:** `decode_default_value` (`utils.py`) returns `None` for a JSON `null`
+>   default; the Python default-value formatter checks `None` before the string case. This
+>   unblocks `clientgen` for *every* language (they all faulted on the null default since phase
+>   2). The other languages' `parse_default_value` already tolerate `None` (C#/C++ emit their
+>   null literal, Java uses overloads, cnano has no defaults), so their golden fixtures could be
+>   regenerated even though their value-type-nullable *signatures* wait for phase 6.
+> - **Python client:** null is signaled purely by `is_null` — `client._invoke` and
+>   `streammanager.update` yield `None` when it is set; `_build_call` sets `is_null` for a `None`
+>   argument. The id-0 class sentinel and the `b"\x00"` collection sentinels are removed from the
+>   decoder, and the `None → id 0` case from the encoder. `service._parse_procedure` keys required
+>   and default on `has_default_value` / `default_value_is_null`.
+> - **A phase-2 gap surfaced here:** the stream write path (`StreamStream.cs`) hand-builds its
+>   `ProcedureResult` for speed and bypasses `ToProtobufMessage`, so it still called
+>   `Encoder.Encode` on a null stream value and crashed the stream server. Fixed to set `is_null`
+>   (committed to `core`). The `test_nullable_stream` case caught it.
+> - **Behavioral change made visible:** passing `None` to a non-nullable parameter (e.g. a
+>   non-nullable collection) now sends `is_null` and is rejected by the server (`RPCError`) rather
+>   than failing a client-side coercion (`TypeError`) — uniform server enforcement. The guarded
+>   nullable setter (`NullableObject`) surfaces the service's `ArgumentNullException` as
+>   `ValueError`. Tests updated; the obsolete id-0 sentinel unit tests were removed.
+> - Golden `clientgen-*`/`docgen-*` fixtures regenerated for all languages.
+
 **Phase 5 — services audit + revert workarounds** (`service/*`, Server changes items 10–11;
 depends only on phase 2). Confirm every null-accepting parameter is nullable (Target*
 covered by the property flag, existing `[KRPCNullable]` params); delete the ~58 redundant
