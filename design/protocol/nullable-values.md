@@ -589,6 +589,27 @@ workarounds — the #824 `LaunchVessel.crew` empty-list hack and its `new List<s
 pass-throughs. In-game SpaceCenter tests (`target_vessel = None` clears, `focussed_vessel =
 None` errors).
 
+> Implementation notes:
+> - **77 guards removed** (the ~58 estimate was low), all on non-nullable class parameters of
+>   `[KRPCMethod]`/`[KRPCProcedure]` methods and non-nullable `[KRPCProperty]` setters — the bulk
+>   being `referenceFrame`/`target`/`vessel`/`body` coordinate-transform and lookup args. **Kept**
+>   guards in constructors, `GetHashCode`/`Equals`, extension methods and private helpers; on the
+>   nullable-property setters `Camera.FocussedBody`/`FocussedVessel` (the enforcement) and
+>   `SpaceCenter.ActiveVessel`; and on tuple-typed (not class) setters. Two files
+>   (`AlarmManager.cs`, `WaypointManager.cs`) kept their `using System;` — still used elsewhere.
+> - **The #824 revert is `[KRPCNullable] IList<string> crew = null`, not an empty-list default.**
+>   The actual workaround (commit "Make LaunchVessel crew … non-optional") had turned a
+>   *null-default nullable* param into a required one; the true revert restores that. Finding 1's
+>   "empty-collection default" label for #824 was imprecise — but phase 2 fixed both null and
+>   empty-collection defaults, and the empty-collection case is separately exercised by phase 3's
+>   `EmptyListDefault`.
+> - **Audit result: no missed markers.** The only candidate found — `ReferenceFrame.CreateHybrid`'s
+>   `rotation`/`velocity`/`angularVelocity` (`= null`) — is already nullable via the
+>   null-default-implies-nullable rule, so it needs no `[KRPCNullable]`. All other null-accepting
+>   params are marked or have null defaults.
+> - Verified in-game: `test_clear_target`, `test_target_body`, `test_target_vessel` (nullable
+>   setters clear the target) and a new `test_focussed_rejects_null` all pass against a live game.
+
 **Phase 6 — remaining clients, one sub-phase each.** Each sub-phase updates that client's
 decode/encode/default handling together with its clientgen generator and golden fixtures,
 and passes its comms suite against the phase-2 server:
