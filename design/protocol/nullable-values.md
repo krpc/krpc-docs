@@ -410,7 +410,10 @@ end of that phase.
 **Phase 1 — protobuf schema.** `protobuf/krpc.proto` (the `is_null`, `has_default_value` and
 `default_value_is_null` fields) plus the matching protocol docs
 (`doc/src/communication-protocols/messages.rst`, per the Documentation section). Fields are
-additive and unused, so the schema regenerates at build time and the tree stays green.
+additive and unused, so the schema regenerates at build time. (One cnano encoder golden test
+does start failing here — cnano builds its `Argument` on an un-zeroed struct, so the new
+`is_null` bool serializes uninitialized memory — but per the phasing that break is expected
+and is fixed when cnano lands in phase 6c.)
 
 **Phase 2 — core server + core tests.** All `core/` changes (Server changes items 1–9):
 Encoder, `MessageExtensions`, `Services.cs` validation, `Expression.cs`, property-setter
