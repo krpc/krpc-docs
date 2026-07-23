@@ -128,6 +128,19 @@ Python 7.35.1, nanopb 0.4.9.1) support `optional`.
   `List<int>`). A nullable collection — like a nullable `string` or class — is therefore declared
   **explicitly** with `[KRPCNullable]` / `Nullable = true`; null then flows through the same
   reference-type `is_null` path, and the collection encoding runs only for non-null values.
+
+  Why the split is principled, and why the scanner does not try to catch `List<int>?`:
+  `Nullable<T>` is a genuine runtime type (`System.Nullable<T>`), present regardless of the
+  `<Nullable>` compiler setting — reliably detectable, so it is honored. A reference-type `?`
+  lives only in `NullableAttribute` metadata, which is unreliable: kRPC compiles in a
+  **nullable-disabled** context (writing `List<int>?` yields compiler warning **CS8632**, an
+  error under CI's `-warnaserror`), where the annotation is oblivious and not dependably emitted.
+  So `List<int>?` cannot be distinguished from `List<int>` at scan time the way a genuinely
+  unsupported type can. **Decision: document, don't detect** — rely on CS8632 plus the explicit
+  markers rather than parsing fragile, compiler-context-dependent NRT metadata. (Contrast: a type
+  kRPC cannot serialize at all — e.g. `Vector3d` — *is* caught, via `IsAValidType` →
+  `ServiceException` at scan time. `List<int>` is a valid type; only its intended nullability is
+  lost, and the compiler warning is the guard.)
 - **All types nullable.** `is_null` is type-agnostic, so value types (`int`, `float`,
   `bool`, enums) are nullable when marked (`[KRPCNullable]`, `Nullable = true`, or a
   `Nullable<T>` declaration), not just reference/class types; generated client signatures
