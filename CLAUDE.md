@@ -9,15 +9,13 @@ and planning notes that do not ship with the mod.
 
  * `design/` — one doc per feature/issue, filed by area: `autopilot/`, `protocol/`, `services/`,
    `build-tools/`. Docs spanning all areas (audits, sweeps) sit in `design/` itself.
- * `PLANNED_WORK.md`, `COMPLETED_WORK.md` — the work index.
 
-## Planned and completed work
+## Tracking work
 
- * Group `PLANNED_WORK.md` items by target release, where possible.
- * Link a GitHub issue or PR (`krpc/krpc`) on every item.
- * GitHub issues should point to the relevant design doc if there is one.
- * On completion, move the section to `COMPLETED_WORK.md`, condensed to one line: what was done,
-   the PR, and the design doc if there is one. Newest first.
+ * Work is tracked on GitHub — issues and pull requests on [`krpc/krpc`](https://github.com/krpc/krpc).
+   This repo holds the design, not the status: there is no planned/completed work index here.
+ * A GitHub issue should point to the relevant design doc if there is one, and each design doc should
+   link its issue or PR.
 
 ## Writing docs here
 
@@ -25,6 +23,10 @@ These are **design** docs — how a feature is meant to work, decided before it 
 
  * Give each doc a status line near the top: proposal, in progress, done (with the PR), or negative
    result.
+ * **Reference issues and PRs by number, never commit SHAs or branch names.** Branches are deleted
+   after merge and SHAs vanish on squash/rebase, so both go stale fast; issue and PR numbers are
+   stable. When a branch has landed, cite the PR that merged it, not the branch or its commits. If
+   you must describe individual commits, use their messages, not their hashes.
  * Keep a doc in step with `krpc` while its feature is being built — say which parts landed, which
    are still open, and where the implementation diverged from the design.
  * Once a feature is fully implemented and merged, treat its doc as a **historical record of the

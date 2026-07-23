@@ -9,12 +9,6 @@ This repo is **not** the kRPC user documentation — that lives in the
 
 ## What is here
 
-| Path | Contents |
-| --- | --- |
-| [`PLANNED_WORK.md`](PLANNED_WORK.md) | In-progress and planned work, grouped by target release |
-| [`COMPLETED_WORK.md`](COMPLETED_WORK.md) | Finished work, one line each, newest first |
-| [`design/`](design) | One design doc per feature or issue, filed by area |
-
 Design docs describe how a feature is meant to work, decided before it is built. Once a feature has
 merged, its doc is a historical record of that design, not a description of the code — the kRPC
 docs and PR history are the source of truth for current behavior.
