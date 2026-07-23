@@ -120,6 +120,14 @@ Python 7.35.1, nanopb 0.4.9.1) support `optional`.
   (`Expression.Call`) evaluates a nullable value-type return as `Nullable<T>` so the null is
   representable (resolving Open question 2). Nested element nullability (`List<int?>`) is out of
   scope — only top-level parameter/return `Nullable<T>` is unwrapped.
+
+  Only *value* types can be `Nullable<T>`. The **collection** types (`List`, `Set`,
+  `Dictionary`, and `System.Tuple<>`) are all **reference** types, so `List<int>?` / `Tuple<…>?`
+  are not `Nullable<>` — the `?` is a C# nullable-reference *annotation*, erased at runtime and
+  not read by the reflection scanner (a bare `List<int>?` would be treated as a non-nullable
+  `List<int>`). A nullable collection — like a nullable `string` or class — is therefore declared
+  **explicitly** with `[KRPCNullable]` / `Nullable = true`; null then flows through the same
+  reference-type `is_null` path, and the collection encoding runs only for non-null values.
 - **All types nullable.** `is_null` is type-agnostic, so value types (`int`, `float`,
   `bool`, enums) are nullable when marked (`[KRPCNullable]`, `Nullable = true`, or a
   `Nullable<T>` declaration), not just reference/class types; generated client signatures
@@ -493,7 +501,9 @@ broken until its phase lands.**
 >   and a parameter made nullable **implicitly by a null default** (`ProcedureOptionalNullArg`,
 >   `X x = null` — omit → default null, or pass null explicitly), and **`Nullable<T>` value-type**
 >   params+returns implicitly nullable with no marker (`EchoNullableInt` for `int?`,
->   `EchoNullableEnum` for `TestEnum?` — covering both encoder branches, numeric and enum), plus
+>   `EchoNullableEnum` for `TestEnum?` — covering both encoder branches, numeric and enum), and
+>   an explicitly-marked **nullable collection** (`EchoNullableList`, `[KRPCNullable] IList<string>`
+>   — collections are reference types, so nullable via marker not `Nullable<T>`), plus
 >   null-rejection tests for the non-nullable counterparts. `EchoTestObject`'s param was marked `[KRPCNullable]` (it relied
 >   on the dropped implicit class-nullability). `MessageAssert` gained `HasNullableParameter` and
 >   `HasNullableParameterWithDefaultValue`; `HasParameter` now also asserts *not* nullable.
