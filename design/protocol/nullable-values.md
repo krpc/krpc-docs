@@ -1,10 +1,10 @@
 # Nullable values and default-value presence (issue #843)
 
-**Status:** in progress (as of 2026-07-24). Phases 1–5 and phase 6a, 6b and 6d (C#, C++, Java)
-implemented — protocol schema, core server + enforcement, TestService fixtures, the Python client
-and shared krpctools path, the SpaceCenter services audit + workaround revert, and the C#, C++ and
-Java clients. The remaining phase 6 sub-phases (6c cnano, 6e Lua) and the final changelog commit
-are pending. Tracked by [issue #843](https://github.com/krpc/krpc/issues/843); each phase's
+**Status:** in progress (as of 2026-07-24). Phases 1–5 and phase 6a, 6b, 6d and 6e (C#, C++,
+Java, Lua) implemented — protocol schema, core server + enforcement, TestService fixtures, the
+Python client and shared krpctools path, the SpaceCenter services audit + workaround revert, and
+the C#, C++, Java and Lua clients. Only phase 6c (cnano) and the final changelog commit remain
+pending. Tracked by [issue #843](https://github.com/krpc/krpc/issues/843); each phase's
 implementation notes are inline under [Implementation phases](#implementation-phases).
 
 ## Context
@@ -624,7 +624,7 @@ nullable *signature* work plus that client's runtime encode/decode changes.)
   - 6b — C++ (`std::optional`) ✅ *Done.*
   - 6c — cnano (nullable-return out-parameter — Open question 1)
   - 6d — Java (boxed `Integer`/`Double`/… value-type nullables) ✅ *Done.*
-  - 6e — Lua
+  - 6e — Lua ✅ *Done.*
 
 > Phase 6a (C#) implementation notes:
 > - **Out-of-band null.** `Connection.Invoke` now returns the `ProcedureResult` (not the raw
@@ -691,6 +691,24 @@ nullable *signature* work plus that client's runtime encode/decode changes.)
 >   id-0 sentinel tests were dropped for a null-encode assertion. The Java client has no default-arg
 >   support (all arguments are required), so the empty-collection default has no Java client test.
 >   Passes against the phase-2 `TestServer`.
+
+> Phase 6e (Lua) implementation notes:
+> - **Out-of-band null.** Lua is dynamically typed with no generated stubs, so this is a
+>   runtime-only change. `client._invoke` returns `Types.none` when the result's `is_null` is set;
+>   `client._build_request` sends `is_null` for a `Types.none` argument (checked before the usual
+>   type validation/coercion, which would otherwise reject it). `service._parse_procedure` reads
+>   `has_default_value` / `default_value_is_null` instead of the `default_value` field's presence,
+>   so a null default becomes `Types.none` and an empty-collection default is distinguished from no
+>   default.
+> - **Null representation.** `Types.none` is the uniform null value for every type (Lua `nil`
+>   cannot be stored in argument lists). The decoder no longer maps object id 0 to `Types.none` or
+>   an empty collection to `nil`, and the encoder no longer emits id 0 for a null class — null is
+>   carried only by `is_null`. Lua has no stream support, so there is no stream change.
+> - **Tests:** the Lua comms suite gained nullable value/string/list returns and arguments, null
+>   rejection on a non-nullable class parameter, the nullable class instance/static methods, the
+>   null-accepting vs null-guarding property setters and the empty-collection default; the retired
+>   id-0 sentinel unit tests were dropped and the service/class member-list assertions updated for
+>   the new procedures. Passes against the phase-2 `TestServer`.
 
 **Final commit — changelogs.** ⏳ *Pending.* Per-component `CHANGELOG.md` entries (repo convention), as the
 dedicated final commit before merging the PR.
