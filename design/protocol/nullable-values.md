@@ -1,9 +1,9 @@
 # Nullable values and default-value presence (issue #843)
 
-**Status:** in progress (as of 2026-07-24). Phases 1–5 and phase 6a (C#) implemented —
+**Status:** in progress (as of 2026-07-24). Phases 1–5 and phase 6a–6b (C#, C++) implemented —
 protocol schema, core server + enforcement, TestService fixtures, the Python client and shared
-krpctools path, the SpaceCenter services audit + workaround revert, and the C# client. The
-remaining phase 6 sub-phases (6b–6e: C++, cnano, Java, Lua) and the final changelog commit are
+krpctools path, the SpaceCenter services audit + workaround revert, and the C# and C++ clients.
+The remaining phase 6 sub-phases (6c–6e: cnano, Java, Lua) and the final changelog commit are
 pending. Tracked by [issue #843](https://github.com/krpc/krpc/issues/843); each phase's
 implementation notes are inline under [Implementation phases](#implementation-phases).
 
@@ -621,7 +621,7 @@ and passes its comms suite against the phase-2 server. (The phase-4 golden regen
 added the new procedures to every language's fixtures; each sub-phase below is the value-type
 nullable *signature* work plus that client's runtime encode/decode changes.)
   - 6a — C# (`T?` value-type nullables) ✅ *Done.*
-  - 6b — C++ (`std::optional`)
+  - 6b — C++ (`std::optional`) ✅ *Done.*
   - 6c — cnano (nullable-return out-parameter — Open question 1)
   - 6d — Java (boxed `Integer`/`Double`/… value-type nullables)
   - 6e — Lua
@@ -647,6 +647,30 @@ nullable *signature* work plus that client's runtime encode/decode changes.)
 >   properties, the null-accepting vs null-guarding property setters, the empty-collection
 >   default and a nullable stream; `EncoderTest`'s retired id-0 sentinel tests were dropped and a
 >   `Nullable<T>` round-trip added. Passes against the phase-2 `TestServer`.
+
+> Phase 6b (C++) implementation notes:
+> - **Out-of-band null.** `Client::invoke` now returns the `ProcedureResult` rather than the raw
+>   value bytes, so a generated call reads `is_null` before decoding. Argument encoding gained a
+>   `krpc::encoder::Value` (encoded bytes + `is_null`); `build_call`/`build_request` take a
+>   `std::vector<encoder::Value>` and set `is_null` on the wire. `StreamImpl` carries an `is_null`
+>   flag (set by `StreamManager` from the update), and `Stream<T>::operator()` / callbacks skip
+>   decoding when it is set.
+> - **`std::optional<T>` for non-class nullables.** Nullable value, string, collection and enum
+>   parameters/returns are generated as `std::optional<T>`; a `decode(std::optional<T>&)` overload
+>   decodes the present value and `encode_nullable(const std::optional<T>&)` maps an empty optional
+>   to `is_null`. **Nullable class** parameters/returns keep their class type: null is the id-0
+>   `Object<T>`, `encode_nullable(const Object<T>&)` maps id 0 to `is_null`, and a null return
+>   leaves the default (id-0) object. The generated `_result` is value-initialized so a null return
+>   is the correct default without an uninitialized read.
+> - **Clientgen** (`cpp.py`/`cpp.tmpl`): the `args` macro emits `encode_nullable` for nullable
+>   parameters; `cpp.py` wraps non-class nullable param/return types in `std::optional` (procedures,
+>   class/static methods, property getters) and the golden `clientgen-TestService-cpp.txt` was
+>   regenerated.
+> - **Tests:** the C++ comms suite gained nullable value/string/list/class returns and arguments,
+>   null rejection on a non-nullable class parameter (an id-0 object the server decodes to null),
+>   the null-accepting vs null-guarding property setters, the empty-collection default and a
+>   nullable stream. (A non-nullable property cannot be passed null in statically-typed C++, so
+>   that case has no C++ test.) Passes against the phase-2 `TestServer`.
 
 **Final commit — changelogs.** ⏳ *Pending.* Per-component `CHANGELOG.md` entries (repo convention), as the
 dedicated final commit before merging the PR.
