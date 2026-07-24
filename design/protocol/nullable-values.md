@@ -1,10 +1,10 @@
 # Nullable values and default-value presence (issue #843)
 
-**Status:** in progress (as of 2026-07-24). Phases 1–5 and phase 6a–6b (C#, C++) implemented —
-protocol schema, core server + enforcement, TestService fixtures, the Python client and shared
-krpctools path, the SpaceCenter services audit + workaround revert, and the C# and C++ clients.
-The remaining phase 6 sub-phases (6c–6e: cnano, Java, Lua) and the final changelog commit are
-pending. Tracked by [issue #843](https://github.com/krpc/krpc/issues/843); each phase's
+**Status:** in progress (as of 2026-07-24). Phases 1–5 and phase 6a, 6b and 6d (C#, C++, Java)
+implemented — protocol schema, core server + enforcement, TestService fixtures, the Python client
+and shared krpctools path, the SpaceCenter services audit + workaround revert, and the C#, C++ and
+Java clients. The remaining phase 6 sub-phases (6c cnano, 6e Lua) and the final changelog commit
+are pending. Tracked by [issue #843](https://github.com/krpc/krpc/issues/843); each phase's
 implementation notes are inline under [Implementation phases](#implementation-phases).
 
 ## Context
@@ -623,7 +623,7 @@ nullable *signature* work plus that client's runtime encode/decode changes.)
   - 6a — C# (`T?` value-type nullables) ✅ *Done.*
   - 6b — C++ (`std::optional`) ✅ *Done.*
   - 6c — cnano (nullable-return out-parameter — Open question 1)
-  - 6d — Java (boxed `Integer`/`Double`/… value-type nullables)
+  - 6d — Java (boxed `Integer`/`Double`/… value-type nullables) ✅ *Done.*
   - 6e — Lua
 
 > Phase 6a (C#) implementation notes:
@@ -671,6 +671,26 @@ nullable *signature* work plus that client's runtime encode/decode changes.)
 >   the null-accepting vs null-guarding property setters, the empty-collection default and a
 >   nullable stream. (A non-nullable property cannot be passed null in statically-typed C++, so
 >   that case has no C++ test.) Passes against the phase-2 `TestServer`.
+
+> Phase 6d (Java) implementation notes:
+> - **Out-of-band null.** `Connection.invoke` now returns the `ProcedureResult`, so calls read
+>   `is_null` before decoding; `StreamManager` does the same for stream updates. `buildCall` sets
+>   `is_null` on an argument whose encoded value is null. `Encoder.encode(null, …)` returns a null
+>   `ByteString` for any type (the class id-0 encode branch is gone), and `decodeObject` no longer
+>   maps id 0 to null (null is signaled by `is_null`, so decode only ever runs for a present value).
+> - **Boxed value-type nullables.** Nullable value-type parameters and return values are generated
+>   as the boxed type (`Integer`, `Double`, `Boolean`, …) so they can hold null; the generated
+>   `return` emits an `if (_data.getIsNull()) return null;` guard for any nullable return. Reference
+>   types (`String`, `byte[]`, classes, enums, collections) carry null naturally and are unchanged.
+> - **Clientgen** (`java.py`/`java.tmpl`): value-type nullable params/returns use `type_map_classes`,
+>   `return_is_nullable` is threaded into the return-type descriptor, and the golden
+>   `clientgen-TestService-java.txt` was regenerated.
+> - **Tests:** the Java comms suite gained nullable value/string/list returns and arguments, null
+>   rejection on a non-nullable class parameter, the nullable class instance/static methods, the
+>   null-accepting vs null-guarding property setters, and a nullable stream; `EncoderTest`'s retired
+>   id-0 sentinel tests were dropped for a null-encode assertion. The Java client has no default-arg
+>   support (all arguments are required), so the empty-collection default has no Java client test.
+>   Passes against the phase-2 `TestServer`.
 
 **Final commit — changelogs.** ⏳ *Pending.* Per-component `CHANGELOG.md` entries (repo convention), as the
 dedicated final commit before merging the PR.
