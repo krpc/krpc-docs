@@ -1,11 +1,11 @@
 # Nullable values and default-value presence (issue #843)
 
-**Status:** in progress (as of 2026-07-23). Phases 1–5 implemented — protocol schema, core
-server + enforcement, TestService fixtures, the Python client and shared krpctools path, and
-the SpaceCenter services audit + workaround revert. Phase 6 (the remaining clients: C#, C++,
-cnano, Java, Lua) and the final changelog commit are pending. Tracked by
-[issue #843](https://github.com/krpc/krpc/issues/843); each phase's implementation notes are
-inline under [Implementation phases](#implementation-phases).
+**Status:** in progress (as of 2026-07-24). Phases 1–5 and phase 6a (C#) implemented —
+protocol schema, core server + enforcement, TestService fixtures, the Python client and shared
+krpctools path, the SpaceCenter services audit + workaround revert, and the C# client. The
+remaining phase 6 sub-phases (6b–6e: C++, cnano, Java, Lua) and the final changelog commit are
+pending. Tracked by [issue #843](https://github.com/krpc/krpc/issues/843); each phase's
+implementation notes are inline under [Implementation phases](#implementation-phases).
 
 ## Context
 
@@ -620,11 +620,33 @@ decode/encode/default handling together with its clientgen generator and golden 
 and passes its comms suite against the phase-2 server. (The phase-4 golden regeneration already
 added the new procedures to every language's fixtures; each sub-phase below is the value-type
 nullable *signature* work plus that client's runtime encode/decode changes.)
-  - 6a — C# (`T?` value-type nullables)
+  - 6a — C# (`T?` value-type nullables) ✅ *Done.*
   - 6b — C++ (`std::optional`)
   - 6c — cnano (nullable-return out-parameter — Open question 1)
   - 6d — Java (boxed `Integer`/`Double`/… value-type nullables)
   - 6e — Lua
+
+> Phase 6a (C#) implementation notes:
+> - **Out-of-band null.** `Connection.Invoke` now returns the `ProcedureResult` (not the raw
+>   `ByteString`), so generated stubs read `is_null` before decoding; `StreamManager` does the
+>   same for stream updates. Argument building sets `Argument.is_null` when the encoder yields a
+>   null `ByteString`. The legacy id-0 sentinel is gone from both the encoder (`null` argument →
+>   `is_null`, not `WriteUInt64(0)`) and decoder (a class value is always instantiated; null is
+>   never carried in the value bytes).
+> - **`Nullable<T>` handling is localized.** `Encoder.Encode`/`Decode` unwrap `Nullable<T>` to `T`
+>   (`Nullable.GetUnderlyingType`), so the generated signature can be `int?` while `typeof(int?)`
+>   still encodes/decodes as `int`; the generated `return` emits an `if (_result.IsNull) return
+>   null;` guard for any nullable return (value or reference type). Only genuine value types and
+>   enums gain the `?`; `string`, `byte[]`, classes and collections stay as-is and carry null
+>   naturally.
+> - **Clientgen** (`csharp.py`/`csharp.tmpl`): value-type nullable params/returns get the `?`
+>   suffix, `return_is_nullable` is threaded per member (procedures, class/static methods,
+>   property getters), and the golden `clientgen-TestService-csharp.txt` was regenerated.
+> - **Tests:** the C# comms suite (`ConnectionTest`/`StreamTest`) gained nullable
+>   value/string/list/class returns and arguments, null-rejection on non-nullable params and
+>   properties, the null-accepting vs null-guarding property setters, the empty-collection
+>   default and a nullable stream; `EncoderTest`'s retired id-0 sentinel tests were dropped and a
+>   `Nullable<T>` round-trip added. Passes against the phase-2 `TestServer`.
 
 **Final commit — changelogs.** ⏳ *Pending.* Per-component `CHANGELOG.md` entries (repo convention), as the
 dedicated final commit before merging the PR.
