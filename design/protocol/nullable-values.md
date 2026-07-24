@@ -1,11 +1,11 @@
 # Nullable values and default-value presence (issue #843)
 
-**Status:** in progress (as of 2026-07-24). Phases 1–5 and phase 6a, 6b, 6d and 6e (C#, C++,
-Java, Lua) implemented — protocol schema, core server + enforcement, TestService fixtures, the
-Python client and shared krpctools path, the SpaceCenter services audit + workaround revert, and
-the C#, C++, Java and Lua clients. Only phase 6c (cnano) and the final changelog commit remain
-pending. Tracked by [issue #843](https://github.com/krpc/krpc/issues/843); each phase's
-implementation notes are inline under [Implementation phases](#implementation-phases).
+**Status:** in progress (as of 2026-07-24). Phases 1–6 implemented — protocol schema, core server
++ enforcement, TestService fixtures, the Python client and shared krpctools path, the SpaceCenter
+services audit + workaround revert, and every client (C#, C++, Java, Lua, cnano). Only the final
+changelog commit remains pending. Tracked by
+[issue #843](https://github.com/krpc/krpc/issues/843); each phase's implementation notes are
+inline under [Implementation phases](#implementation-phases).
 
 ## Context
 
@@ -419,10 +419,22 @@ write it as a wire sentinel.
   natural here).
 - Class types: null is signaled by `is_null` on the wire and represented as
   `krpc_object_t` 0 (`types.h:26`) in-memory.
-- Non-class nullable returns: generated stubs (`clientgen/cnano.tmpl:22-35`) for
-  procedures with `return_is_nullable` take an extra `bool * returnValueIsNull`
-  out-parameter (exact shape to settle at implementation; cnano templates currently
-  ignore nullability entirely).
+- Non-class nullable returns (value, string, collection): generated stubs for procedures
+  with `return_is_nullable` take an extra `bool * returnValueIsNull` out-parameter, inserted
+  immediately after `returnValue`. It is set `true` when the result is null and `*returnValue`
+  is then left untouched; like `returnValue` it may be passed `NULL` if the caller does not
+  need it. A uniform flag (rather than a per-type in-band sentinel) is used so a null return
+  is distinguishable from an empty collection or an empty string. **Class** nullable returns
+  keep the existing `krpc_object_t` out-parameter and signal null as `KRPC_NULL` (0) — no
+  extra parameter, no change to existing nullable-class procedures. (Resolves Open question 1;
+  the new-error-code alternative was rejected because a null result is a valid value, not an
+  error, and would trip `KRPC_CHECK`.)
+- Nullable **arguments**: every non-class nullable argument is a pointer, where `NULL` means
+  null. String and collection arguments are already pointers (`const char *`,
+  `const krpc_..._t *`), so they need no signature change; a nullable **value-type** argument
+  (`int?`, `float?`, `bool?`, enum) changes from by-value to `const T *`. A null argument is
+  encoded as `is_null` with the value unset. **Class** nullable arguments pass `KRPC_NULL` (0),
+  also encoded as `is_null`.
 
 ### clientgen / krpctools (`tools/krpctools/`)
 
@@ -622,7 +634,7 @@ added the new procedures to every language's fixtures; each sub-phase below is t
 nullable *signature* work plus that client's runtime encode/decode changes.)
   - 6a — C# (`T?` value-type nullables) ✅ *Done.*
   - 6b — C++ (`std::optional`) ✅ *Done.*
-  - 6c — cnano (nullable-return out-parameter — Open question 1)
+  - 6c — cnano (nullable-return out-parameter — Open question 1) ✅ *Done.*
   - 6d — Java (boxed `Integer`/`Double`/… value-type nullables) ✅ *Done.*
   - 6e — Lua ✅ *Done.*
 
@@ -710,13 +722,45 @@ nullable *signature* work plus that client's runtime encode/decode changes.)
 >   id-0 sentinel unit tests were dropped and the service/class member-list assertions updated for
 >   the new procedures. Passes against the phase-2 `TestServer`.
 
+> Phase 6c (cnano) implementation notes:
+> - **Out-of-band null.** The result's `is_null` is read from the decoded `ProcedureResult`
+>   (`krpc_result_t.message.is_null`); the value callback fires only when the value field is
+>   present, so a null result leaves the buffer empty and is never decoded. `krpc_add_argument`
+>   now sets `is_null = false` explicitly (the argument array is caller-allocated and was
+>   previously left uninitialized — the phase-1 encoder golden-test break), and a new
+>   `krpc_add_null_argument` sets `is_null = true` with the value callback left unset.
+> - **Return shape** (resolved Open question 1). Non-class nullable returns take an extra
+>   `bool * returnValueIsNull` out-parameter after `returnValue`, set from `is_null`; it may be
+>   `NULL` if unwanted, and the value is decoded only when not null. Class nullable returns are
+>   unchanged — null is `KRPC_NULL` (0) in the `krpc_object_t` out-parameter.
+> - **Argument shape.** Each non-class nullable argument is a pointer where `NULL` means null:
+>   string and collection arguments are already pointers (unchanged), and a nullable value-type
+>   argument changes from by-value to `const T *`. Class nullable arguments pass `KRPC_NULL`.
+>   The generated stub adds a null argument when the pointer is `NULL` (or the object is
+>   `KRPC_NULL`), otherwise encodes the value as before.
+> - **Clientgen** (`cnano.py`/`cnano.tmpl`): `generate_context_parameters` marks nullable
+>   parameters (null-check expression, and the pointer type for value-type/enum args); return
+>   types are annotated with `nullable`/`is_class`; the `return` and `parameters` macros emit the
+>   `returnValueIsNull` out-parameter and the `KRPC_NULL` vs flag handling. The golden
+>   `clientgen-TestService-cnano.txt` was regenerated. The object-id encode/decode primitives are
+>   unchanged (id 0 ↔ `KRPC_NULL`), so their unit tests stand.
+> - **Tests:** the cnano comms suite gained nullable value/string/list returns and arguments,
+>   null rejection on a non-nullable class parameter, the nullable class instance/static methods,
+>   and the null-accepting vs null-guarding property setters. The C client has no default-argument
+>   support, so the empty-collection default has no cnano client test. Passes against the phase-2
+>   `TestServer`; the previously-failing encoder golden test now passes.
+
 **Final commit — changelogs.** ⏳ *Pending.* Per-component `CHANGELOG.md` entries (repo convention), as the
 dedicated final commit before merging the PR.
 
 ## Open questions
 
-1. **cnano nullable-return API shape**: extra out-parameter vs. a new error code — settle
-   when implementing phase 6c.
+1. **cnano nullable-return API shape** — *resolved (2026-07-24)*. Non-class nullable returns
+   take an extra `bool * returnValueIsNull` out-parameter (set true on null); the new-error-code
+   alternative was rejected because null is a valid value, not an error, and would trip
+   `KRPC_CHECK`. Nullable value-type **arguments** become `const T *` (NULL = null), matching the
+   string/collection arguments that are already pointers; class nulls use `KRPC_NULL` (0). See the
+   [cnano client changes](#cnano-clientcnano).
 2. **Nullable value-type returns in the expression API** — *resolved (phase 2)*.
    `Expression.Call` builds `LinqExpression.Convert(result.Value, returnType)`, which would
    fault converting a null `Value` to a value type; it now converts to `Nullable<T>` when the
