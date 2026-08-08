@@ -1,7 +1,17 @@
 # Object lifetime, destroyed objects and object-store reclamation
 
-**Status:** in progress. Everything below is built, on a branch whose history is being restructured
-into the phases below; no PR is raised yet. The approach was agreed
+**Status:** in progress. Every phase below is built, on a branch whose history is being
+restructured into those phases; no PR is raised yet. Phases 7 to 14, which give the rest of
+SpaceCenter and every other service the same treatment, are one commit each, with the tests for
+what they change, and are covered more thinly than the phases before them; see
+[The tests the later phases land](#the-tests-the-later-phases-land). The editor scene API this
+work builds on landed in [#1038](https://github.com/krpc/krpc/pull/1038)
+(see [services/editor-scene-api.md](services/editor-scene-api.md)), so this design also has to
+answer for the vessel under construction, which is a second kind of thing a part can belong to.
+See [The vessel in the editor](#the-vessel-in-the-editor); it settles the reload half of the
+follow-up that document leaves open. The branch is stacked on the user interface controls work,
+which has no PR yet either, and which adds the controls and the layout objects that [UI](#ui) has
+to answer for. The approach was agreed
 on [PR #894](https://github.com/krpc/krpc/pull/894), whose own branch predates that discussion and is
 not the implementation. Covers issues
 [#885](https://github.com/krpc/krpc/issues/885),
@@ -33,6 +43,19 @@ game object. That single decision causes four reported problems:
 Proxies that already store an id and re-derive (`Vessel`, `Part`, `Resource`, `Propellant`,
 `CrewMember`) do not have the access bug, but they still accumulate in the object store forever.
 
+The same two causes run through every other service, and through the SpaceCenter classes the four
+reports do not name. None of those is in a report, and half of them take a mod to reach at all, but
+the code is the same shape: a captured `PartModule` behind an InfernalRobotics servo, a captured
+alarm in KerbalAlarmClock, a captured contract, waypoint and comm link in SpaceCenter, a captured
+`GameObject` behind every Drawing and UI object. Two are worse than anything in SpaceCenter, because
+they are keyed on an object the game or the wrapper builds afresh on every read, so the store takes
+an entry per call rather than per game object, and two objects for one thing never compare equal:
+
+| Where | What is keyed on a per-call object |
+|---|---|
+| `InfernalRobotics.Servo`, `InfernalRobotics.ServoGroup` | the wrapper `IRWrapper` allocates for each servo and group every time one is listed, compared with `==` on an interface type, which is reference equality |
+| `UI.RectTransform` | built fresh from `GetComponent` on every read of any `RectTransform` property, and it defines no equality at all |
+
 Two independent halves, and both must be solved:
 
 1. **Access.** Every proxy access must either reach the game state that currently represents its
@@ -44,12 +67,20 @@ Two independent halves, and both must be solved:
 In scope:
 
 * `KRPC.Service.ObjectStore` and the core service infrastructure
-* The SpaceCenter proxies for parts, part modules, vessels, maneuver nodes, comm nodes and reference frames.
+* The SpaceCenter proxies for parts, part modules, vessels, maneuver nodes, comm nodes and reference
+  frames, which is where the four reported issues are.
+* Everything else SpaceCenter hands out that the game can destroy: its alarms, contracts, waypoints,
+  comm links and close approaches. See [The rest of SpaceCenter](#the-rest-of-spacecenter).
+* Every other service that hands out proxies: Drawing, UI, RemoteTech, InfernalRobotics,
+  KerbalAlarmClock, LiDAR and DockingCamera. See [The other services](#the-other-services). This
+  includes proxies for objects kRPC itself creates and the client explicitly removes, which the game
+  destroys anyway when it takes the scene away.
 
 Out of scope:
 
-* Other proxies are left as is, and maintain their existing behavior.
-* Proxies for objects that kRPC itself creates and the client explicitly removes (Drawing, UI).
+* Proxies that stand for nothing in the game: the `KRPC` service's own `Expression` and `Type`, and
+  the classes listed under [Deliberately not covered](#deliberately-not-covered) and
+  [What the other services leave out](#what-the-other-services-leave-out).
 * The protocol change once considered for [#877](https://github.com/krpc/krpc/issues/877). See
   [protocol/stream-invalidation.md](protocol/stream-invalidation.md); the granular error-per-stream
   design agreed there needs nothing from this work beyond the exception itself.
@@ -256,6 +287,13 @@ The generation has to move at the boundary itself; the sweep must not. For examp
 change starts the game's vessel list is empty, and it fills over the following frames. A sweep
 must run after the vessel list has stabilized.
 
+"Stabilized" is a count that has stopped changing, since the game offers no event for having
+finished. In an editor the vessel list is beside the point and is empty on a save with nothing in
+flight; what settles there is the part count of the vessel the editor has open, which is rebuilt a
+part at a time in the same way. Without that, a sweep landing in the middle of a craft being
+reloaded would see every part of it as absent and drop the proxies for the very parts about to
+come back.
+
 Destruction events ask for a sweep, but do not move the generation on. Nothing has been rebuilt, so
 nothing a proxy resolved before the event has to be resolved again. One sweep also covers a whole
 vessel coming apart, which destroys many parts in a single moment.
@@ -451,6 +489,11 @@ and cannot be removed. That is why the hash rule is a rule and not a preference.
 | the `GameObjectState` properties | **service layer** | which persistent forms a game keeps, and so which state a proxy is in, is the service's to decide |
 | `CachedObject<T>` | **service layer**, typed on `UnityEngine.Object` | a core version has to call back into the service to test the object, which costs an indirection on the hottest path in the mod |
 | `ModuleRef` | SpaceCenter | KSP specific |
+| `ClientOwnedObjects.RemoveDestroyed` | server assembly | it is one more operation on the collection every addon holding client-owned state already uses, and only that assembly and the services see both it and `IGameObjectState` |
+
+`CachedObject<T>` and `ModuleRef` stay internal to SpaceCenter. No other service resolves anything
+of its own: each reaches the game through a `Part` or a `Vessel`, which is public and does its own
+resolving and caching.
 
 ## SpaceCenter implementation
 
@@ -464,7 +507,7 @@ on purpose.
 | Kind | Proxy classes | Identity | Resolved by |
 |---|---|---|---|
 | [vessel](#vessels) | `Vessel` | the game's vessel id, a `Guid` | a search of every vessel in the game, loaded or not |
-| [part](#parts) | `Part` | the part's flight id | a search of the parts of every loaded vessel |
+| [part](#parts) | `Part` | the part's flight id in flight, its craft id in the editor | a search of the parts of every loaded vessel, or of the vessel the editor has open |
 | [part module](#part-modules) | `Module` and ~28 module proxies (`Engine`, `Parachute`, `Thruster`, `Experiment`, `ResourceConverter`, `Antenna`, `Sensor`, `Light`, ...) | its part, the module's class name, and which occurrence of that class it is | the module found last, or `part.Modules[id]` for the id the game knows it by, or counting the part's modules of the class |
 | [field, event, action](#a-modules-fields-events-and-actions) | `PartField`, `PartEvent`, `PartAction`, `ActionGroupAction` | its module, and the name the game gives it | a lookup by name on the module, or nothing at all for the record of one assigned to an action group |
 | [named against a vessel or a part](#anything-named-against-a-vessel-or-a-part) | the parts collections, `AutoPilot`, `Control`, `Comms`, `Flight`, `Orbit`, `Resources`, `Resource`, `Propellant`, `Stage`, `ResourceTransfer` | that vessel's or part's identity, plus whatever picks it out among its siblings: a resource id, a stage number | resolving the owner |
@@ -499,6 +542,101 @@ what is left: no live part and no snapshot.
 
 A failed lookup returning null, with every member then dereferencing it, is the `Part` half
 of #885. Resolving, classifying the failure and throwing for it is what closes it.
+
+A part in the editor is a different game object reached through the same proxy, and is identified
+and classified differently; see [The vessel in the editor](#the-vessel-in-the-editor). `PartId`
+holds which of the two a proxy names, so `Part` itself only caches and throws.
+
+### The vessel in the editor
+
+The editor holds one `ShipConstruct`, which is not a `Vessel` and whose parts have no flight id:
+the game assigns one only when a vessel is launched. What it does give them is a **craft id**,
+which it writes into the craft file and restores whenever it builds the vessel again, so the id
+outlives the reload and the undo that both destroy every part and build them anew. A proxy taken
+in the editor names its part by that, and one taken in flight names its part by the flight id;
+neither id means anything in the other scene, so `PartId` records which kind it holds and resolves
+accordingly.
+
+The id outliving the rebuild is not by itself enough to name a part, because it says nothing about
+which vessel it belongs to; see [Which vessel a craft id belongs to](#which-vessel-a-craft-id-belongs-to).
+That is what separates the undo, where the proxy keeps working, from the reload, where it does
+not.
+
+There is no dormant state in the editor. The editor has exactly one vessel and no persistent form
+of anything outside it, so a part it does not have is **destroyed**, not out of range, and leaving
+the editor destroys the vessel and everything in it. The one uncertainty is an editor that has not
+finished starting up and has no vessel yet, which says nothing about any part and is dormant, per
+the bias in [Classification](#classification-live-dormant-and-destroyed).
+
+`EditorExtensions` answers in one place what the game holds for the vessel in the editor, which
+vessel that is, and how to reach it.
+
+| Situation | State |
+|---|---|
+| the editor has the part in the vessel the proxy was taken from | live |
+| the editor has that vessel, and the part is not in it | destroyed |
+| the editor has loaded another vessel over the one the proxy was taken from | destroyed |
+| an undo or redo has rebuilt the vessel, and it still has the part | live |
+| an undo or redo has rebuilt the vessel without the part | destroyed |
+| an editor scene is loaded but has no vessel yet | dormant |
+| no editor scene is loaded | destroyed |
+
+#### Which vessel a craft id belongs to
+
+A craft id is unique only within one vessel, and it is saved into the craft file, so a craft file
+saved from another carries its ids over. That makes a clash between two vessels the normal case
+rather than a remote one: across the 44 craft in `service/SpaceCenter/test/craft`, 50 craft ids
+appear in more than one file, and **every one of those names a different part in each**.
+`ActionGroups.craft` was saved from `Basic.craft` and carries all nine of its ids. Resolving by
+craft id alone, a proxy taken in one and used after the other is loaded silently returns the part
+of the new vessel that answers to the old id, with nothing to say the answer came from a vessel the
+client never asked about. This was confirmed in game before it was fixed.
+
+So a proxy taken in the editor also records **which vessel** it was taken from, as
+`EditorExtensions.ShipGeneration`, and a part of any earlier vessel is destroyed rather than
+resolved. What counts as a new vessel is the `ShipConstruct` object being a different one, read
+from the game rather than waited for as an event, with one exception below for undo.
+
+##### Why not the persistent id
+
+`persistentId` is the game's own globally unique part id, it is in the craft file too, and it is a
+far better discriminator: of the 44 craft, 9 persistent ids appear in more than one file and **none
+of them names a different part**. It cannot be used, because the game regenerates it every time it
+builds a ship: measured in game, a part keeps its craft id across a reload 9 times out of 9, and
+its persistent id 0 times out of 9. An id that changes whenever the vessel is rebuilt cannot name a
+part across a rebuild at all.
+
+##### Undo is not a new vessel
+
+An undo, and a redo, restore the vessel from the game's own backup rather than from a craft file,
+and hand back a `ShipConstruct` of their own: measured in game, the vessel object is a different
+object afterwards. The parts it builds carry the craft ids they had, so a part the undo did not
+touch is the same part. Treating the object changing as a new vessel would therefore throw away
+every part proxy on every undo, which is exactly what a script editing a vessel cannot afford.
+
+`EditorShipAddon` hears `onEditorUndo`, `onEditorRedo` and `onEditorRestoreState` and marks the
+next vessel as restored rather than new, so the generation adopts it without moving on. A part the
+undo took away is then simply not in the vessel and is destroyed by the ordinary rule; nothing has
+to know which parts an undo affected. Parts are not expected to survive an undo followed by a redo.
+
+The handlers are **instance** methods, and have to be. `EventData.Add` wraps the delegate in an
+`EvtDelegate` whose constructor reads the target the delegate was made over and raises a null
+reference when there is none, which throws out of whatever registered it. A static handler
+therefore looks from the outside exactly like an event that never fires, and that, rather than
+anything about the events themselves, is what made an earlier attempt here appear to hear nothing.
+
+##### The trade this forces
+
+An id that survives a rebuild has to come from the craft file; an id that cannot clash has to come
+from the running game. No id is both, and no structural check separates the two cases either:
+`Basic` and `ActionGroups` have the same nine parts, with the same names, the same craft ids and
+the same tree, differing only in action group configuration. There is nothing to compare.
+
+So a part of a vessel the editor has loaded another vessel over is **destroyed**, whether or not
+the vessel loaded was the same craft file. Nothing tells a reload from a replacement, and the safe
+answer is the same for both. Reloading a craft therefore invalidates the part proxies taken before
+it, which is the reload half of the follow-up left open by
+[services/editor-scene-api.md](services/editor-scene-api.md), settled against surviving the reload.
 
 ### Part modules
 
@@ -580,9 +718,18 @@ exactly as live, dormant or destroyed as the vessel or part it was reached throu
 resolves by resolving that owner and then picking itself out with a resource id, a stage number or
 nothing at all.
 
-`Stage` holds a `Vessel` proxy rather than the KSP vessel, so its identity is a vessel id and
-resolving is the vessel's job. Reading `.id` off a captured Unity object inside `Equals` is the one
-thing [Identity](#identity) forbids.
+`Stage` names its vessel by id rather than holding the KSP vessel, so resolving is a lookup by
+that id. Reading `.id` off a captured Unity object inside `Equals` is the one thing
+[Identity](#identity) forbids. As built it holds the id itself rather than a `Vessel` proxy: the
+editor scene work had already moved it off the KSP vessel and onto an id, so that a stage of the
+vessel under construction could be told from a stage of a vessel in flight.
+
+Three of these can be named against the vessel in the editor instead: the parts collection,
+`Resources` and `Stage`. That vessel has no id, so each carries a flag saying it is the editor's
+and takes its state from [The vessel in the editor](#the-vessel-in-the-editor) rather than from a
+vessel lookup. Judging them by an absent vessel id would find no such vessel and drop every one of
+them at the first sweep. `Resources` has a third case, a single part's, which answers from that
+part; that one is a plain bug, and applies in flight as much as in the editor.
 
 `ResourceTransfer` is the one of these that runs on its own. Its update is driven by the game's
 fixed update rather than by a client call, so there is nobody to raise the exception at, and it
@@ -668,8 +815,286 @@ would ever be swept.
 | `CelestialBody` | bodies are never destroyed and the set is bounded |
 | `ConfigNode` | a part's configuration comes from the game's part database, which is built once at startup and not torn down with any game state |
 | `Camera`, `AlarmManager`, `ContractManager`, `WaypointManager` | one instance each |
-| `Alarm`, `Contract`, `ContractParameter`, `Waypoint`, `LaunchSite`, `CommLink`, `ClosestApproach` | outside the scope above; each is worth revisiting on its own evidence |
-| `Force` | kRPC creates it and the client removes it, like the Drawing and UI proxies |
+| `LaunchSite` | named by a string and built from values, so the store dedups it already, and the game's list of sites is bounded and outlives any game state |
+
+`Alarm`, `Contract`, `ContractParameter`, `Waypoint`, `CommLink` and `ClosestApproach` were on that
+list while the work stopped at what a client reaches through a vessel or a part.
+[The rest of SpaceCenter](#the-rest-of-spacecenter) covers them. `Force` was on it as an object kRPC
+creates and the client removes;
+[Objects kRPC creates for a client](#objects-krpc-creates-for-a-client) covers it with the Drawing
+and UI objects it is shaped like.
+
+## The rest of SpaceCenter
+
+[SpaceCenter implementation](#spacecenter-implementation) covers what a client reaches through a
+vessel or a part. What is left is the records the game keeps for the loaded game rather than for any
+vessel, and two objects that are defined against others.
+
+| Kind | Proxy classes | Identity | Resolved by |
+|---|---|---|---|
+| [alarm](#alarms) | `Alarm` | the alarm's id, a `uint` the game writes into the save | asking the alarm scenario for the id |
+| [contract](#contracts) | `Contract` | the contract's guid, which the game writes into the save | a search of the contracts the system lists, running and finished |
+| [contract parameter](#contracts) | `ContractParameter` | its contract, and the indices that lead to it | walking the contract's parameters from the top |
+| [waypoint](#waypoints) | `Waypoint` | the waypoint's navigation id, a `Guid` it is given when it is built | a search of the waypoint manager's list |
+| [comm link](#comm-links) | `CommLink` | the vessel whose control path it is a hop in, and the two nodes it joins | a walk of that vessel's control path as it stands |
+| [close approach](#close-approaches) | `ClosestApproach` | the two orbits and the time, all held as values | nothing to resolve; its orbits resolve |
+
+### Alarms
+
+`Alarm` already looks its alarm up by id on each access, and the id is durable: `AlarmTypeBase`
+writes it out and reads it back, which is why it also survives the game destroying and rebuilding an
+alarm when the player edits one. Two things are missing. A lookup that finds nothing leaves the
+object using the alarm it found last, so an alarm the game no longer has still answers, out of a
+game state that may since have been replaced. And nothing classifies the object, so it stays in the
+store for the session.
+
+One change covers both: resolve by id on every access and take finding nothing as the answer. Live
+while the scenario has an alarm with the id, destroyed once it does not, and dormant while there is
+no scenario to ask.
+
+`Remove` then leaves the object destroyed for the sweep to reclaim, rather than nulling the alarm it
+holds and reporting an invalid operation from every member afterwards.
+
+### Contracts
+
+A contract is keyed on `ContractID`, read off the captured contract every time the object is hashed,
+which is what [Identity](#identity) forbids: hashing must not dereference anything. That much is
+survivable, since a contract is a plain object that nothing can Unity-destroy, but what it holds is
+not. The contract system builds new contract objects when a game is loaded, so a proxy taken before
+a quickload reports the state of a contract in a game that is no longer loaded, which is #764 again
+with nothing about parts in it.
+
+The contract's guid is the identity instead, held as a value: the game writes it into the save and
+reads it back, and it is what `ContractSystem.GetContractByGuid` looks up. That method searches the
+running contracts only, and kRPC hands out objects for finished contracts too, so resolving searches
+both lists. Live while a contract answers to the guid, destroyed once none does, and dormant while
+there is no contract system, which is every game without contracts and every moment between states.
+
+A `ContractParameter` is keyed on the parameter object itself. A parameter has no id of its own, but
+the game reaches one the same way twice: a contract's parameters are an ordered list, and each
+parameter's children are another, so the indices that lead to a parameter name it. The object holds
+its contract and that path, resolves by walking it, and is as alive as its contract, plus destroyed
+when the path no longer leads anywhere.
+
+### Waypoints
+
+A waypoint gets a `navigationId`, a `Guid`, in its constructor, and it is the only thing that names
+one, so the object holds it and searches the manager's list. Live while the list has it, destroyed
+once it does not, dormant while there is no waypoint manager.
+
+What survives a load is worth saying out loud, because little of it does. The game saves the id only
+for the waypoints registered with `ScenarioCustomWaypoints`, and this service creates its own through
+`WaypointManager.AddWaypoint`, which does not register them, so a waypoint a client created does not
+outlive the game state it was created in. A contract waypoint is rebuilt by the contract that owns
+it, with a fresh id where the saved one does not survive. Either way a load can leave the object
+standing for nothing, which it then reports; nothing else names a waypoint, so that is the honest
+answer rather than a choice.
+
+`Remove` leaves the object holding a waypoint the manager no longer has, and every member then
+writes through to it, changing a waypoint that is not in the game. Classification is what makes that
+raise instead.
+
+### Comm links
+
+A `CommLink` holds the game's link object, which is a hop in a vessel's control path. What matters
+about that path is that it is a **deep copy**: `Path.CopyTo` clears the vessel's path and builds a
+new link object per hop, carrying over the two nodes and the cost, and the signal strength and hop
+type are then written onto the copies. The game does that every time it works out the vessel's
+connection. So the object a client is given stands for one hop at one moment:
+
+* a client streaming `signal_strength` reads the value the hop had when it asked for the object,
+  for as long as it holds it, because the link it holds is not the one the game is updating;
+* every read of `ControlPath` gives objects the store has never seen, so a client polling it grows
+  the store without bound.
+
+The vessel and the two nodes are the identity, the nodes held the way [Comm nodes](#comm-nodes)
+holds one, and the hop is found by walking that vessel's control path. Nothing else identifies it:
+the network's own edge between the two nodes is a different object, carrying none of the per-path
+values a client reads a link for. The three states fall out of that:
+
+| Situation | State |
+|---|---|
+| the path takes the hop | live |
+| the vessel and both nodes are there, and the path does not take the hop | dormant: a path that has lost contact takes the hop again when the two are in range, and nothing has been destroyed |
+| the vessel, or either node, is destroyed | destroyed |
+
+### Close approaches
+
+A `ClosestApproach` is a snapshot of values plus the two `Orbit` objects it was computed for, and it
+already compares by value, so the store dedups it. It needs the state getter alone, `LeastAlive` of
+its two orbits, exactly as a reference frame combines what it is defined against.
+
+## The other services
+
+Every other service that hands out proxies is covered. Between them they need one piece of shared
+infrastructure, for the objects kRPC creates, and nothing else: what the rest need is a state getter
+and, in two cases, an identity that is not a per-call object.
+
+| Service | Proxy classes | Stands for | Identity |
+|---|---|---|---|
+| [Drawing](#drawing) | `Line`, `Polygon`, `Text`, `NavballMarker` | a drawing kRPC made in the scene | itself |
+| [UI](#ui) | `Canvas`, `Panel`, `Text`, `Button`, `InputField` | an interface element kRPC made | itself |
+| [UI](#ui) | `RectTransform` | the Unity rect transform of one of those | that transform |
+| [RemoteTech](#remotetech) | `Antenna` | a part carrying `ModuleRTAntenna` | its part |
+| [RemoteTech](#remotetech) | `Comms` | a vessel's communications | its vessel |
+| [InfernalRobotics](#infernalrobotics) | `Servo` | a part carrying `ModuleIRServo_v3` | its part |
+| [InfernalRobotics](#infernalrobotics) | `ServoGroup` | the servos of a vessel sharing a group name | its vessel and that name |
+| [KerbalAlarmClock](#kerbalalarmclock) | `Alarm` | an alarm Kerbal Alarm Clock holds | the alarm's id, a string |
+| [LiDAR](#lidar-and-dockingcamera) | `Laser` | a part carrying `LiDARModule` | its part |
+| [DockingCamera](#lidar-and-dockingcamera) | `Camera` | a part carrying `PartCameraModule` | its part |
+
+None of these services owns anything the game rebuilds under an id of its own, so none of them needs
+a cached resolve, a module reference or any other piece of
+[the SpaceCenter infrastructure](#where-each-piece-lives). What they reach the game through is a
+`Part` or a `Vessel`, which already resolves, classifies itself and is public.
+
+### Objects kRPC creates for a client
+
+Drawing objects, UI objects and SpaceCenter's `Force` are one kind of thing: one client owns each of
+them, the client removes it, and an addon holds it in a `ClientOwnedObjects` collection and walks
+that collection every frame. They were left out on the grounds that a client removes what it
+created, which is half true. The other half is that something else removes it first, in four ways:
+the service's `Clear`, the addon releasing what a disconnected client owned, the addon clearing
+everything when the scene changes, and, for a force, the part it is applied to being destroyed.
+
+A drawing and an interface element are a game object kRPC made, so each is its own identity and
+classifies itself from what it holds: live while its `GameObject` is not Unity-destroyed, destroyed
+once it is, and no dormant state, because nothing rebuilds a client's line or panel. It also
+records having been taken out, because the game tears a game object down at the end of the frame
+rather than at once, and an object the client has removed should not answer for the rest of that
+frame. A `Force` is not a game object at all. It is an instruction naming a part, so it takes its
+part's state, dormant included.
+
+What they share is the frame loop, and that is the one piece of infrastructure the other services
+need. It goes where `ClientOwnedObjects` already lives:
+
+| Piece | Where | Does |
+|---|---|---|
+| `ClientOwnedObjects.RemoveDestroyed` | server assembly, `KRPC.Utils` | drops the entries whose object is an `IGameObjectState` reporting destroyed, without running the release action: there is nothing left to tear down |
+| the addons' update loops | each service | call it, and then act only on what is live |
+
+`Force` is what makes this more than tidiness. `PartForcesAddon` applies every force in its
+collection on every fixed update, through `Part.InternalPart`, so a force on a part the game has
+destroyed throws out of the physics step, every step, with no client call to attribute it to. That
+is the `ResourceTransfer` problem in another addon, and it gets the same answer: a destroyed part
+takes the force with it, and an unloaded part, which has no rigidbody to push, makes it wait. A
+reference frame that is not live makes it wait too, on the same grounds as a drawing's: a frame is a
+settable property, so the client can point the force at another one. It also answers the
+`// TODO: delete the object` on `Force.Remove`, which is the object store never letting go.
+
+### Drawing
+
+`Line`, `Polygon`, `Text` and `NavballMarker` take the rule above: live while the drawable's game
+object is, destroyed once it is not. A client that reads a line it has removed gets
+`ObjectDestroyedException` where today it gets whatever Unity raises for a torn-down renderer, and
+the object leaves the store at the next sweep.
+
+The addon has a second problem of its own. It positions every drawable on every frame through the
+drawable's reference frame, and that frame can be defined against a part or a vessel the game has
+destroyed, so one destroyed vessel turns into an exception per drawable per frame. A drawable whose
+frame is not live is not drawn, rather than positioned: the frame is a settable property, so a
+client can point the drawable at another one, and destroying the drawing because the thing it was
+measured against went away would take that away.
+
+### UI
+
+Every user interface object takes the same rule, from the `Canvas` and `Panel` an interface is built
+in down to each control in it. As with a drawing, what raises is what reaches into the game, and a
+member that only hands back what the object was built from does not resolve: a button's, toggle's or
+input field's label, an input field's placeholder, and a scroll view's panel. Each of those is an
+object in its own right and raises from the first of its own members that reaches the game. Three
+things are specific to the service:
+
+* The controls share a base, `Control`, which reaches the game through the component that handles
+  interaction, so one checked accessor there answers for the interactable state, the tint and the
+  tooltip of every control built on it. Each control checks its own component for the rest, as
+  `Panel` does for the members it has beyond adding elements to itself.
+* `RectTransform`, `Layout`, `LayoutElement` and `SizeFitter` wrap a component of the element they
+  were taken from rather than standing for an element of their own, and none of them says whether
+  the game still has it. `RectTransform` has no identity at all and is built fresh from
+  `GetComponent` on every read, so a client that reads `panel.rect_transform` in a loop adds an
+  object to the store on every iteration.
+  The other three do have one, but built on Unity's `operator ==`, which reports a destroyed
+  component as equal to null, so two objects standing for different destroyed components compare
+  equal and the store can hand back the wrong one. All four are named by the component they wrap,
+  compared by reference and hashed by identity hash, as [Comm nodes](#comm-nodes) does, so the store
+  dedups them; each takes its state from that component, which is what lets the sweep drop it.
+* The stock canvas hangs off `UIMasterController`, which the game keeps across scene changes, so it
+  is always live and is never reclaimed. This is the one UI object that is not a client's own.
+
+The service and its addon both run in every scene, and leaving a scene destroys the elements built
+in it. That is existing behavior; what changes is that the object standing for such an element says
+so rather than failing on a torn down game object.
+
+### RemoteTech
+
+`Antenna` holds a `Part` and reaches the mod's API with it, so it needs no resolve of its own: it is
+as live, dormant or destroyed as its part, and destroyed when a part that is live no longer carries
+`ModuleRTAntenna`. Checking the module list is a walk of one part's modules, which is only ever run
+from the classifier, and the classifier is off the fast path by construction.
+
+`Comms` reads its vessel's id out of the game at construction, through `vessel.InternalVessel.id`,
+which now fails for a vessel that is dormant or destroyed at that moment. The id is what the
+`Vessel` object holds anyway, so it takes it from there, and its state is the vessel's.
+
+### InfernalRobotics
+
+A servo is a `ModuleIRServo_v3`, a part module, and `IServo.UID` is the part's craft id, so the mod
+identifies a servo by its part. `Servo` does the same: it holds the `Part`, finds the module by name
+on each access, and wraps whatever it finds. Its state is its part's, and destroyed when a live part
+no longer carries the module.
+
+`ServoGroup` is named by its vessel and the group's name, and resolves through the same
+`ServoGroupsForVessel` that lists them. Its state is its vessel's, and dormant, never destroyed,
+where the mod's assembly is not there to be asked at all: a group absent from a list that nothing
+populated proves nothing. The mod not being *ready* is not that case, and must not be treated as
+one: its controller only ever tracks the active vessel, and kRPC's own synthesized groups are what
+answer for every other vessel whether the controller is ready or not.
+
+What this fixes is not only the store. Both classes compare their wrapper objects with `==` on an
+interface type, which is reference equality, and the wrappers are allocated per call: `IRWrapper`
+builds a new `IRServo` for every servo every time a group's servos are listed, and a new synthesized
+group for every group of a non-active vessel. So two objects for one servo never compare equal
+today, the store takes a fresh entry for each, and a script that polls `servo_group.servos` grows
+the store without bound. Naming a servo by its part and a group by its vessel and name is what
+makes the store dedup them at all.
+
+Wrapping a module on each access is only affordable because wrapping is cheap. It is not today:
+`IRServo`'s constructor looks up around forty properties and methods by reflection, per instance,
+and those lookups depend on the mod's types alone. They move to the one-time wrapper initialization,
+which also takes that cost off every existing listing call. `KACWrapper`'s alarm wrapper has the same
+shape and needs the same treatment, for the same reason; see [KerbalAlarmClock](#kerbalalarmclock).
+
+### KerbalAlarmClock
+
+`Alarm` already holds the alarm's id, which is what the mod's API creates and finds alarms by, and
+it holds the alarm object too. The object is what it uses, so an alarm the mod has rebuilt, which is
+what loading a game does, is read out of the old one. It resolves by id from the mod's alarm list on
+each access instead. Live while an alarm with the id is in the list, destroyed once none is, and
+dormant while the mod is not ready, which says nothing about any alarm.
+
+`Remove` deletes the alarm and leaves the object destroyed, rather than nulling the alarm it holds
+so that every later member reports an invalid operation.
+
+Resolving walks the mod's alarm list, and listing the alarms wraps every one of them, which costs
+about twenty reflection lookups each. Those lookups depend on the mod's alarm type alone, so, as in
+[InfernalRobotics](#infernalrobotics), they are made once for the assembly rather than for every
+alarm wrapped.
+
+### LiDAR and DockingCamera
+
+`Laser` and `Camera` are `Antenna` again with another module name, `LiDARModule` and
+`PartCameraModule`: each holds a `Part`, passes it to its mod's API, and takes its part's state,
+plus destroyed when a live part no longer carries the module. Neither mod is in the test harness's
+mod list, so both are by inspection; the code is a state getter in each and nothing else.
+
+### What the other services leave out
+
+| Excluded | Why |
+|---|---|
+| `KRPC.Expression`, `KRPC.Type` | neither stands for anything in the game. An expression is built from values and used to make a stream, and nothing can destroy it. They do accumulate in the store, one entry per expression a client builds, which is a real cost for a client that rebuilds expressions in a loop, but it is a question about objects the client owns and not about game state, so it belongs with whatever answers that generally |
+| the `Debug` service | it has no classes, only procedures |
+| `Drawing`'s and `UI`'s services and `RemoteTech.Target` | static classes and an enum |
 
 ## Alternatives considered
 
@@ -703,6 +1128,17 @@ below was turned down on evidence, several of them after being built and measure
 | Record only where a module was found, not that a part has none | An object with an optional module it does not have, an engine with no gimbal, then searches the whole module list on every access, since nothing records the absence. Built that way, `engine.thrust` cost 1165 ns. A reference records a part having no such module as readily as which module it found, so both answers cost an index and a string comparison. |
 | A module reference generic on the module type | Built and measured: the shared generic it compiles to costs 21 ns against 7 ns for the indexed lookup underneath it, so the wrapper cost three times the work it wrapped. Naming the module by its class name keeps the whole resolve path non-generic; with the absence fix above it took `module.name` from 51 ns to 46 ns and `engine.thrust` from 1165 ns to 46 ns. |
 
+The rest of SpaceCenter and the other services turned down these:
+
+| Alternative | Why not |
+|---|---|
+| Make `ModuleRef` public, so the module-backed objects in other services use it | It buys them nothing. `Antenna`, `Laser`, `Camera` and `Servo` each hand a `Part` to their mod's API and never touch a `PartModule` on the way, so the only place a module has to be found is the classifier, which runs after a resolve has already failed or from a sweep, and a walk of one part's modules is affordable there. `Servo` does resolve a module, but Infernal Robotics itself names a servo by its part, so a lookup by name is exact. Keeping the two SpaceCenter pieces internal keeps the fast path they exist for from being an inter-assembly contract. |
+| Give a `Servo` a cached resolve of the module it wraps | Every member of a servo is a reflection call into the mod, hundreds of nanoseconds at best, so the tens of nanoseconds a cache saves are invisible. What made wrapping expensive was the wrapper's own per-instance reflection lookups, and those are the thing to move, since every listing call pays them today too. |
+| Leave Drawing and UI out, as objects the client owns | The client owning an object says who removes it, not whether the game can. A scene change destroys every drawing and every interface element, so the objects standing for them are as dead as any part's, and reading one raises whatever Unity raises for a torn-down object rather than saying so. |
+| Destroy a drawing whose reference frame is destroyed | The frame is a settable property, so the object is recoverable and taking it away is not. Not drawing it is enough, and it is reversible. |
+| Identify a `CommLink` by the link object the network holds, and only classify it | The network drops a link object when contact is lost and never gives it back, so a client streaming through it would read the last values it had forever. What is durable is which two nodes the link is between. |
+| Key a `Waypoint` on its name, or on its seed and index | A name is neither unique nor stable, and a seed and index only name a contract's waypoints, not the custom ones this service creates. The navigation id names both, and the game saves it for the ones that are saved at all. |
+
 Two findings from that run outlived its numbers. **The part lookup was never the bottleneck**:
 `part.mass` is mostly KSP's own mass computation, and the resolve strategy moves the total by
 single-digit percent. **The real cost of the fix is module re-derivation**, from a captured
@@ -716,15 +1152,37 @@ regression on both counts; the numbers are in the table above.
 
 ## Phases
 
-The general infrastructure comes first, the game-object-specific work next, the documentation and
-the SpaceCenter benchmarks last. That order is what lets the work land as separate pull requests:
-phases 1 to 3 name no game object, phase 4 is one game object at a time, and phases 5 to 7 sit on
-top of whatever of phase 4 has landed.
+The general infrastructure comes first, the game-object-specific work next, one service at a time
+after that, and the documentation and the benchmarks last. That order is what lets the work land as
+separate pull requests: phases 1 to 3 name no game object, phase 4 is one game object at a time,
+phases 5 to 8 sit on top of whatever of phase 4 has landed, and phases 9 to 14 are one service at a
+time, each of which only needs what phase 4 did to parts and vessels.
 
 Phases run in order, and within phase 4 each game object builds on the ones above it. A phase is a
 sequence of commits wherever it needs to be, each commit doing one thing. Tests land with the phase
 they exercise. Changelog entries belong to no phase; they are consolidated into a single commit
 before the branch is pushed.
+
+Phase 6 is the vessel in the editor, which is a second kind of thing a part can belong to rather
+than another kind of game object, and is why it is a phase of its own rather than a sub-phase of 4.
+It lands only with the editor scene API (see
+[services/editor-scene-api.md](services/editor-scene-api.md)), and everything before it is
+independent of that.
+
+Not all of it can wait for the phase, though, because this work sits on top of that API rather than
+introducing it: the editor's parts and its vessel already exist when phase 4 runs. A proxy that
+classifies itself at all has to answer for both scenes from the moment it answers for either, so
+the editor's half of 6b and 6c lands inside 4b and 4e, and `EditorExtensions` with them. Deferring
+it would leave a window in which the editor's objects are misclassified and swept. What is left for
+the phase is what the editor adds rather than what it shares: its reclamation trigger, and which
+vessel a craft id belongs to.
+
+Phases 7 to 14 are one service, or one kind of object within a service, at a time. They depend on
+phase 4 and on nothing in each other, apart from Drawing and UI both needing the collection change
+in phase 9, so the order among them is only a running order and any of them can be dropped or
+deferred without touching the rest. Three of them, 12 to 14, need a mod installed to run at all,
+which is why they come last: what they change cannot be exercised by the non-game test suite, and
+two of the mods are not in the test harness's mod list at all.
 
 | # | Phase | Contents |
 |---|---|---|
@@ -733,8 +1191,17 @@ before the branch is pushed.
 | 3 | SpaceCenter infrastructure | The SpaceCenter-side pieces every later phase builds on, and no game object of its own: the testing tools a lifetime test needs, destroying a part and sizing the store, and `CachedObject<T>`, which stamps its weak reference with `GameState`'s generation and so comes after phase 2. |
 | 4 | SpaceCenter game objects | One sub-phase per kind of game object, in the order of [SpaceCenter implementation](#spacecenter-implementation); see below. |
 | 5 | Event-driven reclamation | Subscribe to `onPartDie` / `onVesselDestroy` so obviously dead proxies leave the store immediately rather than at the next load boundary. Pure latency improvement over the sweep from phase 2. |
-| 6 | Documentation | `doc/src/object-lifetime.rst`, a page of its own explaining rebinding, the exception, and what a client should do about it, linked from every client's page where remote procedures are introduced, and in `doc/order.txt`. It is client-facing behavior rather than part of any one language's client, and nothing else in the docs covers what an object is. The exception itself is documented across all client languages. |
-| 7 | SpaceCenter benchmarks | The cases that measure what this design added: the resolution primitives against each other (captured reference, cached resolve, `FindPartByID`, indexed module lookup, the module reference, a by-name scan), and the accessors the [Budgets](#budgets) are written against. Last because each of them names something phase 3 or 4 introduces. |
+| 6 | [The vessel in the editor](#the-vessel-in-the-editor) | Everything the editor's vessel needs, which is a second kind of thing a part can belong to rather than another kind of game object; see below. |
+| 7 | [SpaceCenter records](#the-rest-of-spacecenter) | `Alarm`, `Contract`, `ContractParameter` and `Waypoint`: the records the game keeps for the loaded game rather than for a vessel. Each gains an identity the game writes into the save and re-derives from it; each `Remove` leaves its object destroyed rather than holding something the game no longer has. |
+| 8 | [SpaceCenter objects defined against others](#comm-links) | `CommLink` is named by the vessel whose control path it is a hop in and the two nodes it joins, and finds that hop in the path as it stands, so it reports the link as it is rather than as it was when the object was made; `ClosestApproach` takes the state getter alone. Needs 4a, 4h and 4i for what it defers to. |
+| 9 | [Objects kRPC creates for a client](#objects-krpc-creates-for-a-client) | `ClientOwnedObjects.RemoveDestroyed`, and `Force` as its first user: a destroyed part takes its forces with it, and an unloaded part, or a reference frame that cannot be measured in, makes them wait, instead of the physics step dereferencing a part that is gone. Needs 4b and 4h. |
+| 10 | [Drawing](#drawing) | `Line`, `Polygon`, `Text` and `NavballMarker` classify themselves from their game object and from having been removed, so that removing one twice reports it gone rather than not found, and the addon does not draw a drawable whose reference frame is not live. Needs 9 and 4h. |
+| 11 | [UI](#ui) | Every user interface object classifies itself and raises from the members that reach the game, removal included, with `Control` answering for the members its controls share; `RectTransform`, `Layout`, `LayoutElement` and `SizeFitter` gain a state, and an identity the store can dedup, so reading one repeatedly stops adding an object to the store per call. Needs 9. |
+| 12 | [RemoteTech](#remotetech), [LiDAR and DockingCamera](#lidar-and-dockingcamera) | `Antenna`, `Laser` and `Camera` defer to their part and are destroyed when a live part no longer carries their module; `Comms` names its vessel by the id its `Vessel` already holds. Three services, one shape, so one phase. Needs 4a and 4b. |
+| 13 | [InfernalRobotics](#infernalrobotics) | `Servo` named by its part and resolving its module on each access, `ServoGroup` named by its vessel and the group name, and `IRWrapper`'s per-instance reflection lookups moved to its one-time initialization so that wrapping a module is cheap. Both stop being keyed on a wrapper the mod's listing calls allocate, which is what makes the store dedup them. Needs 4a and 4b. |
+| 14 | [KerbalAlarmClock](#kerbalalarmclock) | `Alarm` resolves by its id on each access, is dormant while the mod is not ready, and is destroyed by `Remove`; `KACWrapper` binds the mod's alarm fields once for the assembly, as 13 does for the servo ones, since resolving now walks the alarm list. |
+| 15 | Documentation | `doc/src/object-lifetime.rst`, a page of its own, which landed with the SpaceCenter work and which this phase adds the other services to. It explains rebinding, the exception, what a client should do about it, and what the editor does differently, linked from every client's page where remote procedures are introduced, and in `doc/order.txt`. It is client-facing behavior rather than part of any one language's client, and nothing else in the docs covers what an object is. The exception itself is documented across all client languages. Last of the behavior phases, so that it describes every service rather than one. |
+| 16 | SpaceCenter benchmarks | The cases that measure what this design added: the resolution primitives against each other (captured reference, cached resolve, `FindPartByID`, indexed module lookup, the module reference, a by-name scan), and the accessors the [Budgets](#budgets) are written against. Last because each of them names something phase 3 or 4 introduces. Phases 7 to 14 add no case; see [Performance](#performance). |
 
 Phase 4, one game object at a time:
 
@@ -744,7 +1211,7 @@ Phase 4, one game object at a time:
 | 4b | [Parts](#parts) | `Part` resolves through the cache and classifies itself against the proto-part snapshots of unloaded vessels, so an unloaded vessel's parts are dormant rather than destroyed. Fixes the `Part` half of #885 and, with the sweep, the pinning half of #771. |
 | 4c | [Part modules](#part-modules) | `ModuleRef`, keyed on the part, the module's class and the occurrence, and resolving through the remembered position validated by the persistent id; `Module` and the ~28 concrete module proxies converted onto it; their equality and hashing rebased off the captured module. Fixes the rest of #885 and all of #764. |
 | 4d | [Fields, events and actions](#a-modules-fields-events-and-actions) | `PartField`, `PartEvent` and `PartAction` look themselves up by name on their module on each access; `ActionGroupAction` carries the part, module and names as values and defers its state. |
-| 4e | [Named against a vessel or a part](#anything-named-against-a-vessel-or-a-part) | The parts collections, `AutoPilot`, `Control`, `Comms`, `Flight`, `Resources`, `Resource`, `Propellant`, `Stage` and `ResourceTransfer` defer to their owner. `Stage` holds a `Vessel` proxy rather than the KSP vessel; `ResourceTransfer` reads its parts' states rather than resolving them, so a destroyed part cancels the transfer and an unloaded one makes it wait. |
+| 4e | [Named against a vessel or a part](#anything-named-against-a-vessel-or-a-part) | The parts collections, `AutoPilot`, `Control`, `Comms`, `Flight`, `Resources`, `Resource`, `Propellant`, `Stage` and `ResourceTransfer` defer to their owner. `Stage` names its vessel by id rather than holding the KSP vessel; `ResourceTransfer` reads its parts' states rather than resolving them, so a destroyed part cancels the transfer and an unloaded one makes it wait. |
 | 4f | [Maneuver nodes](#maneuver-nodes) | `Node` holds the node object for its whole life and answers from the vessel's flight plan instead. Closes the hash bug that nulling the field on removal would cause, and the FIXME on `Node`. `Orbit` lands here rather than in 4e: an orbit is named against its owner like the rest, but one owner is a maneuver node, so it cannot be written before the node can be asked. |
 | 4g | [Crew members](#crew-members) | `CrewMember` compares by the name it is already named by, so the store dedups it and the roster search answers for its state. |
 | 4h | [Reference frames](#reference-frames) | A frame is as alive as everything it is defined against, hybrid frames included; part-relative and docking-port frames re-derive from ids, which closes the raw `NullReferenceException` from `DockingPort.ReferenceFrame`. |
@@ -752,9 +1219,20 @@ Phase 4, one game object at a time:
 | 4j | [Science data](#science-data) | `ScienceData` defers to its experiment module, and to that module still listing the record where the part is live. |
 | 4k | [Science subjects](#science-subjects) | `ScienceSubject` gains an identity, the subject id plus the generation it was read in, and is live while that generation is the loaded one. The science gain multiplier is read on each access rather than captured. |
 
+Phase 6, the vessel in the editor:
+
+| # | Step | Lands in | Contents |
+|---|---|---|---|
+| 6a | `EditorExtensions` | 4e, then 6 | One place for the vessel the editor has open, what the game holds for it, and which vessel it is. 4e needs the first two as soon as the parts collection and `Resources` classify themselves, so it introduces them; the phase then replaces the copies of the same lookup that the editor scene API left in `Editor`, `EditorDeltaV`, `EditorVessel`, `Stage`, `Resources` and the parts collection. |
+| 6b | Parts in the editor | 4b | `PartId` holds a craft id or a flight id and says which, so a `Part` resolves against the vessel the editor has open or against the loaded vessels. Editor parts have no dormant form, and the errors say so. Cannot wait for the phase: a part that classifies itself at all has to answer for both scenes at once. |
+| 6c | The editor's vessel as an owner | 4e | The parts collection, `Resources` and `Stage` can be named against the vessel in the editor, which has no id, so each takes its state from the editor rather than from a vessel lookup. `Resources` also answers from its part when it is a single part's, which is a plain bug and applies in flight too. Cannot wait, for the same reason as 6b. |
+| 6d | Reclamation in the editor | 6 | `onEditorShipModified` asks for a sweep, the game raising no part-died event in an editor, and the sweep settles on the editor vessel's part count rather than on the game's vessel list, which is empty on a save with nothing in flight. Needs 5. |
+| 6e | Which vessel a craft id belongs to | 6 | The generation, so that a part of a vessel the editor has loaded over is gone rather than whatever now answers to its id; and `EditorShipAddon`, so that an undo is not taken for a new vessel. Needs 6a and 6b. |
+
 ## Testing
 
-`service/SpaceCenter/test/test_object_lifetime.py` and the core unit tests in
+`service/SpaceCenter/test/test_object_lifetime.py`,
+`service/SpaceCenter/test/test_editor_object_lifetime.py` and the core unit tests in
 `core/test/Service/` cover:
 
 | Case | Covered by |
@@ -769,10 +1247,22 @@ Phase 4, one game object at a time:
 | sweep drops dead proxies, keeps proxies without liveness, removes one exactly once, never reuses ids | `ObjectStoreTest` |
 | reclaimed id throws `ObjectDestroyedException`, unissued id throws `ArgumentException` | `ObjectStoreTest.RemovedAndUnissuedObjectIds` |
 | the generation moves at a boundary, a sweep leaves it alone, a change leaves a sweep pending | `GameStateTest` |
+| a part of a vessel the editor has loaded over, and its modules, raise `ObjectDestroyedException`, whether the vessel loaded is the same craft or another, and leave the store | `test_a_part_of_a_reloaded_vessel_is_destroyed`, `test_a_part_of_a_replaced_vessel_is_destroyed`, `test_the_store_drops_a_part_of_a_replaced_vessel` |
+| a part is not confused with the part of another vessel that shares its craft id | `TestEditorPartIdCollision`, which loads `ActionGroups` over `Basic`; it was saved from it and carries all nine of its craft ids, so resolving by craft id alone returns the wrong part with no error |
+| the parts collection, `Resources` and `Stage` of the vessel in the editor survive a sweep, having no vessel id to be judged by | `test_the_vessels_objects_outlive_a_sweep` |
+| leaving the editor destroys the vessel it had open, and everything named against it | `test_leaving_the_editor_destroys_the_vessels_objects` |
+| a part survives an undo, which replaces the vessel object while keeping the craft ids | `test_a_part_survives_an_undo`, driving the game's own undo through `TestingTools.EditorUndo` |
 
 The service suites for maneuver nodes, orbits, reference frames, resource transfers, resources,
 comms, docking ports and part modules were run against each phase; the maneuver node tests were
-updated to expect the object-destroyed error where they expected an invalid-call error.
+updated to expect the object-destroyed error where they expected an invalid-call error. The editor
+suites were run too, since a sweep now runs in the editor on every change to the vessel.
+
+A part leaving the editor's vessel is provoked by loading a different craft, not by deleting the
+part. `EditorLogic.DeletePart` refreshes the editor's attach-node icons before it deletes anything,
+which raises a `NullReferenceException` when the call did not come from the editor UI, so the part
+is never deleted. The two craft the tests use were checked to have disjoint craft ids, which is
+what makes replacing one with the other a reliable way to make a part's id absent.
 
 Specified in this design and **not** covered by a test:
 
@@ -783,9 +1273,18 @@ Specified in this design and **not** covered by a test:
    the store tests check;
  * a stream over a destroyed part delivering the error once and being removed, per
    [protocol/stream-invalidation.md](protocol/stream-invalidation.md);
- * every liveness implementation other than `Part` and the module reference. `CommNode`,
-   `ScienceData`, `ReferenceFrame`, `ResourceTransfer`, `ScienceSubject` and `Stage` all carry
-   real logic and none of it is exercised. `CommNode`'s is the one to pin down first: it is alive
+ * a part deleted from the editor's vessel one at a time, as opposed to the whole vessel being
+   replaced. The classification path is the same one either way, and the game's delete cannot be
+   driven from a test;
+ * a part that an undo actually takes away, as opposed to one it leaves alone. Nothing in the
+   test framework adds or removes a part in the editor, so the undo test restores a vessel with
+   the same parts; what it demonstrates is that the vessel object being replaced does not by
+   itself kill a part proxy;
+ * an editor emptied of every part, which by the settling rule above never sweeps, matching a game
+   with no vessels at all;
+ * every liveness implementation other than `Part`, the module reference and the editor branch of
+   `Stage`. `CommNode`, `ScienceData`, `ReferenceFrame`, `ResourceTransfer`, `ScienceSubject` and
+   `Stage` in flight all carry real logic and none of it is exercised. `CommNode`'s is the one to pin down first: it is alive
    when its transform is either absent or not Unity-destroyed, which is the two-stage death of a
    Unity object written out in one line;
  * a module reference rebinding when a part's module list changes under it, which is the case
@@ -794,6 +1293,47 @@ Specified in this design and **not** covered by a test:
  * a dormant object reporting not-loaded on a path other than `Part`: a maneuver node on a vessel
    the game is not solving conics for, and any object at all in the window where the game is
    between states and lists no vessels.
+
+### The tests the later phases land
+
+The cases these phases landed are in the suite for the service each one changes, because what they
+need is that service's craft, mod and game state; `TestingTools.ObjectStoreSize` and
+`TestingTools.DestroyPart` are what the store and destruction cases are written against, as they
+are above.
+
+| Case | Covered by |
+|---|---|
+| an alarm survives a quickload and reads the one the game rebuilt | `test_alarm.py::test_alarm_survives_a_quickload` |
+| a removed alarm, and a second attempt to remove it, raise `ObjectDestroyedException` | `test_alarm.py::test_access_after_remove_raises`, `test_remove_twice_raises` |
+| a removed waypoint raises rather than writing through to a waypoint the game does not have | `test_waypoints.py::test_access_after_remove_raises` |
+| a force on a destroyed part leaves the store, rather than being applied on every physics step | `test_object_lifetime.py::test_the_store_drops_a_force_on_a_destroyed_part`, which is where the destruction tools and the store size already are |
+| a removed drawing raises rather than reading a torn down renderer | `test_line.py::test_reading_a_removed_line_raises` |
+| a rect transform read twice is one object, not two | `test_canvas.py::test_rect_transform_is_one_object` |
+| a servo, and a servo group, read twice are one object each | `test_servo.py::test_a_servo_read_twice_is_one_object` |
+
+The existing suites for comms, drawings, interface elements, alarms, waypoints, contracts and parts
+were run against these phases. `test_comms.py` caught the one thing this design got wrong about the
+game; see [Comm links](#comm-links).
+
+Specified in these phases and **not** covered by a test:
+
+ * **LiDAR and DockingCamera at all.** Neither mod is in `MODS` in
+   `tools/krpctest/krpctest/install.py`, so there is no way to reach either class from a test. Both
+   are the same handful of lines as `Antenna`, and that is the whole argument for them.
+ * **The mod services beyond dedup.** RemoteTech, InfernalRobotics and KerbalAlarmClock have
+   suites, and they pass. `test_servo.py` covers a servo and a group read twice being one object
+   each, which is what a script polling a group's servos hits, but nothing in any of the three
+   exercises a destroyed part or vessel, or a reload.
+ * **A comm link coming back.** Two vessels losing contact is drivable; getting them back into
+   contact within a test is not, so the dormant-to-live direction is by argument.
+ * **Contract parameters, and a contract across a load.** Reaching a parameter takes a career game
+   with a contract accepted, which the contract suite does not set up.
+ * **A drawing whose reference frame is destroyed.** What it demonstrates is the absence of an
+   error per frame, which a test cannot see; the frame's own state is what decides it.
+ * **A client-owned object read in the frame it was removed in.** The game tears a game object down
+   at the end of the frame, so the Unity check alone would leave an object answering for the rest
+   of the frame it was removed in. Each of these objects records that it has been taken out as
+   well, which makes removal immediate; nothing tests the window that would otherwise exist.
 
 ## Performance
 
@@ -905,6 +1445,23 @@ Nothing in the suite bears on the correctness half of this design, dormant versu
 semantics, reclaimed-id lookup or hash stability. That is what the tests under
 [Testing](#testing) are for.
 
+### The later phases
+
+Phases 7 to 14 get no budgets and add no benchmark case, because nothing they touch is on a path
+that a stream re-evaluates over hundreds of objects:
+
+| Path | Why it is not measured |
+|---|---|
+| the other services' accessors | every one of them is a call into a mod's API, and RemoteTech's, Infernal Robotics' and Kerbal Alarm Clock's go through reflection, which costs hundreds of nanoseconds before kRPC's own work is counted. Naming a servo by its part adds a part resolve, which is a cache read, and a lookup of one module by name, which was measured at 40 ns |
+| SpaceCenter's records | a client reads a contract, an alarm or a waypoint when something changes, not every fixed update, and each resolve is a search of a list the game keeps short |
+| a comm link | a walk of one vessel's control path, which is a handful of hops, against a captured reference today. `control_path` already allocates a list and an object per hop |
+| the drawing and interface update loops | one state check per client-owned object per frame, on a collection whose size is what a client explicitly created |
+
+The one thing phases 13 and 14 make faster is worth recording anyway. Moving `IRWrapper`'s
+per-instance reflection lookups to its one-time initialization takes about forty `GetProperty` and
+`GetMethod` calls off every servo and group the mod lists, which is per servo per call today, and
+`KACWrapper` gives about twenty back per alarm the same way.
+
 ## Open questions
 
  * **Should dormant get its own exception type?** Reusing `InvalidOperationException` with a clear
@@ -921,6 +1478,26 @@ semantics, reclaimed-id lookup or hash stability. That is what the tests under
    next access through a walk of the module list, and if a popular mod rearranges modules often
    enough that the walk becomes the common case, the hint stops earning its place. Nothing in
    KSP itself does this.
+ * **Should the objects a client owns be reclaimed when the client disconnects?** The addons
+   already destroy the game objects of a client that has gone, so the objects standing for them
+   report themselves destroyed and the next sweep takes them. But a sweep runs at a game-state
+   boundary, and a client disconnecting is not one, so they sit in the store until something else
+   moves. Asking for a sweep when a client disconnects would close that, and it is a change to
+   when sweeps happen rather than to what they do. Recommendation: leave it, and revisit with
+   phase 9, which is where the disconnect path is already being read.
+ * **Is a Kerbal Alarm Clock alarm's id durable across a load?** The mod's API creates alarms by
+   it and finds them by it, and kRPC already uses it that way, but nothing here has checked that
+   the mod writes it into its own scenario rather than assigning it at load. If it does not, an
+   alarm object is a record of one game state, like a `ScienceSubject`, and phase 14 compares the
+   generation instead of searching. The suite in `service/KerbalAlarmClock/test/` can settle it.
+ * **Should a `CrewMember` rename be handled the way a `ServoGroup` rename is?** A servo group had
+   the same problem, its name being both what identifies it and a settable property, and phase 13
+   settled it: the object follows the name it is given, and the hash is taken from the vessel
+   alone, so the name can change without stranding the object in the store. Taking the hash off
+   the mutable part is the whole of what makes carrying an identity forward safe, and it is what
+   the last of the answers below would need. What it does not fix is a second object for the same
+   group, taken before the rename, which stands for a name nothing answers to; the same would be
+   true of a kerbal.
  * **Is a kerbal's name stable enough to be an identity?** A `CrewMember` is named by it, and
    the game keeps its roster under it, but `CrewMember.Name`'s setter renames the kerbal
    through `ProtoCrewMember.ChangeName`. The object is then holding a name the roster no
