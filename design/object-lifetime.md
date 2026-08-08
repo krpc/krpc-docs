@@ -1,9 +1,10 @@
 # Object lifetime, destroyed objects and object-store reclamation
 
 **Status:** in progress. Every phase below is built, on a branch whose history is being
-restructured into those phases; no PR is raised yet. Phases 7 to 14, which give the rest of
-SpaceCenter and every other service the same treatment, are one commit each, with the tests for
-what they change, and are covered more thinly than the phases before them; see
+restructured into those phases; no PR is raised yet, and the two benchmarking phases at the end are
+one of their own. Phases 6 to 13, which give the rest of SpaceCenter and every other service the
+same treatment, are one commit each, with the tests for what they change, and are covered more
+thinly than the phases before them; see
 [The tests the later phases land](#the-tests-the-later-phases-land). The editor scene API this
 work builds on landed in [#1038](https://github.com/krpc/krpc/pull/1038)
 (see [services/editor-scene-api.md](services/editor-scene-api.md)), so this design also has to
@@ -1153,81 +1154,90 @@ regression on both counts; the numbers are in the table above.
 ## Phases
 
 The general infrastructure comes first, the game-object-specific work next, one service at a time
-after that, and the documentation and the benchmarks last. That order is what lets the work land as
-separate pull requests: phases 1 to 3 name no game object, phase 4 is one game object at a time,
-phases 5 to 8 sit on top of whatever of phase 4 has landed, and phases 9 to 14 are one service at a
-time, each of which only needs what phase 4 did to parts and vessels.
+after that, the documentation once every service is covered, and the benchmarking last. That order
+is what lets the work land as separate pull requests: phases 1 and 2 name no game object, phase 3
+is one game object at a time, phases 4 to 7 sit on top of whatever of phase 3 has landed, and
+phases 8 to 13 are one service at a time, each of which only needs what phase 3 did to parts and
+vessels.
 
-Phases run in order, and within phase 4 each game object builds on the ones above it. A phase is a
+Phases 15 and 16 are the benchmarking, and they are a pull request of their own, following the one
+the behavior phases make. Nothing this design changes depends on them: the framework measures
+whatever build it is run against, and the cases in 16 name what phases 2 and 3 ship rather than
+adding to it. Splitting them off keeps the first pull request to the behavior change. Their
+position in the order says nothing about when the numbers were taken: the runs under
+[Performance](#performance) were made during development, with the framework against the build each
+phase landed on.
+
+Phases run in order, and within phase 3 each game object builds on the ones above it. A phase is a
 sequence of commits wherever it needs to be, each commit doing one thing. Tests land with the phase
 they exercise. Changelog entries belong to no phase; they are consolidated into a single commit
 before the branch is pushed.
 
-Phase 6 is the vessel in the editor, which is a second kind of thing a part can belong to rather
-than another kind of game object, and is why it is a phase of its own rather than a sub-phase of 4.
+Phase 5 is the vessel in the editor, which is a second kind of thing a part can belong to rather
+than another kind of game object, and is why it is a phase of its own rather than a sub-phase of 3.
 It lands only with the editor scene API (see
 [services/editor-scene-api.md](services/editor-scene-api.md)), and everything before it is
 independent of that.
 
 Not all of it can wait for the phase, though, because this work sits on top of that API rather than
-introducing it: the editor's parts and its vessel already exist when phase 4 runs. A proxy that
+introducing it: the editor's parts and its vessel already exist when phase 3 runs. A proxy that
 classifies itself at all has to answer for both scenes from the moment it answers for either, so
-the editor's half of 6b and 6c lands inside 4b and 4e, and `EditorExtensions` with them. Deferring
+the editor's half of 5b and 5c lands inside 3b and 3e, and `EditorExtensions` with them. Deferring
 it would leave a window in which the editor's objects are misclassified and swept. What is left for
 the phase is what the editor adds rather than what it shares: its reclamation trigger, and which
 vessel a craft id belongs to.
 
-Phases 7 to 14 are one service, or one kind of object within a service, at a time. They depend on
-phase 4 and on nothing in each other, apart from Drawing and UI both needing the collection change
-in phase 9, so the order among them is only a running order and any of them can be dropped or
-deferred without touching the rest. Three of them, 12 to 14, need a mod installed to run at all,
-which is why they come last: what they change cannot be exercised by the non-game test suite, and
-two of the mods are not in the test harness's mod list at all.
+Phases 6 to 13 are one service, or one kind of object within a service, at a time. They depend on
+phase 3 and on nothing in each other, apart from Drawing and UI both needing the collection change
+in phase 8, so the order among them is only a running order and any of them can be dropped or
+deferred without touching the rest. Three of them, 11 to 13, need a mod installed to run at all,
+which is why they come last among the services: what they change cannot be exercised by the
+non-game test suite, and two of the mods are not in the test harness's mod list at all.
 
 | # | Phase | Contents |
 |---|---|---|
-| 1 | Benchmarking framework | Per [build-tools/benchmarks.md](build-tools/benchmarks.md): the timing RPCs in `TestingTools`, the runner, and the scripts and craft under `tools/benchmarks/`, with its section of the development guide. Nothing here is specific to this design, and no case it ships measures anything this design adds. Each later phase A/Bs against the build before it. |
-| 2 | Core infrastructure | `ObjectDestroyedException`; `IGameObjectState` and `GameObjectState`; the store sweep and reclaimed-id semantics; `GameState` and the load boundary the server addon raises it at; core unit tests. No service uses any of it yet, so no behavior changes. |
-| 3 | SpaceCenter infrastructure | The SpaceCenter-side pieces every later phase builds on, and no game object of its own: the testing tools a lifetime test needs, destroying a part and sizing the store, and `CachedObject<T>`, which stamps its weak reference with `GameState`'s generation and so comes after phase 2. |
-| 4 | SpaceCenter game objects | One sub-phase per kind of game object, in the order of [SpaceCenter implementation](#spacecenter-implementation); see below. |
-| 5 | Event-driven reclamation | Subscribe to `onPartDie` / `onVesselDestroy` so obviously dead proxies leave the store immediately rather than at the next load boundary. Pure latency improvement over the sweep from phase 2. |
-| 6 | [The vessel in the editor](#the-vessel-in-the-editor) | Everything the editor's vessel needs, which is a second kind of thing a part can belong to rather than another kind of game object; see below. |
-| 7 | [SpaceCenter records](#the-rest-of-spacecenter) | `Alarm`, `Contract`, `ContractParameter` and `Waypoint`: the records the game keeps for the loaded game rather than for a vessel. Each gains an identity the game writes into the save and re-derives from it; each `Remove` leaves its object destroyed rather than holding something the game no longer has. |
-| 8 | [SpaceCenter objects defined against others](#comm-links) | `CommLink` is named by the vessel whose control path it is a hop in and the two nodes it joins, and finds that hop in the path as it stands, so it reports the link as it is rather than as it was when the object was made; `ClosestApproach` takes the state getter alone. Needs 4a, 4h and 4i for what it defers to. |
-| 9 | [Objects kRPC creates for a client](#objects-krpc-creates-for-a-client) | `ClientOwnedObjects.RemoveDestroyed`, and `Force` as its first user: a destroyed part takes its forces with it, and an unloaded part, or a reference frame that cannot be measured in, makes them wait, instead of the physics step dereferencing a part that is gone. Needs 4b and 4h. |
-| 10 | [Drawing](#drawing) | `Line`, `Polygon`, `Text` and `NavballMarker` classify themselves from their game object and from having been removed, so that removing one twice reports it gone rather than not found, and the addon does not draw a drawable whose reference frame is not live. Needs 9 and 4h. |
-| 11 | [UI](#ui) | Every user interface object classifies itself and raises from the members that reach the game, removal included, with `Control` answering for the members its controls share; `RectTransform`, `Layout`, `LayoutElement` and `SizeFitter` gain a state, and an identity the store can dedup, so reading one repeatedly stops adding an object to the store per call. Needs 9. |
-| 12 | [RemoteTech](#remotetech), [LiDAR and DockingCamera](#lidar-and-dockingcamera) | `Antenna`, `Laser` and `Camera` defer to their part and are destroyed when a live part no longer carries their module; `Comms` names its vessel by the id its `Vessel` already holds. Three services, one shape, so one phase. Needs 4a and 4b. |
-| 13 | [InfernalRobotics](#infernalrobotics) | `Servo` named by its part and resolving its module on each access, `ServoGroup` named by its vessel and the group name, and `IRWrapper`'s per-instance reflection lookups moved to its one-time initialization so that wrapping a module is cheap. Both stop being keyed on a wrapper the mod's listing calls allocate, which is what makes the store dedup them. Needs 4a and 4b. |
-| 14 | [KerbalAlarmClock](#kerbalalarmclock) | `Alarm` resolves by its id on each access, is dormant while the mod is not ready, and is destroyed by `Remove`; `KACWrapper` binds the mod's alarm fields once for the assembly, as 13 does for the servo ones, since resolving now walks the alarm list. |
-| 15 | Documentation | `doc/src/object-lifetime.rst`, a page of its own, which landed with the SpaceCenter work and which this phase adds the other services to. It explains rebinding, the exception, what a client should do about it, and what the editor does differently, linked from every client's page where remote procedures are introduced, and in `doc/order.txt`. It is client-facing behavior rather than part of any one language's client, and nothing else in the docs covers what an object is. The exception itself is documented across all client languages. Last of the behavior phases, so that it describes every service rather than one. |
-| 16 | SpaceCenter benchmarks | The cases that measure what this design added: the resolution primitives against each other (captured reference, cached resolve, `FindPartByID`, indexed module lookup, the module reference, a by-name scan), and the accessors the [Budgets](#budgets) are written against. Last because each of them names something phase 3 or 4 introduces. Phases 7 to 14 add no case; see [Performance](#performance). |
+| 1 | Core infrastructure | `ObjectDestroyedException`; `IGameObjectState` and `GameObjectState`; the store sweep and reclaimed-id semantics; `GameState` and the load boundary the server addon raises it at; core unit tests. No service uses any of it yet, so no behavior changes. |
+| 2 | SpaceCenter infrastructure | The SpaceCenter-side pieces every later phase builds on, and no game object of its own: the testing tools a lifetime test needs, destroying a part and sizing the store, and `CachedObject<T>`, which stamps its weak reference with `GameState`'s generation and so comes after phase 1. |
+| 3 | SpaceCenter game objects | One sub-phase per kind of game object, in the order of [SpaceCenter implementation](#spacecenter-implementation); see below. |
+| 4 | Event-driven reclamation | Subscribe to `onPartDie` / `onVesselDestroy` so obviously dead proxies leave the store immediately rather than at the next load boundary. Pure latency improvement over the sweep from phase 1. |
+| 5 | [The vessel in the editor](#the-vessel-in-the-editor) | Everything the editor's vessel needs, which is a second kind of thing a part can belong to rather than another kind of game object; see below. |
+| 6 | [SpaceCenter records](#the-rest-of-spacecenter) | `Alarm`, `Contract`, `ContractParameter` and `Waypoint`: the records the game keeps for the loaded game rather than for a vessel. Each gains an identity the game writes into the save and re-derives from it; each `Remove` leaves its object destroyed rather than holding something the game no longer has. |
+| 7 | [SpaceCenter objects defined against others](#comm-links) | `CommLink` is named by the vessel whose control path it is a hop in and the two nodes it joins, and finds that hop in the path as it stands, so it reports the link as it is rather than as it was when the object was made; `ClosestApproach` takes the state getter alone. Needs 3a, 3h and 3i for what it defers to. |
+| 8 | [Objects kRPC creates for a client](#objects-krpc-creates-for-a-client) | `ClientOwnedObjects.RemoveDestroyed`, and `Force` as its first user: a destroyed part takes its forces with it, and an unloaded part, or a reference frame that cannot be measured in, makes them wait, instead of the physics step dereferencing a part that is gone. Needs 3b and 3h. |
+| 9 | [Drawing](#drawing) | `Line`, `Polygon`, `Text` and `NavballMarker` classify themselves from their game object and from having been removed, so that removing one twice reports it gone rather than not found, and the addon does not draw a drawable whose reference frame is not live. Needs 8 and 3h. |
+| 10 | [UI](#ui) | Every user interface object classifies itself and raises from the members that reach the game, removal included, with `Control` answering for the members its controls share; `RectTransform`, `Layout`, `LayoutElement` and `SizeFitter` gain a state, and an identity the store can dedup, so reading one repeatedly stops adding an object to the store per call. Needs 8. |
+| 11 | [RemoteTech](#remotetech), [LiDAR and DockingCamera](#lidar-and-dockingcamera) | `Antenna`, `Laser` and `Camera` defer to their part and are destroyed when a live part no longer carries their module; `Comms` names its vessel by the id its `Vessel` already holds. Three services, one shape, so one phase. Needs 3a and 3b. |
+| 12 | [InfernalRobotics](#infernalrobotics) | `Servo` named by its part and resolving its module on each access, `ServoGroup` named by its vessel and the group name, and `IRWrapper`'s per-instance reflection lookups moved to its one-time initialization so that wrapping a module is cheap. Both stop being keyed on a wrapper the mod's listing calls allocate, which is what makes the store dedup them. Needs 3a and 3b. |
+| 13 | [KerbalAlarmClock](#kerbalalarmclock) | `Alarm` resolves by its id on each access, is dormant while the mod is not ready, and is destroyed by `Remove`; `KACWrapper` binds the mod's alarm fields once for the assembly, as 12 does for the servo ones, since resolving now walks the alarm list. |
+| 14 | Documentation | `doc/src/object-lifetime.rst`, a page of its own. It explains rebinding, the exception, what a client should do about it, what the editor does differently, and what the other services' objects do, linked from every client's page where remote procedures are introduced, and in `doc/order.txt`. It is client-facing behavior rather than part of any one language's client, and nothing else in the docs covers what an object is. The exception itself is documented across all client languages. Last of the behavior phases, so that it describes every service rather than one. |
+| 15 | Benchmarking framework | Per [build-tools/benchmarks.md](build-tools/benchmarks.md): the timing RPCs in `TestingTools`, the runner, and the scripts and craft under `tools/benchmarks/`, with its section of the development guide. Nothing here is specific to this design, and no case it ships measures anything this design adds, so nothing before it needs it and it lands after the behavior phases, in a pull request with 16. |
+| 16 | SpaceCenter benchmarks | The cases that measure what this design added: the resolution primitives against each other (captured reference, cached resolve, `FindPartByID`, indexed module lookup, the module reference, a by-name scan), and the accessors the [Budgets](#budgets) are written against. Last because each of them names something phase 2 or 3 introduces, and has nothing to run in until 15. Phases 6 to 13 add no case; see [Performance](#performance). |
 
-Phase 4, one game object at a time:
+Phase 3, one game object at a time:
 
 | # | Game object | Contents |
 |---|---|---|
-| 4a | [Vessels](#vessels) | `Vessel` opts into liveness and resolves through the cache; a failed lookup throws `ObjectDestroyedException`, and the between-states window is dormant. |
-| 4b | [Parts](#parts) | `Part` resolves through the cache and classifies itself against the proto-part snapshots of unloaded vessels, so an unloaded vessel's parts are dormant rather than destroyed. Fixes the `Part` half of #885 and, with the sweep, the pinning half of #771. |
-| 4c | [Part modules](#part-modules) | `ModuleRef`, keyed on the part, the module's class and the occurrence, and resolving through the remembered position validated by the persistent id; `Module` and the ~28 concrete module proxies converted onto it; their equality and hashing rebased off the captured module. Fixes the rest of #885 and all of #764. |
-| 4d | [Fields, events and actions](#a-modules-fields-events-and-actions) | `PartField`, `PartEvent` and `PartAction` look themselves up by name on their module on each access; `ActionGroupAction` carries the part, module and names as values and defers its state. |
-| 4e | [Named against a vessel or a part](#anything-named-against-a-vessel-or-a-part) | The parts collections, `AutoPilot`, `Control`, `Comms`, `Flight`, `Resources`, `Resource`, `Propellant`, `Stage` and `ResourceTransfer` defer to their owner. `Stage` names its vessel by id rather than holding the KSP vessel; `ResourceTransfer` reads its parts' states rather than resolving them, so a destroyed part cancels the transfer and an unloaded one makes it wait. |
-| 4f | [Maneuver nodes](#maneuver-nodes) | `Node` holds the node object for its whole life and answers from the vessel's flight plan instead. Closes the hash bug that nulling the field on removal would cause, and the FIXME on `Node`. `Orbit` lands here rather than in 4e: an orbit is named against its owner like the rest, but one owner is a maneuver node, so it cannot be written before the node can be asked. |
-| 4g | [Crew members](#crew-members) | `CrewMember` compares by the name it is already named by, so the store dedups it and the roster search answers for its state. |
-| 4h | [Reference frames](#reference-frames) | A frame is as alive as everything it is defined against, hybrid frames included; part-relative and docking-port frames re-derive from ids, which closes the raw `NullReferenceException` from `DockingPort.ReferenceFrame`. |
-| 4i | [Comm nodes](#comm-nodes) | `CommNode` holds the game's object and is live while its transform is either absent or not Unity-destroyed. |
-| 4j | [Science data](#science-data) | `ScienceData` defers to its experiment module, and to that module still listing the record where the part is live. |
-| 4k | [Science subjects](#science-subjects) | `ScienceSubject` gains an identity, the subject id plus the generation it was read in, and is live while that generation is the loaded one. The science gain multiplier is read on each access rather than captured. |
+| 3a | [Vessels](#vessels) | `Vessel` opts into liveness and resolves through the cache; a failed lookup throws `ObjectDestroyedException`, and the between-states window is dormant. |
+| 3b | [Parts](#parts) | `Part` resolves through the cache and classifies itself against the proto-part snapshots of unloaded vessels, so an unloaded vessel's parts are dormant rather than destroyed. Fixes the `Part` half of #885 and, with the sweep, the pinning half of #771. |
+| 3c | [Part modules](#part-modules) | `ModuleRef`, keyed on the part, the module's class and the occurrence, and resolving through the remembered position validated by the persistent id; `Module` and the ~28 concrete module proxies converted onto it; their equality and hashing rebased off the captured module. Fixes the rest of #885 and all of #764. |
+| 3d | [Fields, events and actions](#a-modules-fields-events-and-actions) | `PartField`, `PartEvent` and `PartAction` look themselves up by name on their module on each access; `ActionGroupAction` carries the part, module and names as values and defers its state. |
+| 3e | [Named against a vessel or a part](#anything-named-against-a-vessel-or-a-part) | The parts collections, `AutoPilot`, `Control`, `Comms`, `Flight`, `Resources`, `Resource`, `Propellant`, `Stage` and `ResourceTransfer` defer to their owner. `Stage` names its vessel by id rather than holding the KSP vessel; `ResourceTransfer` reads its parts' states rather than resolving them, so a destroyed part cancels the transfer and an unloaded one makes it wait. |
+| 3f | [Maneuver nodes](#maneuver-nodes) | `Node` holds the node object for its whole life and answers from the vessel's flight plan instead. Closes the hash bug that nulling the field on removal would cause, and the FIXME on `Node`. `Orbit` lands here rather than in 3e: an orbit is named against its owner like the rest, but one owner is a maneuver node, so it cannot be written before the node can be asked. |
+| 3g | [Crew members](#crew-members) | `CrewMember` compares by the name it is already named by, so the store dedups it and the roster search answers for its state. |
+| 3h | [Reference frames](#reference-frames) | A frame is as alive as everything it is defined against, hybrid frames included; part-relative and docking-port frames re-derive from ids, which closes the raw `NullReferenceException` from `DockingPort.ReferenceFrame`. |
+| 3i | [Comm nodes](#comm-nodes) | `CommNode` holds the game's object and is live while its transform is either absent or not Unity-destroyed. |
+| 3j | [Science data](#science-data) | `ScienceData` defers to its experiment module, and to that module still listing the record where the part is live. |
+| 3k | [Science subjects](#science-subjects) | `ScienceSubject` gains an identity, the subject id plus the generation it was read in, and is live while that generation is the loaded one. The science gain multiplier is read on each access rather than captured. |
 
-Phase 6, the vessel in the editor:
+Phase 5, the vessel in the editor:
 
 | # | Step | Lands in | Contents |
 |---|---|---|---|
-| 6a | `EditorExtensions` | 4e, then 6 | One place for the vessel the editor has open, what the game holds for it, and which vessel it is. 4e needs the first two as soon as the parts collection and `Resources` classify themselves, so it introduces them; the phase then replaces the copies of the same lookup that the editor scene API left in `Editor`, `EditorDeltaV`, `EditorVessel`, `Stage`, `Resources` and the parts collection. |
-| 6b | Parts in the editor | 4b | `PartId` holds a craft id or a flight id and says which, so a `Part` resolves against the vessel the editor has open or against the loaded vessels. Editor parts have no dormant form, and the errors say so. Cannot wait for the phase: a part that classifies itself at all has to answer for both scenes at once. |
-| 6c | The editor's vessel as an owner | 4e | The parts collection, `Resources` and `Stage` can be named against the vessel in the editor, which has no id, so each takes its state from the editor rather than from a vessel lookup. `Resources` also answers from its part when it is a single part's, which is a plain bug and applies in flight too. Cannot wait, for the same reason as 6b. |
-| 6d | Reclamation in the editor | 6 | `onEditorShipModified` asks for a sweep, the game raising no part-died event in an editor, and the sweep settles on the editor vessel's part count rather than on the game's vessel list, which is empty on a save with nothing in flight. Needs 5. |
-| 6e | Which vessel a craft id belongs to | 6 | The generation, so that a part of a vessel the editor has loaded over is gone rather than whatever now answers to its id; and `EditorShipAddon`, so that an undo is not taken for a new vessel. Needs 6a and 6b. |
+| 5a | `EditorExtensions` | 3e, then 5 | One place for the vessel the editor has open, what the game holds for it, and which vessel it is. 3e needs the first two as soon as the parts collection and `Resources` classify themselves, so it introduces them; the phase then replaces the copies of the same lookup that the editor scene API left in `Editor`, `EditorDeltaV`, `EditorVessel`, `Stage`, `Resources` and the parts collection. |
+| 5b | Parts in the editor | 3b | `PartId` holds a craft id or a flight id and says which, so a `Part` resolves against the vessel the editor has open or against the loaded vessels. Editor parts have no dormant form, and the errors say so. Cannot wait for the phase: a part that classifies itself at all has to answer for both scenes at once. |
+| 5c | The editor's vessel as an owner | 3e | The parts collection, `Resources` and `Stage` can be named against the vessel in the editor, which has no id, so each takes its state from the editor rather than from a vessel lookup. `Resources` also answers from its part when it is a single part's, which is a plain bug and applies in flight too. Cannot wait, for the same reason as 5b. |
+| 5d | Reclamation in the editor | 5 | `onEditorShipModified` asks for a sweep, the game raising no part-died event in an editor, and the sweep settles on the editor vessel's part count rather than on the game's vessel list, which is empty on a save with nothing in flight. Needs 4. |
+| 5e | Which vessel a craft id belongs to | 5 | The generation, so that a part of a vessel the editor has loaded over is gone rather than whatever now answers to its id; and `EditorShipAddon`, so that an undo is not taken for a new vessel. Needs 5a and 5b. |
 
 ## Testing
 
@@ -1447,7 +1457,7 @@ semantics, reclaimed-id lookup or hash stability. That is what the tests under
 
 ### The later phases
 
-Phases 7 to 14 get no budgets and add no benchmark case, because nothing they touch is on a path
+Phases 6 to 13 get no budgets and add no benchmark case, because nothing they touch is on a path
 that a stream re-evaluates over hundreds of objects:
 
 | Path | Why it is not measured |
@@ -1457,7 +1467,7 @@ that a stream re-evaluates over hundreds of objects:
 | a comm link | a walk of one vessel's control path, which is a handful of hops, against a captured reference today. `control_path` already allocates a list and an object per hop |
 | the drawing and interface update loops | one state check per client-owned object per frame, on a collection whose size is what a client explicitly created |
 
-The one thing phases 13 and 14 make faster is worth recording anyway. Moving `IRWrapper`'s
+The one thing phases 12 and 13 make faster is worth recording anyway. Moving `IRWrapper`'s
 per-instance reflection lookups to its one-time initialization takes about forty `GetProperty` and
 `GetMethod` calls off every servo and group the mod lists, which is per servo per call today, and
 `KACWrapper` gives about twenty back per alarm the same way.
@@ -1484,14 +1494,14 @@ per-instance reflection lookups to its one-time initialization takes about forty
    boundary, and a client disconnecting is not one, so they sit in the store until something else
    moves. Asking for a sweep when a client disconnects would close that, and it is a change to
    when sweeps happen rather than to what they do. Recommendation: leave it, and revisit with
-   phase 9, which is where the disconnect path is already being read.
+   phase 8, which is where the disconnect path is already being read.
  * **Is a Kerbal Alarm Clock alarm's id durable across a load?** The mod's API creates alarms by
    it and finds them by it, and kRPC already uses it that way, but nothing here has checked that
    the mod writes it into its own scenario rather than assigning it at load. If it does not, an
-   alarm object is a record of one game state, like a `ScienceSubject`, and phase 14 compares the
+   alarm object is a record of one game state, like a `ScienceSubject`, and phase 13 compares the
    generation instead of searching. The suite in `service/KerbalAlarmClock/test/` can settle it.
  * **Should a `CrewMember` rename be handled the way a `ServoGroup` rename is?** A servo group had
-   the same problem, its name being both what identifies it and a settable property, and phase 13
+   the same problem, its name being both what identifies it and a settable property, and phase 12
    settled it: the object follows the name it is given, and the hash is taken from the vessel
    alone, so the name can change without stranding the object in the store. Taking the hash off
    the mutable part is the whole of what makes carrying an identity forward safe, and it is what

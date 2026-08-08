@@ -3,7 +3,8 @@
 **Status:** in progress (2026-07-25) - built as designed, PR not yet raised. See
 [As built](#as-built) for where the implementation differs. Split out of
 [object-lifetime.md](../object-lifetime.md), which is its first consumer, so the benchmarks can be
-designed and built independently of that work.
+designed and built independently of that work. They are its last two phases, and land as a pull
+request of their own after the behavior change.
 **Issue:** _none yet - needs filing (`krpc/krpc`)._
 
 ## Problem
@@ -204,7 +205,7 @@ The suite is `tools/TestingTools/src/Benchmark.cs` plus `tools/benchmarks/`
 |---|---|---|
 | a new `Benchmark.cs` plus one `.csproj` line | also `TestingTools` became a `partial` class, and `core` gained `InternalsVisibleTo("TestingTools")` | procedures have to be members of the `[KRPCService]` class; the store case measures the real `KRPC.Service.ObjectStore` rather than a copy of it |
 | time with the game paused | nothing pauses | the timed loop runs on the game's main thread inside the server's update, so physics and rendering cannot interleave with it anyway; and against a server configured with `pauseServerWithGame` (which the local KSP install was) pausing deadlocks the suite, since the server stops answering the RPC that would unpause it |
-| object-store sweep case | `store.dedup`, over a private store pre-filled with one entry per part | there is no sweep until object-lifetime phase 1; the dedup path is what exists to measure, and is the other store cost that work has to not regress |
+| object-store sweep case | `store.dedup`, over a private store pre-filled with one entry per part | there is no sweep until object-lifetime's core infrastructure phase; the dedup path is what exists to measure, and is the other store cost that work has to not regress |
 | multi-vessel scene | three copies of the reference craft, spaced 500 m apart on one orbit | no new craft needed, and the point is the number of *loaded vessels* the scan walks |
 | 300+ part station | `Station300.craft`: a pod carrying 320 cubic octagonal struts in 40 stacks | a fixture, not a spacecraft |
 | results recorded through a pytest fixture | a module-level list in `harness.py` | pytest cannot inject fixtures into `unittest`-style test methods; `conftest.py` keeps the `pytest_terminal_summary` hook and `--benchmark-json` |
@@ -217,8 +218,8 @@ believing the reading; and the allocation figures come from
 `GC.GetAllocatedBytesForCurrentThread`, which the Mono KSP ships does provide, so the
 `GetTotalMemory` fallback is untested in practice.
 
-Both gaps left open for [object-lifetime.md](../object-lifetime.md) phase 2 are now closed by
-that phase:
+Both gaps left open for [object-lifetime.md](../object-lifetime.md) are now closed by its
+SpaceCenter benchmarks phase, which measures what its infrastructure phases ship:
 
  * `resolve.cached` was a stand-in written to the shape that design proposes. It now goes
    through the cache the service layer ships, so the case says what a part getter pays rather
