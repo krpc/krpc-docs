@@ -153,12 +153,13 @@ is documented.
 
 ### 4. Expression-valued calls (#517)
 
-`Function.CallWithArguments(ProcedureCall call, IList<Function> arguments)` — like `Call`,
-but the elements of `arguments` supply the call's arguments *by position* as sub-expressions
-(position 0 is the instance for class members). Positions not covered by the list (or covered by
-a null entry) fall back to the argument encoded in `call`, then to the parameter's default value.
-Each expression's static type must be assignable to the parameter's CLR type (checked at build
-time). This makes per-element calls work:
+`Function.CallWithArguments(ProcedureCall call, IDictionary<int, Function> arguments)` — like
+`Call`, but the entries of `arguments` supply the call's arguments as sub-expressions, keyed by
+the position of the parameter each one supplies (position 0 is the instance for class members).
+A position with no entry falls back to the argument encoded in `call`, then to the parameter's
+default value; a position outside the procedure's parameter list is an error. Each expression's
+static type must be assignable to the parameter's CLR type (checked at build time). This makes
+per-element calls work:
 
 > [!IMPORTANT]
 > Do we need the old `Call`? That is for calling a procedure from it's serialized arguments,
@@ -167,7 +168,7 @@ time). This makes per-element calls work:
 
 ```
 param    = Function.Parameter("e", Type.ClassType("SpaceCenter", "Engine"))
-hasFuel  = CallWithArguments(get_call(any_engine.has_fuel), [param])
+hasFuel  = CallWithArguments(get_call(any_engine.has_fuel), {0: param})
 predicate= Function.Lambda([param], Function.Not(hasFuel))
 anyOut   = Function.Any(Function.Call(get_call(parts.engines)), ...)
 ```
@@ -184,14 +185,23 @@ anyOut   = Function.Any(Function.Call(get_call(parts.engines)), ...)
 (The client builds the template `ProcedureCall` from any convenient instance — only the procedure
 identity is used for overridden positions.)
 
+`arguments` was originally a list, with a null element marking a position that falls back to the
+call or the default. Nullable value support ([PR #1017](https://github.com/krpc/krpc/pull/1017))
+then made null a value signaled out of band rather than by an object id of 0, so a null element
+inside a collection is no longer encodable by any client — leaving a Python function that calls an
+RPC with keyword arguments skipping a parameter no way to express the gap. Keying by position
+needs no placeholder, and drops the list form's trailing-null trimming.
+
 Implementation: both `Call` and `CallWithArguments` compile to a **direct, statically typed
 `LinqExpression.Call` of the procedure's underlying `MethodInfo`** (now exposed as
 `IProcedureHandler.Method` by all three handler types — property accessors are wrapped via
 their getter/setter `MethodInfo`, so every RPC is inlinable). Arguments are typed
-sub-expressions or typed constants — no `object[]` allocation, no boxing, and the .NET JIT can
-inline the target (e.g. `StdLib.Sqrt` inlines down to `Math.Sqrt`; measured 38.4 → 7.8 ns/call
-with gen-0 collections eliminated, which matters under Unity's Boehm GC). Semantics match an
-ordinary RPC exactly via two lean static helpers emitted around the call:
+sub-expressions or typed constants, built at the method's own parameter types rather than the
+procedure signature's — a nullable value-type parameter is `T` in the signature and `Nullable<T>`
+on the method, and only the latter types the call. No `object[]` allocation, no boxing, and the
+.NET JIT can inline the target (e.g. `StdLib.Sqrt` inlines down to `Math.Sqrt`; measured
+38.4 → 7.8 ns/call with gen-0 collections eliminated, which matters under Unity's Boehm GC).
+Semantics match an ordinary RPC exactly via two lean static helpers emitted around the call:
 
 * `Services.CheckFunctionGameScene(procedure)` before every invocation (same scene-mask
   check and `RPCException` as the ordinary dispatch path);
@@ -500,9 +510,10 @@ compile-time error naming the construct rather than a confusing failure on the s
 Procedures are resolved from a cached `KRPC.GetServices` metadata index rather than by stub
 introspection — the dynamic Python stubs bake their metadata into closures, so the index is the
 only representation that works identically for both stub implementations. Template
-`ProcedureCall`s carry no arguments; every argument is supplied positionally as an expression,
-with per-parameter numeric conversion (a Python float is a double, so single-precision parameters
-get `constant_float`/casts).
+`ProcedureCall`s carry no arguments; every argument the call supplies is an expression keyed by
+its parameter position, with per-parameter numeric conversion (a Python float is a double, so
+single-precision parameters get `constant_float`/casts). A position a keyword argument skips is
+simply absent, so the server uses the parameter's default.
 
 ### Python
 
