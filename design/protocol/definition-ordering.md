@@ -169,10 +169,13 @@ sort can be introduced, tested and trusted before anything depends on it being s
   defaults render as named members. Each language's `parse_default_value` gains the
   rendering (`TestEnum.value_c` in Python, `TestEnum::kValueC` in C++, and so on),
   replacing the integer cast.
-- **Pass clientgen the complete definitions.** `clientgen/__init__.py` hands the
-  generator every service's definitions; the generated *output* still covers one
-  service. Phase one then has everything it needs regardless of which service is being
-  generated.
+- **Pass clientgen whatever the input contains.** `clientgen/__init__.py` hands the
+  generator every service in the loaded definitions rather than `defs[args.service]`;
+  the generated *output* still covers one service. Note this changes little in the real
+  pipeline, where the ServiceDefinitions tool emits exactly one service per file, and is
+  mostly about not discarding what a hand-written or future multi-service file provides.
+  Where a referenced service is genuinely absent, that is reported as a missing input,
+  not worked around.
 - **Registration is per run, not per process.** `Generator.types` and
   `Appendable.types` stop being class attributes; the `Types` registry becomes state the
   shared analysis owns for one run. This keeps a run's registrations isolated and
@@ -263,6 +266,72 @@ than something to fix.
 cnano's `build_collection_types` is replaced by the shared `collection_types` helper.
 Same traversal, one copy, and it gains the cycle check it currently does without.
 
+### Why not sort in the producer
+
+Worth asking, because if the definitions arrived already in a valid order then no
+consumer would need to sort at all. The answer is that the producer cannot promise it,
+for four independent reasons, any one of which is enough.
+
+**The ServiceDefinitions tool emits exactly one service.** After scanning, `Program.cs`
+narrows the scanner's results to the requested service and throws the rest away, even
+though the other services were loaded and found:
+
+```csharp
+var services = KRPC.Service.Scanner.Scanner.GetServices ();
+services = new Dictionary<string, ServiceSignature> { { service, services [service] } };
+```
+
+Each JSON file therefore describes one service, and no invocation of the tool ever sees
+the graph it would have to sort.
+
+**Order across kinds is not something a producer can express.** The JSON has separate
+`procedures`, `classes`, `enumerations` and `exceptions` keys, and the protobuf has
+separate repeated fields. "Definitions before procedures" is not an ordering of a
+sequence, it is a choice the consumer makes about which key to read first. No producer
+can stop `docgen/nodes.py` reading `procedures` first, which is the failure that
+actually bites.
+
+**The dynamic clients never see this tool.** They get a `Services` message from
+`KRPC.GetServices` on the running server. Sorting in ServiceDefinitions would do nothing
+for them. Sorting in the scanner instead would cover both paths, but the two reasons
+above still apply, and so does the fourth.
+
+**Cycles between services are legal.** Drawing, UI and the SpaceCenter already form
+cross-service references, with Drawing's `Line.ReferenceFrame` typed as a SpaceCenter
+class. Nothing forbids the reverse direction as well, and two services referring to each
+other's types is a reasonable thing to build. A topological sort over services would
+have to reject it, so the server cannot promise a valid global order even in principle.
+
+And even where a producer could establish an order, a consumer cannot rely on it.
+krpctools reads hand-written definitions such as `Empty.json` and third-party service
+assemblies it did not produce, and docgen merges its definition files with
+`services_info.update(...)` in command-line argument order, which discards whatever
+order each file arrived in.
+
+What the producer *can* usefully do is emit each `structs` list in dependency order
+within its own service, where the scanner has already proved acyclicity. That is worth
+doing when structs land, as a nicety that makes the file easier to read. It does not
+remove the consumer's sort, because the consumer still cannot trust input it did not
+generate.
+
+### A missing definition, not a late one
+
+Following the tool's one-service output through has a consequence for the error story.
+When clientgen generates Drawing, SpaceCenter's definitions are not late, they are
+absent: the file contains Drawing alone. Cross-service references work today only
+because a class reference needs nothing but `service` and `name`, which the `Type`
+message carries. Generated code says `class_type("SpaceCenter", "ReferenceFrame")` and
+never consults a SpaceCenter definition.
+
+So a cross-service enum default is not resolvable by clientgen at whatever ordering, and
+neither would a cross-service struct be, which needs its field list to generate a codec
+at all. The shared pass must report that as the missing input it is, naming the service
+whose definitions were not supplied. Making it work is a separate change with a choice
+of two shapes, either ServiceDefinitions emitting the definitions of services it
+references alongside the requested one, or clientgen accepting several definition files
+the way docgen already does. Neither is needed for this design, and both are cheap to
+add later.
+
 ### What is deliberately not shared
 
 clientgen's `generate_context` and docgen's `Service.__init__`/`Class.__init__` both
@@ -308,9 +377,13 @@ reading a large fixture diff and a structural change at once.
   defaults to the other's enum member, and construct the services in both orders. Both
   must yield a usable service whose default is the right enum member. A list-of-enums
   default covers the recursive case, where the enum sits inside a collection type.
-- **krpctools**: a hand-written multi-service ordering fixture beside `Empty.json`,
-  generating the dependent service, for both clientgen and docgen. The hostile order
-  must produce output identical to the friendly order.
+- **krpctools**: a multi-service ordering fixture beside `Empty.json`, generating the
+  dependent service, for both clientgen and docgen. The hostile order must produce
+  output identical to the friendly order. It has to be hand-written, since the
+  ServiceDefinitions tool emits one service per file and can never produce one.
+- **Missing service**: generating a service whose definitions reference an enumeration
+  no supplied file defines must fail naming the absent service, rather than producing
+  output with a hole in it.
 - **Nested enum default**: a procedure whose parameter defaults to a collection or tuple
   containing an enumeration, which fails today in both clientgen and docgen with no
   ordering involved. Worth adding to `TestService` as well as to the fixture, so the
