@@ -1,8 +1,9 @@
 # Service definition ordering
 
-**Status:** proposal (2026-08-09), no issue filed yet. Prerequisite for
+**Status:** implemented (2026-08-09), all six phases. Prerequisite for
 [struct-types.md](struct-types.md), which cannot be implemented cleanly until this
-lands.
+lands. See *What was built* below for where the implementation differs from this
+design.
 
 ## Context
 
@@ -468,6 +469,61 @@ formed.
 
 The reverse dependency does not hold. Nothing here needs structs, and everything here is
 testable with enumerations alone.
+
+## What was built
+
+All six phases landed, one commit each and in the order above, followed by two commits
+the phases turned out to need: the C++ encode and decode fix below, and the `TestService`
+procedure it unblocked. Where the implementation differs from the design:
+
+| Design | Built |
+| --- | --- |
+| `register_all` and the sort | plus `topological_order(nodes, key, dependencies)`, the sort on its own, which krpctools reuses for `collection_types` so there is one traversal rather than two |
+| errors raised from the ordering pass | the missing-definition and undeclared-value errors surface where the value is decoded, so `krpc/definitions.py` also owns `decode_default_value(client, value, typ, location)`, which both consumers call. `location` is `Service.Procedure parameter name` |
+| Lua gets "the equivalent" | two-phase registration, not a sort: with no edges between definitions the two answers are the same, and a sort in Lua would have nothing to order |
+| C++ renders `TestEnum::kValueC` | `TestService::TestEnum::value_c`. Generated C++ enumeration members are snake case, so that is what a default has to name |
+| nested enum default added to `TestService` | `TestService.EnumListDefault`, declared with `[KRPCDefaultValue]`, which sets a default that is not a compile-time constant and so can be a collection. Adding it meant fixing a C++ bug first, below |
+| rendering changes in the `docgen/csharp.py` and `docgen/cpp.py` overrides | only `docgen/csharp.py`. The C++ domain has no enumeration case of its own, so the language's rendering reaches it unchanged |
+| enum defaults render as named members | Python and Lua also had to learn to write a collection default in their own syntax. Python wrote `repr` of the decoded value, which happened to be Python syntax until it contained an enumeration member; Lua wrote the same, which was never Lua syntax |
+
+### The C++ client could not carry a collection of enumerations at all
+
+Found by adding `EnumListDefault`, and nothing to do with default values: `IList<TestEnum>`
+anywhere in a service was enough to stop the generated C++ client compiling.
+
+```
+encoder.hpp:61:27: error: call to function 'encode' that is neither visible in the
+template definition nor found by argument-dependent lookup
+note: 'encode' should be declared prior to the call site or in namespace 'krpc::services'
+```
+
+`krpc::encoder::encode(const std::vector<T>&)` calls `encode(*x)` unqualified. At the
+point that template is defined only the generic overloads exist, and the per-enumeration
+overload the generated service header adds is in `krpc::encoder`, while argument
+dependent lookup for `TestService::TestEnum` searches `krpc::services`. `decode` failed
+the same way. Nothing in kRPC had a collection of enumerations, which is why it had gone
+unnoticed.
+
+`cpp.tmpl` now also declares each enumeration's `encode` and `decode` in `krpc::services`,
+forwarding to the ones in `krpc::encoder` and `krpc::decoder`, where argument dependent
+lookup finds them. It landed as its own commit before `EnumListDefault`.
+
+One test in the list above was not written, deliberately. The JSON adapter does **not**
+produce the same `Definition` records the client builds from a `Services` message, so
+there is nothing to assert parity against: the client registers an enumeration's values
+under snake case names, which is what its Python API exposes, and krpctools registers
+them under the names the enumeration declares, so that each language can apply its own
+convention. Everything else about the two records matches, and the sort and the errors
+they feed are shared, which is what the test was reaching for.
+
+Two things worth knowing that the design did not call out:
+
+- `Generator.__init__` now takes a `Definitions` rather than one service's definitions,
+  which is a contract change for a generator module passed to `krpc-clientgen` by path.
+- The Python client generator uses a `StubLanguage`, a `PythonLanguage` that knows the
+  service being generated, so that another service's types are named through the module
+  its stubs are imported from. `parse_type_specification` uses it too, in place of the
+  copy of that rule it carried.
 
 ## Open questions
 
