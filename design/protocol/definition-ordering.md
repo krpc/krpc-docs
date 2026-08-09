@@ -178,14 +178,25 @@ sort can be introduced, tested and trusted before anything depends on it being s
   shared analysis owns for one run. This keeps a run's registrations isolated and
   sidesteps the `set_values` assertion instead of weakening it. Within a docgen run
   every service still shares one registry, which is what cross-service references need.
-- **The dynamic clients do not share this code.** krpctools depends on the `krpc`
-  package, so nothing in `client/python` may import from krpctools; the dependency only
-  runs one way. The dynamic clients also consume a protobuf `Services` message rather
-  than the definitions JSON, and Lua shares no Python at all. Each therefore keeps its
-  own registration pass, which is a short loop over every service before any is built.
-  If the struct sort turns out to be worth sharing with Python later, the sort itself
-  can move into `krpc/types.py`, which krpctools already depends on. Not worth doing
-  before there is a second caller.
+- **The dynamic clients do not share this code.** `krpc` is what someone installs to
+  write scripts against a running game; krpctools is what a client author installs to
+  generate stubs and documentation. A player must never have to install client-author
+  tooling in order to talk to the game, so `krpc` depends on nothing but `protobuf`,
+  and the boundary is a product decision rather than a packaging accident. The
+  packaging reflects it: the two are separate distributions, aimed at different
+  audiences, under different licenses, LGPL for the client library and GPL for the
+  tools. Nothing in `client/python` may import from krpctools.
+
+  Two lesser reasons point the same way. The dynamic clients consume a protobuf
+  `Services` message rather than the definitions JSON, and Lua shares no Python at all.
+  Each therefore keeps its own registration pass, a short loop over every service
+  before any is built.
+
+  The reverse move stays available and stays subject to the same rule: a piece of this
+  may go into `krpc/types.py`, which krpctools already depends on, **only if the client
+  itself needs it**, never merely to give krpctools something to share. The struct
+  ordering may qualify one day, since the dynamic client has to register struct fields
+  in dependency order too. Sharing for its own sake would not.
 - **A missing definition is a named error.** If a type is referenced and no service in
   the input defines it, fail with a message naming the service and type. The present
   failure mode is a `NoneType` error from inside a decoder, several frames from the
