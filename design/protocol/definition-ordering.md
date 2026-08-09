@@ -106,6 +106,18 @@ needed: `docgen/nodes.py Service.__init__` builds its procedures, and therefore 
   the input defines it, fail with a message naming the service and type. The present
   failure mode is a `NoneType` error from inside a decoder, several frames from the
   cause.
+- **An enum default that names no declared value is an error too**, on the same footing
+  as a type that cannot be resolved. There is no fallback to the integer cast: a
+  definition that says a parameter defaults to a value its own enumeration does not
+  declare is malformed, and quietly emitting `static_cast<Mode>(7)` would bake the
+  contradiction into generated code and published documentation. Python's `Enum`
+  already supplies the check, raising `ValueError: 7 is not a valid Mode` when
+  constructed with an undeclared value, so removing the sint32 workaround gets this for
+  free; the work is to attach the service, procedure and parameter to the message and
+  raise it as the `RuntimeError` that `clientgen/__init__.py main()` already catches and
+  reports, rather than letting it surface as a traceback. Worth giving the existing
+  unresolvable-type errors the same treatment while nearby, since they escape as
+  tracebacks today.
 - **Defaults stay eagerly decoded.** Deferring the decode to first use would also fix
   the ordering, by making it impossible to decode too early, but it moves work into
   every call and hides definition errors until a user trips over them. A complete phase
@@ -149,6 +161,9 @@ reading a large fixture diff and a structural change at once.
   without it.
 - **Repeated registration**: generating two definition sets in one process must not
   raise, covering the `set_values` assertion.
+- **Malformed enum default**: a fixture whose parameter defaults to an integer its
+  enumeration does not declare must fail generation with a message naming the service,
+  procedure and parameter, for both clientgen and docgen.
 
 ## Effect on structs
 
@@ -168,7 +183,3 @@ testable with enumerations alone.
    each have their own definition-walking code; whether phase one is genuinely shared
    code or the same shape written three times is worth deciding when the Python and Lua
    changes are written.
-2. **Enum member rendering for values with no name.** An enum default whose integer does
-   not correspond to a declared value cannot render as a member. The scanner should not
-   be able to produce one, but the tools should decide between failing and falling back
-   to the cast rather than doing so by accident.
