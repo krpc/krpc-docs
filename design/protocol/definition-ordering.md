@@ -153,11 +153,18 @@ sort can be introduced, tested and trusted before anything depends on it being s
 
 ## Decisions
 
-- **One shared analysis pass in krpctools, not two phases per consumer.** A new module
+- **One shared analysis pass, not two phases per consumer.** A single implementation
   takes the definitions of every service, resolves and orders them, and hands back a
-  structure a consumer can walk front to back without thinking about ordering at all.
-  clientgen and docgen consume that instead of each growing their own phase one. Details
-  below.
+  populated registry a consumer can use without thinking about ordering at all. The
+  dynamic Python client, clientgen and docgen all use it instead of each growing their
+  own. Details below.
+- **It lives in the `krpc` package, and krpctools uses it from there.** krpctools
+  already depends on `krpc` for its whole type system: `Types`, the type classes, the
+  protobuf `Type` message, `Decoder`, `Attributes` and `snake_case`. It never opens a
+  connection or calls an RPC; its definitions come from ServiceDefinitions, which drives
+  the scanner offline. So the two consumers are not separated by much, and the ordered
+  registration is something the dynamic client needs for its own sake, which is the test
+  for putting anything in the player-facing package. Only Lua reimplements it.
 - **Ordering is a topological sort with cycle detection.** Not a hardcoded
   definitions-then-procedures rule, even though that is all today's graph needs. The
   sort makes the guarantee explicit and testable, generalizes to struct fields without
@@ -186,25 +193,20 @@ sort can be introduced, tested and trusted before anything depends on it being s
   shared analysis owns for one run. This keeps a run's registrations isolated and
   sidesteps the `set_values` assertion instead of weakening it. Within a docgen run
   every service still shares one registry, which is what cross-service references need.
-- **The dynamic clients do not share this code.** `krpc` is what someone installs to
-  write scripts against a running game; krpctools is what a client author installs to
-  generate stubs and documentation. A player must never have to install client-author
-  tooling in order to talk to the game, so `krpc` depends on nothing but `protobuf`,
-  and the boundary is a product decision rather than a packaging accident. The
-  packaging reflects it: the two are separate distributions, aimed at different
-  audiences, under different licenses, LGPL for the client library and GPL for the
-  tools. Nothing in `client/python` may import from krpctools.
+- **The dependency direction is fixed, and it is what makes the sharing work.** `krpc`
+  is what someone installs to write scripts against a running game; krpctools is what a
+  client author installs to generate stubs and documentation. A player must never have
+  to install client-author tooling in order to talk to the game, so `krpc` depends on
+  nothing but `protobuf`, and the boundary is a product decision rather than a packaging
+  accident. The packaging reflects it: separate distributions, different audiences,
+  different licenses, LGPL for the client library and GPL for the tools. Nothing in
+  `client/python` may import from krpctools, ever.
 
-  Two lesser reasons point the same way. The dynamic clients consume a protobuf
-  `Services` message rather than the definitions JSON, and Lua shares no Python at all.
-  Each therefore keeps its own registration pass, a short loop over every service
-  before any is built.
-
-  The reverse move stays available and stays subject to the same rule: a piece of this
-  may go into `krpc/types.py`, which krpctools already depends on, **only if the client
-  itself needs it**, never merely to give krpctools something to share. The struct
-  ordering may qualify one day, since the dynamic client has to register struct fields
-  in dependency order too. Sharing for its own sake would not.
+  Shared code therefore goes in `krpc`, which is the direction that already works, and
+  only when the client needs it for itself. Ordered registration passes that test: the
+  client has to register definitions before decoding a default, exactly as krpctools
+  does, and will have to register struct fields in dependency order for the same reason.
+  Sharing is a consequence, not the justification.
 - **A missing definition is a named error.** If a type is referenced and no service in
   the input defines it, fail with a message naming the service and type. The present
   failure mode is a `NoneType` error from inside a decoder, several frames from the
@@ -232,24 +234,46 @@ sort can be introduced, tested and trusted before anything depends on it being s
 
 ## The shared analysis
 
-A new `krpctools/definitions.py`, sitting under clientgen and docgen alike. It is given
-the parsed definitions of **every** service in the input, and is the only thing that
-knows about ordering.
+Split across the two packages along the line the dependency already runs.
+
+**`krpc/definitions.py`**, in the client package, owns everything that is not about how
+the definitions were obtained: the graph, the sort, the cycle check and the registration.
+
+```
+register_all(types, definitions)
+
+  definitions   an iterable of Definition records, each carrying its service, name,
+                kind, the protobuf Types it references, and how to register itself
+  types         the Types registry to populate
+```
+
+It topologically sorts the records by the types they reference, then walks that order
+registering each, calling `set_values` for an enumeration and, later, `set_fields` for a
+struct. It raises on a cycle and on a reference nothing defines. Everything it needs is
+already in the package: `Types`, the type classes, and the protobuf `Type` message. Its
+only caller at first is `client.py`, building `Definition` records from the `Services`
+message before creating any service.
+
+**`krpctools/definitions.py`** is the adapter and nothing more: it reads the definitions
+JSON, converts each declaration into a `Definition` record with
+`utils.py _as_protobuf_type` for the type references, and calls `register_all`. It also
+owns the pieces that only make sense for a generator:
 
 ```
 Definitions.load(services_info) -> Definitions
 
-  .types                  a Types registry with every named definition registered
+  .types                  a registry in which every as_type already resolves
   .services               the definitions, unchanged, keyed by service name
-  .ordered_definitions()  every named definition, dependency order, service-qualified
   .collection_types(...)  structural types innermost first, replacing cnano's copy
 ```
 
-`load` does three things in order: collect every named definition across all services;
-topologically sort them by the types they reference; then walk that order registering
-each into a single `Types` registry, calling `set_values` for an enumeration and, later,
-`set_fields` for a struct. What a consumer gets back is a registry in which every
-`as_type` already resolves, so the ordering question never reaches consumer code.
+What a consumer gets back either way is a registry with everything resolved, so the
+ordering question never reaches consumer code.
+
+The two do differ in what they carry, and the `Definition` record is the seam: the
+client has protobuf `Enumeration` messages with `values`, krpctools has JSON dicts, and
+each builds records its own way. What neither repeats is the sort, the cycle detection
+or the error messages.
 
 Three errors, all naming what failed and where:
 
@@ -355,17 +379,19 @@ afterwards, if at all.
 
 ## Phases
 
-1. **Python dynamic client.** Register the class and enum types of every service before
-   creating any service, extending the pre-generated-stub pass in `client.py` to cover
-   dynamic services too.
-2. **Lua dynamic client.** The same change to `client.lua`.
-3. **`krpctools/definitions.py`**, with its own unit tests and no callers yet: the
-   collection of named definitions, the topological sort, the cycle and
-   unresolved-reference errors, and the registry population. Testable entirely on its
-   own, which is most of the argument for landing it separately.
-4. **Adopt it in clientgen and docgen.** The full definitions through
-   `clientgen/__init__.py`, a `Definitions` built once in `docgen/__init__.py`, and the
-   registries moved off the class. cnano's `build_collection_types` gives way to the
+1. **`krpc/definitions.py`**, with its own unit tests and no callers yet: the
+   `Definition` record, the topological sort, the cycle and unresolved-reference errors,
+   and the registration walk. Testable entirely on its own, which is most of the
+   argument for landing it first.
+2. **Python dynamic client** adopts it, registering every service's definitions before
+   creating any service and replacing the pre-generated-stub pass in `client.py` that
+   already does half of this.
+3. **Lua dynamic client.** The equivalent in `client.lua`, written directly rather than
+   shared, since Lua reaches none of the above.
+4. **krpctools adapter and adoption.** `krpctools/definitions.py` builds `Definition`
+   records from the JSON and calls `register_all`; the full definitions go through
+   `clientgen/__init__.py`; docgen builds one `Definitions` in `__init__.py`; the
+   registries move off the class; cnano's `build_collection_types` gives way to the
    shared helper. No output change yet, so the golden files are untouched and the diff
    stays about the mechanism.
 5. **Retire the enum workaround.** Drop the sint32 special case and render enum defaults
@@ -375,9 +401,15 @@ afterwards, if at all.
    every golden fixture.
 6. **Changelogs**, as a single commit before the branch is pushed.
 
-Phases 4 and 5 are separable and worth separating: phase 4 is pure mechanism with no
-output change, phase 5 is entirely output change. Reviewing them together would mean
-reading a large fixture diff and a structural change at once.
+Phase 1 landing before its callers is what makes the sort reviewable as a piece of
+graph code rather than as an incidental part of a client change. Phases 4 and 5 are
+separable for the opposite reason: phase 4 is pure mechanism with no output change,
+phase 5 is entirely output change, and reviewing them together would mean reading a
+large fixture diff and a structural change at once.
+
+This spans both the `krpc` and krpctools changelogs, which is expected: the client
+package gains the ordered registration and the fix for a cross-service default, and
+krpctools gains the corrected enum defaults.
 
 ## Tests
 
@@ -403,12 +435,15 @@ reading a large fixture diff and a structural change at once.
   it.
 - **Repeated registration**: generating two definition sets in one process must not
   raise, covering the `set_values` assertion.
-- **`definitions.py` unit tests**, independent of any generator: a shuffled input
-  produces the same order; a definition referencing an undefined type raises naming
-  both; a cyclic definition raises listing the cycle; collection types come back
-  innermost first, matching what cnano emits today. The cycle case needs a hand-written
-  fixture until structs exist, since nothing the scanner can currently produce has an
-  edge to cycle on.
+- **`krpc/definitions.py` unit tests**, with no client and no generator involved: a
+  shuffled input produces the same order; a definition referencing an undefined type
+  raises naming both; a cyclic definition raises listing the cycle. These are plain
+  graph tests over hand-built `Definition` records, and they are where the sort is
+  actually pinned. The cycle case needs hand-built records until structs exist, since
+  nothing the scanner can currently produce has an edge to cycle on.
+- **`krpctools/definitions.py`**: collection types come back innermost first, matching
+  what cnano emits today, and the JSON adapter produces the same records the client
+  builds from a protobuf `Services` message for an equivalent definition.
 - **Malformed enum default**: a fixture whose parameter defaults to an integer its
   enumeration does not declare must fail generation with a message naming the service,
   procedure and parameter, for both clientgen and docgen.
@@ -418,17 +453,18 @@ reading a large fixture diff and a structural change at once.
 [struct-types.md](struct-types.md) records this as its gotcha 4, because a struct's
 field list is contents a consumer needs, exactly like an enumeration's values, and it is
 needed far more often than only for defaults: it is the decoder. Once this lands, adding
-structs to krpctools means teaching `definitions.py` two things, that a struct
-definition contributes edges to each type its fields mention and that registering one
-means calling `set_fields`. Nothing in clientgen or docgen changes to accommodate the
-ordering, struct-typed default values need no special rule, and the gotcha and the
-ordering work under its *Default values* section can be deleted rather than
-implemented.
+structs means teaching `krpc/definitions.py` two things, that a struct definition
+contributes edges to each type its fields mention and that registering one means calling
+`set_fields`, plus a record builder on each side. That is one place for the ordering
+rather than three. Nothing in the dynamic client, clientgen or docgen changes to
+accommodate it, struct-typed default values need no special rule, and the gotcha and the
+ordering work under its *Default values* section can be deleted rather than implemented.
 
 Struct cycles are where the cycle check earns its place. The server rejects them at
 scan time, but krpctools also generates from hand-written JSON and from third-party
-service assemblies it did not validate, so it cannot assume the definitions it is given
-are well formed.
+service assemblies it did not validate, and the dynamic client will connect to whatever
+server it is pointed at, so neither can assume the definitions it is handed are well
+formed.
 
 The reverse dependency does not hold. Nothing here needs structs, and everything here is
 testable with enumerations alone.
@@ -436,6 +472,6 @@ testable with enumerations alone.
 ## Open questions
 
 None outstanding. The question of whether the ordering pass is genuinely shared code is
-settled above: shared between clientgen and docgen in `krpctools/definitions.py`, and
-deliberately not shared with the dynamic clients, which sit below krpctools in the
-dependency order and read a different representation.
+settled above: the graph, the sort and the errors live once in `krpc/definitions.py`,
+used by the dynamic Python client and, through a thin JSON adapter, by clientgen and
+docgen. Only Lua writes its own, having no way to reach Python.
