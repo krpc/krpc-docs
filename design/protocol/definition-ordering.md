@@ -163,6 +163,11 @@ sort can be introduced, tested and trusted before anything depends on it being s
   sort makes the guarantee explicit and testable, generalizes to struct fields without
   revisiting every consumer, and turns a cyclic definition into a named error instead of
   a stack overflow.
+- **The sort lives only in the consumer.** Nothing changes in the server or in the
+  ServiceDefinitions tool, which keep emitting definitions in declaration order. A
+  producer cannot guarantee a usable order anyway, for the reasons below, and a
+  producer-side sort would be a second implementation to keep correct that saves the
+  consumer nothing.
 - **Remove the enum sint32 workaround** in `decode_default_value`, and decode an enum
   default through its registered type like any other value. This is what makes the
   ordering machinery real rather than decorative, and it corrects the generated output:
@@ -308,11 +313,14 @@ assemblies it did not produce, and docgen merges its definition files with
 `services_info.update(...)` in command-line argument order, which discards whatever
 order each file arrived in.
 
-What the producer *can* usefully do is emit each `structs` list in dependency order
-within its own service, where the scanner has already proved acyclicity. That is worth
-doing when structs land, as a nicety that makes the file easier to read. It does not
-remove the consumer's sort, because the consumer still cannot trust input it did not
-generate.
+So the producer sorts nothing, and keeps emitting definitions in declaration order. It
+would be possible to sort each `structs` list within its own service once structs land,
+since the scanner has proved acyclicity by then, but it would buy nothing. The
+consumer's sort runs either way, because the consumer cannot trust input it did not
+generate. The only thing a producer-side sort would add is a second ordering
+implementation to keep correct, written in C#, where it is harder to test than the
+shared pass and where being wrong would be invisible until some consumer stopped
+compensating for it.
 
 ### A missing definition, not a late one
 
