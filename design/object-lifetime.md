@@ -1,6 +1,8 @@
 # Object lifetime, destroyed objects and object-store reclamation
 
-**Status:** in progress. Every phase below is built; no PR is raised yet. Covers issues
+**Status:** in progress. Phases 1 to 14 are built; no PR is raised yet. Phases 15 and 16, the
+benchmarking, are a pull request of their own and are not built here; the numbers under
+[Performance](#performance) were measured on a build that carried them. Covers issues
 [#885](https://github.com/krpc/krpc/issues/885),
 [#764](https://github.com/krpc/krpc/issues/764),
 [#771](https://github.com/krpc/krpc/issues/771) and the follow-up left open by
@@ -283,6 +285,11 @@ part at a time in the same way. Without that, a sweep landing in the middle of a
 reloaded would see every part of it as absent and drop the proxies for the very parts about to
 come back.
 
+Only counts taken since the sweep was asked for say anything about whether the game has finished.
+A count left over from an earlier sweep can equal the first count of this one by coincidence, which
+would report a state that has not begun to settle as settled, so the count is forgotten whenever no
+sweep is due.
+
 Destruction events ask for a sweep, but do not move the generation on. Nothing has been rebuilt, so
 nothing a proxy resolved before the event has to be resolved again. One sweep also covers a whole
 vessel coming apart, which destroys many parts in a single moment.
@@ -370,7 +377,7 @@ The rest of the interface's contract is what makes a sweep over the whole store 
 |---|---|
 | implementing it is opt-in | additive per class, and what a class that does not implement it gets is the behavior of today: never swept, always usable. Anything not yet reasoned about falls back to that |
 | `Destroyed` means definitively gone; anything less certain is `Dormant` | the two mistakes do not cost the same, per [Classification](#classification-live-dormant-and-destroyed). The store removes on one value only, so the conservative answer is the implementer's to give |
-| it must not throw | one pass calls it on every entry in the store |
+| it must not throw | one pass calls it on every entry in the store. The sweep catches one that does anyway and keeps the proxy, because several implementations reach into a mod's API through reflection and one that breaks the rule must not stop the rest of the store being checked |
 
 **The state getter goes on everything, whether or not the class re-derives.** The sweep reclaims
 only what opts in, so a class left out accumulates in the store for the whole session however well
@@ -382,6 +389,14 @@ Classification is off the fast path by construction. It runs only once a resolve
 failed, or from a sweep at a load boundary, so it may search as widely as it needs to. Searching
 every persistent form the game keeps, to prove nothing holds the object before calling it
 destroyed, is affordable exactly because nothing reaches that code on a working access.
+
+The exception is a caller that asks on every update rather than on a client call: a force being
+applied to a part, and a resource transfer running between two. A `Part` therefore answers live
+straight from its cache, since a part looked up in this game state and still there is the part,
+and only falls through to the search on a miss. That holds in flight alone. A part in an editor
+belongs to the vessel it was taken from, and one of a vessel the editor has loaded over is gone
+however alive the game object it was still is; see
+[The vessel in the editor](#the-vessel-in-the-editor).
 
 A proxy with no existence of its own does not classify itself, it defers: one that only names
 something reached through another is exactly as live, dormant or destroyed as its owner. Where it
@@ -686,6 +701,13 @@ can be caught by: the position stops carrying the id, and the lookup that follow
 wherever it moved to, or reports it gone. What it costs is a walk of the list, once, until the next
 change; see [Open questions](#open-questions).
 
+There is a third outcome, where the id answers to nothing and the count is what decides. A module
+removed from a part carrying several of its class renumbers the occurrences of the rest, so the
+reference for the one that went finds the module that has taken its place rather than reporting it
+gone. That needs a part's module list to change at runtime with ids already given out, which
+nothing in KSP does, and the count is what has to answer wherever the game knows a module by no id
+at all.
+
 A proxy standing for several modules holds a reference to each rather than a list of the modules:
 `Engine` keeps one per mode, and `ResourceConverter` one per converter, in the order its index
 arguments count in. A list of modules is the same captured reference in another shape.
@@ -718,6 +740,13 @@ nothing at all.
 `Stage` names its vessel by id rather than holding the KSP vessel, so resolving is a lookup by
 that id. Reading `.id` off a captured Unity object inside `Equals` is the one thing
 [Identity](#identity) forbids.
+
+`Orbit` is one of these, and the game rebuilds an orbit with the thing that has it, so an orbit
+asks its owner for it on each access rather than holding the one the owner had. What it is, is
+whose orbit it is, so that is also its identity, and the store hands back one object for a
+vessel's orbit however often it is asked for. A patch is the exception: it is an orbit the object
+follows on to rather than the owner's own, and the game offers nothing to ask for it by, so a
+patch holds the KSP orbit and is identified by it, while still taking its state from the owner.
 
 Three of these can be named against the vessel in the editor instead: the parts collection,
 `Resources` and `Stage`. That vessel has no id, so each carries a flag saying it is the editor's
@@ -786,6 +815,11 @@ it stands for is a record in one game's science database, so the proxy is live w
 it was read from is the loaded one, and destroyed once that state has been replaced. Comparing
 `GameState.Generation` is the whole of both the access check and its state, so it costs a `uint`
 comparison and no search.
+
+The subject is also looked up by its id on each access, falling back to what the proxy was built
+from. Dedup and a held object do not go together otherwise: the game builds a subject nothing has
+been banked against on the spot, so the first read of one takes a throwaway, and every later read
+is deduped onto that proxy and would go on reporting no science after some had been banked.
 
 `ScienceSubject` also needs an identity, having none today, so that the store dedups it instead of
 taking a new entry per read. That identity is the subject id **and** the generation it was read in,
@@ -940,7 +974,9 @@ once it is, and no dormant state, because nothing rebuilds a client's line or pa
 records having been taken out, because the game tears a game object down at the end of the frame
 rather than at once, and an object the client has removed should not answer for the rest of that
 frame. A `Force` is not a game object at all. It is an instruction naming a part, so it takes its
-part's state, dormant included.
+part's state, dormant included, and it records having been taken out for a reason of its own: the
+part goes on living, so nothing else would ever say that a force the client removed is no longer
+applied.
 
 What they share is the frame loop, and that is the one piece of infrastructure the other services
 need. It goes where `ClientOwnedObjects` already lives:
@@ -995,7 +1031,8 @@ things are specific to the service:
   component as equal to null, so two objects standing for different destroyed components compare
   equal and the store can hand back the wrong one. All four are named by the component they wrap,
   compared by reference and hashed by identity hash, as [Comm nodes](#comm-nodes) does, so the store
-  dedups them; each takes its state from that component, which is what lets the sweep drop it.
+  dedups them; each takes its state from that component, which is what lets the sweep drop it. The
+  interface objects themselves compare their game objects the same way, for the same reason.
 * The stock canvas hangs off `UIMasterController`, which the game keeps across scene changes, so it
   is always live and is never reclaimed. This is the one UI object that is not a client's own.
 
@@ -1151,7 +1188,7 @@ adding to it. Splitting them off keeps the first pull request to the behavior ch
 | 5 | [The vessel in the editor](#the-vessel-in-the-editor) | Everything the editor's vessel needs, which is a second kind of thing a part can belong to rather than another kind of game object; see below. |
 | 6 | SpaceCenter records | [`Alarm`](#alarms), [`Contract`, `ContractParameter`](#contracts) and [`Waypoint`](#waypoints): the records the game keeps for the loaded game rather than for a vessel. Each gains an identity the game writes into the save and re-derives from it; each `Remove` leaves its object destroyed rather than holding something the game no longer has. |
 | 7 | SpaceCenter objects defined against others | [`CommLink`](#comm-links) is named by the vessel whose control path it is a hop in and the two nodes it joins, and finds that hop in the path as it stands, so it reports the link as it is rather than as it was when the object was made; [`ClosestApproach`](#close-approaches) takes the state getter alone. Needs 3a, 3h and 3i for what it defers to. |
-| 8 | [Objects kRPC creates for a client](#objects-krpc-creates-for-a-client) | `ClientOwnedObjects.RemoveDestroyed`, and `Force` as its first user: a destroyed part takes its forces with it, and an unloaded part, or a reference frame that cannot be measured in, makes them wait, instead of the physics step dereferencing a part that is gone. Needs 3b and 3h. |
+| 8 | [Objects kRPC creates for a client](#objects-krpc-creates-for-a-client) | `ClientOwnedObjects.RemoveDestroyed`, and `Force` as its first user: a destroyed part takes its forces with it, and an unloaded part, or a reference frame that cannot be measured in, makes them wait, instead of the physics step dereferencing a part that is gone. `Force.Remove` leaves the object gone, as removing a drawing does. Needs 3b and 3h. |
 | 9 | [Drawing](#drawing) | `Line`, `Polygon`, `Text` and `NavballMarker` classify themselves from their game object and from having been removed, so that removing one twice reports it gone rather than not found, and the addon does not draw a drawable whose reference frame is not live. Needs 8 and 3h. |
 | 10 | [UI](#ui) | Every user interface object classifies itself and raises from the members that reach the game, removal included, with `Control` answering for the members its controls share; `RectTransform`, `Layout`, `LayoutElement` and `SizeFitter` gain a state, and an identity the store can dedup, so reading one repeatedly stops adding an object to the store per call. Needs 8. |
 | 11 | [RemoteTech](#remotetech), [LiDAR and DockingCamera](#lidar-and-dockingcamera) | `Antenna`, `Laser` and `Camera` defer to their part and are destroyed when a live part no longer carries their module; `Comms` names its vessel by the id its `Vessel` already holds. Three services, one shape, so one phase. Needs 3a and 3b. |
@@ -1219,10 +1256,14 @@ unit tests for the store and the generation:
   the vessel in the editor survive a sweep; leaving the editor destroys the vessel it had open and
   everything named against it; and a part survives an undo, which replaces the vessel object while
   keeping the craft ids;
+* an orbit survives a quickload, reads the orbit the game rebuilt with its vessel, and is still the
+  one object the vessel answers with afterwards;
 * an alarm survives a quickload and reads the one the game rebuilt; a removed alarm, waypoint or
   drawing raises rather than writing through to something the game no longer has, and removing one
   twice reports it gone rather than not found;
-* a force on a destroyed part leaves the store, rather than being applied on every physics step;
+* a force on a destroyed part leaves the store, rather than being applied on every physics step,
+  and a removed force reports itself gone rather than the force it was applying;
+* the sweep survives a proxy whose state getter throws, keeping it and checking the rest;
 * a rect transform, a servo and a servo group each read twice are one object, not two.
 
 Two things the tests have to work around:
