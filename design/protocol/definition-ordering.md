@@ -9,20 +9,24 @@ lands.
 Everything that reads a service definition builds its type objects in whatever order
 the definitions happen to arrive. That is fine while a consumer only needs a type's
 *name*, which is all a class reference or a return type annotation requires. It stops
-being fine the moment a consumer needs a type's *contents*.
+being fine the moment a consumer needs a type's *contents*, and the failures come in
+two shapes: a definition registered too late, and one never registered at all.
 
 Exactly one kind of type has contents a consumer needs today, and it needs them in
-exactly one place: an enumeration, when decoding a parameter's default value. So the
-whole problem is currently visible only through a cross-service enum default, which
-nothing in kRPC happens to use.
+exactly one place: an enumeration, when decoding a parameter's default value.
 
-| Consumer | Reads | Order of construction | Order-safe? |
+| Consumer | Reads | Order of construction | Safe? |
 | --- | --- | --- | --- |
-| Python dynamic client | `KRPC.GetServices` reply | one service at a time; within a service, classes, enums, exceptions, then procedures | **no** |
-| Lua dynamic client | same | same | **no** |
-| clientgen `generator.py` | one service's JSON | classes, enums, exceptions, then procedures | only by accident, see below |
-| docgen `nodes.py` | merged JSON of every service | **procedures first**, then classes, enums, exceptions | only by accident, see below |
-| C#, C++, Java, cnano | nothing at runtime | n/a | yes |
+| Python dynamic client | `KRPC.GetServices` reply | one service at a time; within a service, classes, enums, exceptions, then procedures | **no**, across services |
+| Lua dynamic client | same | same | **no**, across services |
+| clientgen `generator.py` | one service's JSON | classes, enums, exceptions, then procedures | **no**, for an enum nested in a default |
+| docgen `nodes.py` | merged JSON of every service | **procedures first**, then classes, enums, exceptions | **no**, for an enum nested in a default |
+| C#, C++, Java, cnano libraries | nothing at runtime | n/a | yes |
+
+The static clients are safe only in the sense that the generated library resolves
+nothing at runtime. clientgen, which produces them, is a consumer like any other and is
+**not** safe: see below, where it turns out to fail without any cross-service definition
+at all.
 
 ### The dynamic clients genuinely break
 
@@ -45,28 +49,48 @@ class and enum types of pre-generated stubs in a first pass over every service, 
 comment saying it does so "so that class/enum types are loaded if a dynamic service
 needs them". That is the right shape, applied to only one source of definitions.
 
-### The tools dodge it rather than handle it
+### The tools dodge it rather than handle it, and only halfway
 
 `krpctools/utils.py decode_default_value` skips the type system for enums altogether,
 decoding the value as a plain sint32, with a comment that this is a workaround because
 `set_values` has not been called. Order stops mattering because the definition is never
 consulted. The cost is paid in the output, which names a raw integer where it should
-name a member:
+name a member. In the shipped Python client:
 
+```python
+def message(self, content: str, duration: float = 1.0,
+            position: MessagePosition = MessagePosition(1), ...)
 ```
-.. staticmethod:: enum_default_arg([x = TestEnum(2)])
+
+and the same in the published documentation, for every enum-valued default.
+
+The workaround also guards only the **top level** of the default's type:
+
+```python
+if not isinstance(typ, EnumerationType):
+    return Decoder.decode(None, value, typ)
+return Decoder.decode(None, value, Types().sint32_type)
 ```
 
-and in the generated Python client, `def enum_default_arg(self, x: TestEnum = TestEnum(2))`.
+A default whose type merely *contains* an enumeration, such as `IList<SomeEnum>`,
+`Tuple<int,SomeEnum>` or `IDictionary<string,SomeEnum>`, takes the first branch and
+decodes through the registry, where the enumeration is unpopulated. Confirmed against
+`client/python`: decoding a list-of-enums default with an unregistered enumeration gives
+`TypeError: 'NoneType' object is not callable`, the same failure as the dynamic clients.
+This one needs no cross-service definition and no unlucky ordering; it fails within a
+single service, always. It is latent purely because no service declares such a default
+today. `UI.Message`'s `MessagePosition` parameter is a top-level enum, so it lands on
+the workaround.
 
-Two consequences. First, this is a visible defect in generated clients and published
-documentation for every enum-valued default. Second, an ordering test written against
-krpctools today would pass without exercising anything, so the workaround has to go for
-enums to be a meaningful test vehicle.
+Three consequences. It is a visible defect in generated clients and published
+documentation for every enum-valued default. It is a latent hard failure the first time
+anyone writes a default over a collection of enumerations. And an ordering test written
+against krpctools today would pass without exercising anything, so the workaround has to
+go for enumerations to be a meaningful test vehicle.
 
-Removing it exposes a same-service ordering bug too, with no cross-service definition
-needed: `docgen/nodes.py Service.__init__` builds its procedures, and therefore its
-`Parameter` objects and their decoded defaults, before it builds `self.enumerations`.
+Removing it exposes an ordering bug that likewise needs no cross-service definition:
+`docgen/nodes.py Service.__init__` builds its procedures, and therefore its `Parameter`
+objects and their decoded defaults, before it builds `self.enumerations`.
 `TestService.EnumDefaultArg` alone is enough to fail it.
 
 ### Two smaller hazards found while tracing this
@@ -123,8 +147,9 @@ needed: `docgen/nodes.py Service.__init__` builds its procedures, and therefore 
   every call and hides definition errors until a user trips over them. A complete phase
   one makes eager decoding correct.
 - **Scope.** The server is unchanged: it already emits complete definitions and does not
-  consume them. The static clients are unchanged: everything is resolved when their
-  stubs are generated.
+  consume them. The static client *libraries* are unchanged, since they resolve nothing
+  at runtime, but clientgen is squarely in scope, and is the consumer with the failure
+  that needs no ordering at all to reproduce.
 
 ## Phases
 
@@ -139,7 +164,8 @@ needed: `docgen/nodes.py Service.__init__` builds its procedures, and therefore 
 4. **Retire the enum workaround.** Drop the sint32 special case, render enum defaults as
    named members in each `lang/*.py` and in the `docgen/csharp.py` and `docgen/cpp.py`
    overrides, and reorder `docgen/nodes.py` so definitions precede procedures.
-   Regenerate every golden fixture.
+   Registration from phase 3 is what lets the default decode through its real type, and
+   fixes the nested case in the same stroke. Regenerate every golden fixture.
 5. **Changelogs**, as a single commit before the branch is pushed.
 
 Phases 3 and 4 are separable and worth separating: phase 3 is pure mechanism with no
@@ -155,6 +181,10 @@ reading a large fixture diff and a structural change at once.
 - **krpctools**: a hand-written multi-service ordering fixture beside `Empty.json`,
   generating the dependent service, for both clientgen and docgen. The hostile order
   must produce output identical to the friendly order.
+- **Nested enum default**: a procedure whose parameter defaults to a collection or tuple
+  containing an enumeration, which fails today in both clientgen and docgen with no
+  ordering involved. Worth adding to `TestService` as well as to the fixture, so the
+  combination is covered by the client suites and the golden files from then on.
 - **Regression on the existing fixtures**: after phase 4, `TestService`'s
   `EnumDefaultArg` renders a named member in all five clientgen languages and all six
   docgen languages. This also pins the `docgen/nodes.py` reordering, since it fails
