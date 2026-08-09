@@ -55,28 +55,14 @@ Four gotchas found:
    either way, whereas for a struct the deferred field list *is* the decoder. Eager
    construction cannot work, because a procedure signature naming a struct may be parsed
    before, or in a different service from, the definition that describes it.
-4. **A struct-typed default value forces struct definitions to be registered before
-   procedures.** Decoding a default needs the field types, and unlike the enum case
-   there is no way around it: `krpctools/utils.py decode_default_value` sidesteps
-   `EnumerationType` by decoding it as sint32, which works only because the wire value
-   is an sint32 whatever the enum turns out to be. Three places currently register
-   definitions in an order that would not serve a struct default:
-   - `docgen/nodes.py Service.__init__` builds its procedures, and with them the
-     `Parameter` objects that decode their own defaults, **before** `self.classes` and
-     `self.enumerations`.
-   - `clientgen/generator.py generate_context` builds classes, enumerations and
-     exceptions before procedures, so structs slot in ahead of the procedure loop
-     without reordering anything, but `clientgen/__init__.py` loads every service's
-     definitions and then hands the generator only `defs[args.service]`, so a struct
-     defined in another service is not visible at all.
-   - The dynamic clients create services one at a time (`client.py`, `client.lua`), so
-     a struct belonging to a service created later is unregistered when an earlier
-     service's procedure defaults are decoded. The Python client already solves exactly
-     this for pre-generated stubs, registering their class and enum types in a first
-     pass over every service before creating any dynamic one, with a comment saying so.
-
-   The same latent ordering constraint exists today for a cross-service *enum* default;
-   it has simply never been hit.
+4. **Definitions have to be registered before the procedures that use them.** A struct's
+   field list is contents a consumer needs, exactly as an enumeration's values are, and
+   the consumers all build their types in whatever order the definitions arrive. This
+   turned out to be a general defect rather than a struct one, reachable today through a
+   cross-service enum default, so it is split out into
+   [definition-ordering.md](definition-ordering.md) and **fixed first**. Nothing
+   struct-specific is left once it lands: struct definitions register in the same pass
+   as classes and enumerations.
 
 ## Decisions
 
@@ -103,10 +89,9 @@ Four gotchas found:
   `[KRPCDefaultValue(typeof(Factory))]` names a static class with a static `Create()`
   returning the value; that is how `Tuple`, `IList`, `ISet` and `IDictionary` defaults
   are already written, and a struct needs nothing new. Server-side the value is
-  encoded by the same `Encoder.Encode` path as any other struct value, so the whole
-  cost lands on the client tooling as the registration ordering of gotcha 4. Worth
-  paying: the ordering is a latent constraint for cross-service enum defaults already,
-  and fixing it once retires the entire class of bug.
+  encoded by the same `Encoder.Encode` path as any other struct value. The client
+  tooling needs the field list to decode it, which the ordering work in
+  [definition-ordering.md](definition-ordering.md) provides for every definition alike.
 - **Authoring**: `[KRPCStruct]` on a public, non-generic **C# `struct`** (value
   semantics; enforced by `AttributeUsage(AttributeTargets.Struct)`), with `Service`
   resolution like `KRPCClassAttribute`. Fields are the **`[KRPCProperty]`-marked public
@@ -283,20 +268,10 @@ same construction the generated type declares — aggregate initialization in C+
 `new Foo(...)` in C# and Java, `Foo(...)` for the Python namedtuple. cnano needs
 nothing: its `parse_default_value` returns `None`, because C has no default arguments.
 
-Making the field types available at that point is the ordering work from gotcha 4:
-
-- `clientgen/generator.py`: a `structs` loop in `generate_context` ahead of the
-  procedure loop, calling `set_fields` on each. `Generator.types` is a class-level
-  `Types()` shared by every generator in a run, so the registrations persist.
-- `clientgen/__init__.py`: register the struct definitions of **every** service in the
-  loaded definitions, not just the one being generated, so a struct default whose type
-  belongs to another service resolves. A struct that is genuinely absent from the input
-  should raise a clear error naming it, rather than failing inside the decoder.
-- `docgen/nodes.py`: build `self.structs` before the procedures loop in
-  `Service.__init__`, since `Parameter.__init__` decodes its own default value.
-- Dynamic clients: register every service's structs in a first pass before creating any
-  service, extending the pass `client.py` already runs to register the class and enum
-  types of pre-generated stubs. `client.lua` needs the same.
+Making the field types available at that point needs no struct-specific work, provided
+[definition-ordering.md](definition-ordering.md) has landed: structs join classes and
+enumerations in its registration pass, in the dynamic clients, clientgen and docgen
+alike. The only addition is calling `set_fields` from that pass.
 
 ## docgen
 
@@ -307,8 +282,7 @@ docs.
 
 `Service.__init__` in `nodes.py` takes `classes`, `enumerations` and `exceptions` as
 positional parameters with the deprecation pair as keywords, and `Service.remove`
-enumerates the same three dictionaries; both change, and `self.structs` has to be built
-before the procedures loop for the reason in gotcha 4.
+enumerates the same three dictionaries; both change.
 
 `docgen/csharp.py` and `docgen/cpp.py` override `default_value` with their own
 tuple/list/set/dictionary recursion for rendering defaults in the docs, rather than
@@ -346,38 +320,39 @@ RPC does.
   `ValueUtils.Equal` fix); Python/Lua graceful-skip test (hand-crafted definition with
   an unknown code → warning, other procedures usable).
 - **krpctools**: clientgen golden fixtures regenerate for all five languages; docgen
-  fixture for the struct macro. Two ordering fixtures pin gotcha 4: a struct default
-  whose type is declared in a service other than the one being generated, which fails
-  without the cross-service registration pass, and one whose type is declared after the
-  procedure that defaults to it.
+  fixture for the struct macro. The ordering fixtures belong to
+  [definition-ordering.md](definition-ordering.md); extending them with a struct once
+  both have landed is cheap and worth doing.
 
 ## Implementation order
 
-Following the shape [PR #1017](https://github.com/krpc/krpc/pull/1017) landed in, which
-is the closest precedent for a change that crosses the schema and every client:
+[definition-ordering.md](definition-ordering.md) lands first, as its own PR. It is
+independently useful, testable with enumerations alone, and removes the only part of
+this design that was not a straight extension of an existing pattern.
+
+The rest follows the shape [PR #1017](https://github.com/krpc/krpc/pull/1017) landed in,
+which is the closest precedent for a change that crosses the schema and every client:
 
 1. Schema: the `STRUCT` code, the `Struct`/`StructField` messages, `Service.structs`.
 2. Server: attribute, TypeUtils, scanner/signatures, messages, encoder/decoder,
    `ValueUtils.Equal`; core tests.
 3. Protocol documentation.
 4. TestService struct types and procedures.
-5. Python client (dynamic) + `types.py`, which unblocks krpctools, plus the
-   first-pass struct registration in `client.py` and graceful degradation.
-6. krpctools: the language-independent definition handling, being the `structs` loop in
-   `generate_context` and the cross-service registration in `clientgen/__init__.py`.
-   Landing this before the per-language backends keeps the ordering work reviewable on
-   its own rather than buried in whichever client happens to come first.
+5. Python client (dynamic) + `types.py`, which unblocks krpctools, plus adding structs
+   to the registration pass and the graceful-degradation change.
+6. krpctools: structs in `generate_context`, registered with `set_fields` from the same
+   pass classes and enumerations already use.
 7. Regenerate the clientgen golden fixtures.
 8. One commit per remaining client, each carrying that client's clientgen backend and
    template, its runtime codec, its `lang/*.py` default-value branch and its tests
    together: C#, C++, Java, Lua, cnano. Keeping clientgen and the runtime codec in one
    commit per client is what #1017 did, and it keeps each client's change reviewable on
    its own.
-9. docgen structs support, including the `nodes.py` ordering fix and the `default_value`
-   overrides in `docgen/csharp.py` and `docgen/cpp.py`.
-9. `CHANGELOG.md` entries (core, all clients, krpctools) as the final pre-merge commit,
-   noting the old-dynamic-client compatibility consequence. Per-component
-   `CHANGELOG.md` replaced the old `CHANGES.txt` files.
+9. docgen structs support, including the `default_value` overrides in
+   `docgen/csharp.py` and `docgen/cpp.py`.
+10. `CHANGELOG.md` entries (core, all clients, krpctools) as the final pre-merge commit,
+    noting the old-dynamic-client compatibility consequence. Per-component
+    `CHANGELOG.md` replaced the old `CHANGES.txt` files.
 
 First-adoption candidates (separate follow-up work, per the issue): a
 `LaunchSiteInfo` struct for `SpaceCenter.launch_sites`, and an additive
