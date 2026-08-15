@@ -1,12 +1,14 @@
 # Client testing standard and the shared TestService
 
-**Status:** reference (as of 2026-07-24). A living standard, not a single-PR proposal. It
+**Status:** reference (as of 2026-08-14). A living standard, not a single-PR proposal. It
 defines the coverage every kRPC client's test suite is expected to meet, records the current
 per-client coverage from an audit, and specifies the shared `TestService` surface that makes
 that coverage possible. Use it when adding a new client, when extending an existing client's
 tests, or when growing `TestService`. Grew out of the nullable-values work
 ([issue #843](https://github.com/krpc/krpc/issues/843)); the audit below was taken right after
-that landed.
+that landed, Section J was added during the object lifetime work
+([issue #1019](https://github.com/krpc/krpc/issues/1019)), and Section C6 during the
+[special default values](build-tools/special-default-values.md) work.
 
 ## Purpose and scope
 
@@ -43,7 +45,7 @@ pumps `core.Update()` at 60 FPS and auto-allows connections) and serves every tr
 protobuf over TCP, websockets, websockets-echo, and serial. It exposes one hand-written service,
 `tools/TestServer/src/TestService.cs` (id 9999), that every client tests against.
 
-- **Layer 1 — Comms tests (the full rubric A–I, against `TestServer`).** The client calls
+- **Layer 1 — Comms tests (the full rubric A–J, against `TestServer`).** The client calls
   `TestService` over a live connection and asserts behavior. This is the primary layer and where
   most of the rubric is verified. Mature suites add robustness tests here too —
   unknown-exception-type degradation, blocking/`YieldException` procedures, deferred ("…Later")
@@ -64,10 +66,13 @@ protobuf over TCP, websockets, websockets-echo, and serial. It exposes one hand-
   target naming convention is language-specific (e.g. Python's snake_case).
 - **Layer 5 — Golden fixtures (generated code and docs).**
   `tools/krpctools/krpctools/test/clientgen-TestService-<lang>.txt` pins the generated client —
-  every member, the `T?`/`std::optional`/boxed signatures, default values, and the Section-I
-  deprecation markers; the docgen fixtures pin the generated documentation. Both are checked by
+  every member, the `T?`/`std::optional`/boxed signatures, default values (including each
+  language's spelling of the Section-C6 special numeric values), and the Section-I deprecation
+  markers; the docgen fixtures pin the generated documentation. Both are checked by
   `//tools/krpctools:test`; regenerate them when the generator or `TestService` changes. (Dynamic
-  clients — Lua — have no clientgen fixture.)
+  clients — Lua — have no clientgen fixture.) The generated C#, C++ and Java stubs are also
+  *compiled* by the client test builds, so a default the language will not accept is a build
+  failure rather than a fixture diff someone has to read.
 - **Layer 6 — Connection & transport (TCP).** Connection setup/teardown, wrong-port /
   wrong-server detection, and message framing, plus platform helpers such as hexlify and float
   conversions (language-specific — N/A where the platform provides them). (The server's non-TCP
@@ -143,6 +148,19 @@ and a **class static method** (the vehicle is one shared four-parameter signatur
   (too many arguments, a duplicate, an unknown name). Applies only to clients with named-argument
   support.
 
+Finally, one kind of default value is a code-generation problem rather than a wire one:
+
+- C6 special numeric defaults — NaN, the infinities, and the extremes of the integer and floating
+  point ranges, as defaults. Unlike C1a, which takes a single representative scalar because the
+  default *mechanism* does not vary by type, C6 is **per numeric type**: each value has its own
+  spelling in each target language (`double.NaN`, `float.MaxValue`,
+  `std::numeric_limits<int32_t>::min()`, `krpc.limits.SINT32_MIN`), and a generator that falls
+  back to a decimal literal emits source that does not compile — `long.MinValue` written out
+  parses in C# as unary minus applied to a literal too large for `long`, and C++ has no unsigned
+  decimal literal at all. So this row is verified mostly at [Layer 5](#test-layers): the fixture
+  pins the spelling and the client test build compiles it. A Layer 1 test adds the other half,
+  that the applied defaults reach the server intact.
+
 **D. Nullable arguments**
 - D1 nullable value type
 - D2 nullable string
@@ -198,6 +216,28 @@ deprecation marker (C# `[Obsolete]`, C++ `[[deprecated]]`, Java `@Deprecated`, C
 - I4 deprecated class method
 - I5 deprecated enumeration — I5a the type · I5b a member
 - I6 deprecated exception
+
+**J. Request-decode failures and recovery** — a request can fail *before* the call it names is
+built, and the commonest cause is naming an object identifier the server does not have: a handle
+kept past the object's life, or one made up. The server reports that as an ordinary call error and
+consumes the request, so the connection carries on. Before
+[#1019](https://github.com/krpc/krpc/issues/1019) the failed request's bytes stayed in the receive
+buffer and were decoded again on every poll, so the client never got another call through — the
+error surfaced, but the connection was dead. Both halves need testing.
+- J1 an unknown object identifier is rejected, surfacing as the client's `ArgumentException`
+  mapping (as A7a): J1a as the target of a class member call · J1b as a class-typed argument to a
+  procedure
+- J2 the connection survives the rejection — a call made afterwards on the same connection
+  returns normally
+
+An identifier the server *once issued and has since reclaimed* takes the same path but raises
+`KRPC.ObjectDestroyedException`. `TestServer` never destroys an object, so a client suite can only
+reach the never-issued case; the destroyed case is covered in-game by
+`service/SpaceCenter/test/test_object_lifetime.py`.
+
+Unlike every other section, J is per **transport** — each transport's `RPCStream` drops the failed
+request's bytes itself — so the `websockets` and `serialio` test-clients should cover J1a and J2
+too, not only the six full clients.
 
 ## TestService specification
 
@@ -365,6 +405,36 @@ that previously hid inside `BlockingProcedure` and the `OptionalArguments` membe
 kind has one obvious owner. The `OptionalArguments` members are retained for a different job — the
 argument-passing mechanism below.
 
+#### Special numeric defaults
+
+A second family, one member per numeric type, defaults each of its parameters to one of that type's
+special values (C6) and returns them as a list. A member per value would be seventeen procedures;
+grouping by type keeps it to six and lets one call assert every special value of a type at once.
+
+| Member | Signature | Defaults | Rubric | Status |
+|---|---|---|---|---|
+| `DoubleSpecialDefaults` | `(double ×5) → IList<double>` | `NaN`, `PositiveInfinity`, `NegativeInfinity`, `MaxValue`, `MinValue` | C6 | existing |
+| `FloatSpecialDefaults` | `(float ×6) → IList<float>` | the same five, plus a finite `0.1f` | C6 | existing |
+| `Int32SpecialDefaults` | `(int ×2) → IList<int>` | `MaxValue`, `MinValue` | C6 | existing |
+| `Int64SpecialDefaults` | `(long ×2) → IList<long>` | `MaxValue`, `MinValue` | C6 | existing |
+| `Uint32SpecialDefaults` | `(uint) → IList<uint>` | `MaxValue` | C6 | existing |
+| `Uint64SpecialDefaults` | `(ulong) → IList<ulong>` | `MaxValue` | C6 | existing |
+
+Notes on the shape of this family:
+
+- The unsigned types have no member for their minimum: it is `0`, which every language writes as an
+  ordinary literal, so it exercises nothing the other defaults do not.
+- The floating point types take `MinValue` — the most negative finite value — where C++ says
+  `lowest()`, since `std::numeric_limits<double>::min()` is the smallest positive normal instead.
+  A generator that maps the two families onto one name gets this wrong.
+- `FloatSpecialDefaults` carries the finite `0.1f` because a 32-bit float default is decoded as a
+  double before it reaches a generator. It pins the shortening back to the fewest digits that
+  narrow to the same float, rather than the `0.10000000149011612` the widened value spells out.
+- All of these are compile-time constants in C#, so they are declared as plain `= value` optional
+  parameters. `[KRPCDefaultValue]` would be wrong here: it bypasses type checking, and `Encoder`
+  dispatches on the runtime type, so a `Create()` returning the wrong width would silently encode
+  the wrong bytes.
+
 ### Partial and named arguments
 
 The three `OptionalArguments` members share one signature —
@@ -500,6 +570,27 @@ vehicles for partial/named argument passing — listed under
 | `TestEnum` | `{ ValueA, ValueB, ValueC }` | A8 (representation), Ba4, Bb4 (wire) | existing |
 | `CustomException` | `[KRPCException]` | A6 | existing |
 
+### Invalid object identifiers (Section J)
+
+No new surface: the vehicles are members that already exist — a class member for J1a
+(`TestClass.GetValue`), a class-typed parameter for J1b (`EchoTestObject`), and any cheap call for
+J2 (`FloatToString`). What Section J needs from the *client* is the ability to build a handle for
+an identifier the server never issued, which every generated handle type allows:
+
+| Client | A handle the server does not know |
+|---|---|
+| Python | `conn.test_service.TestClass(conn, 1000000)` |
+| C# | `new TestService.TestClass(connection, 1000000)` |
+| C++ | `TestService::TestClass(&conn, 1000000)` |
+| Java | `new TestService.TestClass(connection, 1000000)` |
+| Lua | `conn.test_service.TestClass(1000000)` |
+| C-nano | `krpc_TestService_TestClass_t obj = 1000000;` (the handle is the identifier) |
+
+Pick an identifier far above anything the server has issued: identifiers are handed out in
+sequence and never reused, so one *below* the next to be allocated is treated as an object that
+has been reclaimed (`KRPC.ObjectDestroyedException`) rather than one that never existed
+(`ArgumentException`).
+
 ### Deprecation levers (Section I)
 
 These members carry no behavior — they exist purely as levers for the generators and the docs. Each
@@ -571,6 +662,7 @@ test_client — the RPC surface (Sections A–F, plus Section B live)
     test_collection_defaults       # List/Set/Dictionary/Tuple/EmptyList Default (C2a-C2e)
     test_null_default              # NullDefault                                (C3)
     test_enum_default              # EnumDefault                                (C4)
+    test_special_defaults          # <T>SpecialDefaults: NaN, infinities, extremes  (C6)
     # partial & named argument passing, on each callable kind individually (Section C5) -- N/A Java, C-nano
     test_partial_arguments_procedure     # trailing omission, service procedure          (C5a)
     test_partial_arguments_method        # trailing omission, class instance method      (C5a)
@@ -623,10 +715,13 @@ test_event — events (Section H) -- N/A for Lua, C-nano (no event support)
     test_event_wait_timeout        # wait with a timeout                        (H2b)
     test_event_callbacks           # callback added, invoked on fire, removed   (H2c)
 
-test_objects — remote-object representation (Section A9)
+test_objects — remote-object representation (Section A9) and invalid handles (Section J)
     test_object_equality           # two handles to one object compare equal    (A9)
     test_object_inequality         # handles to different objects differ
     test_object_hash               # hashable/orderable by identity
+    test_invalid_object_id         # a handle the server does not know: as the call target and
+                                   #   as an argument, both rejected             (J1a, J1b)
+                                   #   a call afterwards still succeeds          (J2)
 
 test_threading — thread safety (robustness)
     test_thread_safe_connection    # concurrent calls on one connection
@@ -693,6 +788,8 @@ has no clientgen fixture and so does not flag Section I):
 ```text
 clientgen-TestService-<lang>       # the generated client, pinned verbatim
     - every member, its nullable (T? / optional / boxed) signature and default values
+    - the language's spelling of each special numeric default              (C6)
+        double.NaN / std::numeric_limits<int32_t>::min() / float("inf") / ...
     - the deprecation marker for each deprecated kind:
         DeprecatedProcedure / ...NoMessage       (I1a, I1b)
         DeprecatedProperty                        (I2)
@@ -738,7 +835,7 @@ Work through the [test layers](#test-layers):
    checks the Section-I deprecation markers and the generated documentation.
 2. **Comms tests (Layer 1)** — wire up a test that launches `TestServer` (see an existing
    client's `BUILD.bazel` `client_test` target) and connects over the default transport, then
-   **cover every rubric row (A–I)** that applies, using the members in the
+   **cover every rubric row (A–J)** that applies, using the members in the
    [TestService specification](#testservice-specification). Mark rows *N/A* only for genuine
    language/feature limits (no default-argument support, no streams, …), and say why. **Do not
    forget E5** (`ReturnNullWhenNotAllowed` → assert the client's RPC-error type) — the row most
@@ -751,24 +848,28 @@ Work through the [test layers](#test-layers):
 5. **Connection & transport (Layer 6)** — connection setup and wrong-port/wrong-server handling.
 
 (A new full client speaks protobuf over TCP; the `websockets`/`serialio` transport test-clients
-are separate and only need the Layer 1 comms tests — no code generation, no full rubric.)
+are separate and only need the Layer 1 comms tests — no code generation, no full rubric, except
+Section J, which each transport implements for itself.)
 
 ## Current coverage
 
-Audit taken 2026-07-24. Legend: **✓** tested live · **◐** codec/unit-test only (no live
-round-trip) · **✗** surface exists but untested (client gap) · **∅** no `TestService` surface
+Audit taken 2026-07-24; the Section J row was added on 2026-07-26 with the object-lifetime work,
+and the C6 row on 2026-08-14 with the special-default-values work. Legend: **✓** tested live ·
+**◐** codec/unit-test only (no live round-trip) ·
+**✗** surface exists but untested (client gap) · **∅** no `TestService` surface
 yet (needs a service addition — see the [TestService specification](#testservice-specification)) · **—** N/A
 in this client, by design. Uniformly-covered leaf ids are collapsed into one row; rows with any
 non-✓ cell are broken out. **Section B (types)** is identical across all clients — the same
 `TestService` procedures and the same per-scalar codec unit tests everywhere — so it is broken
 out by direction in the separate [type-coverage table](#type-coverage-section-b); this matrix
-covers Sections A and C–H.
+covers Sections A and C–J.
 
 | Dimension (rubric ids) | Python | C# | C++ | Java | Lua | C-nano |
 |---|:--:|:--:|:--:|:--:|:--:|:--:|
 | Member kinds & type representation (A1–A9) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Default arguments except bytes (C1a, C1b, C2a–e, C3, C4) | ✓ | ✓ | ✓ | — | ✓ | — |
 | `bytes` default (C1c) | ∅ | ∅ | ∅ | — | ∅ | — |
+| Special numeric defaults (C6) | ✓ | ✗ | ✗ | — | ✗ | — |
 | Partial arguments, procedure — trailing omission (C5a, procedure) | ✓ | ✓ | ✓ | — | ✗ | — |
 | Partial/named on method & static method, and by-name (C5a method/static, C5b) | ✗ | ✗ | ✗ | — | ✗ | — |
 | Nullable value/string/list/class args + rejection (D1, D2, D3a, D4, D5) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
@@ -782,6 +883,7 @@ covers Sections A and C–H.
 | Stream freeze/thaw (G3f) | — | — | ✓ | — | — | — |
 | Events (H1a–H2c) | ✓ | ✓ | ✓ | ✓ | — | — |
 | Deprecation flagged (I1–I6) | ✓ | ✓ | ✓ | ✓ | — | ✓ |
+| Invalid object id rejected, connection survives (J1a, J1b, J2) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 
 By-design **—** cells: the Java and C-nano clients have no default-argument support (all
 arguments are required, so both defaults and partial/named arguments C5 are N/A); the Lua and
@@ -823,9 +925,15 @@ tests (no live procedure in that direction) · **∅** not exercised at all.
 The **◐ returns** are a surface limitation, not a client gap: no procedure returns a top-level
 `float`/`double`/`sint64`/`uint32`/`uint64`/`bool`/`bytes`, so those decode paths run live only
 as elements inside a returned collection or tuple (e.g. `sint64` inside `IncrementTuple`) and
-directly only in codec unit tests. `uint64` has no live member in either direction. The **∅**
-rows have no `TestService` member at all. See [surface gaps](#surface-gaps) and the
-[TestService specification](#testservice-specification) for the additions that close these.
+directly only in codec unit tests. The **∅** rows have no `TestService` member at all. See
+[surface gaps](#surface-gaps) and the [TestService specification](#testservice-specification)
+for the additions that close these.
+
+One qualification to "identical across all six clients": the
+[`<T>SpecialDefaults` family](#special-numeric-defaults) gave `uint64` its first live members —
+`Uint64SpecialDefaults` takes a `ulong` and returns a list of them — but only the Python suite
+calls them so far, so `Ba1f` stays ◐ above until the C6 test lands in the other clients. `Bb1f`
+stays ◐ regardless: the return is a *list* of `ulong`, not a bare one.
 
 ### Client gaps (surface exists — a client should add the test)
 
@@ -842,6 +950,36 @@ rows have no `TestService` member at all. See [surface gaps](#surface-gaps) and 
   | Lua | call `return_null_when_not_allowed()`, assert an error is raised |
   | C-nano | call `krpc_TestService_ReturnNullWhenNotAllowed(...)`, assert `KRPC_ERROR_RPC_FAILED` |
 
+- **Section J — invalid object identifiers, tested only by Python.**
+  `test_objects.test_invalid_object_id` (added with
+  [#1019](https://github.com/krpc/krpc/issues/1019)) is the only client test that a rejected
+  request leaves the connection usable. The server side is pinned by the core unit test
+  `RPCStreamTest.ReadRequestThatCannotBeDecoded`, which covers the protobuf transport only. Each
+  remaining client should build a handle the server does not know (see
+  [invalid object identifiers](#invalid-object-identifiers-section-j)) and add one test that:
+
+  | Step | Assertion |
+  |---|---|
+  | call `GetValue` on the handle | the client's `ArgumentException` mapping, as `test_argument_exception` already asserts (J1a) |
+  | pass the handle to `EchoTestObject` | the same error (J1b) |
+  | call `FloatToString` afterwards | returns normally — the connection was not wedged (J2) |
+
+  The `websockets` and `serialio` test-clients need the same three steps, since each transport
+  consumes the failed request's bytes in its own `RPCStream`.
+
+- **Special numeric defaults (C6) — tested only by Python.** The harder half is already covered
+  everywhere: the fixtures pin each language's spelling, and the C#, C++ and Java client test
+  builds compile the generated stub, so a default the language rejects fails the build. What only
+  Python asserts is the value half — that the defaults the client sends are the ones the service
+  declared. Fix per client: call each `<T>SpecialDefaults` with no arguments and check the returned
+  list, remembering that NaN needs an is-NaN predicate rather than an equality comparison.
+
+  | Client | Test to add |
+  |---|---|
+  | C# | `DoubleSpecialDefaults()` etc., assert against `double.NaN`, `double.MaxValue`, … |
+  | C++ | `double_special_defaults()` etc., assert against `std::numeric_limits<double>::…` |
+  | Lua | `double_special_defaults()` etc., assert against `math.huge` and `krpc.limits.…` |
+
 - **Partial/named arguments (C5) — mostly untested outside Python.** C# and C++ test only trailing
   omission on the *service procedure* (`OptionalArguments`, C5a·procedure); Python additionally
   covers the instance method and the named / non-contiguous form (C5a·method, C5b). No client tests
@@ -856,8 +994,10 @@ These affect every client equally: the service exposes no member to exercise the
 can test them until it is extended (see the [TestService specification](#testservice-specification)).
 <a id="surface-gaps"></a>
 
-- **`uint64`/`ulong` never round-trips live** (`Ba1f`, `Bb1f`) — covered only by codec unit
-  tests; no member takes or returns it.
+- **`uint64`/`ulong` has no dedicated live member** (`Ba1f`, `Bb1f`) — `Uint64SpecialDefaults`
+  takes one and returns a list of them, which is enough for `Ba1f` once the clients test it, but
+  there is still no `UInt64ToString`/`StringToUInt64` conversion pair and nothing returns a bare
+  `ulong`.
 - **No member returns `bytes`** (`Bb3`) — `bytes` is only ever an argument (`Ba3`, via
   `BytesToHexString`), so the bytes decode path runs live only in codec tests.
 - **No parameter declares a `bytes` default** (C1c) — representable via `[KRPCDefaultValue]` (a
@@ -868,7 +1008,9 @@ can test them until it is extended (see the [TestService specification](#testser
   `TestClass.StaticOptionalArguments`.
 - **Non-string scalar returns are untested live** (`Bb1a`, `Bb1b`, `Bb1d`, `Bb1e`, `Bb1f`,
   `Bb1g`) — no procedure returns a top-level `float`, `double`, `long`, `uint`, `ulong` or
-  `bool`; only `sint32` (`Bb1c`) and `string` (`Bb2`) are returned live.
+  `bool`; only `sint32` (`Bb1c`) and `string` (`Bb2`) are returned live. The `<T>SpecialDefaults`
+  members return *lists* of each numeric type, which exercises the element decode path but not
+  the top-level one.
 - **Object collections are list-only** — a list of objects exists (`Ba11a`/`Bb11a`), but no set,
   dictionary or tuple of class objects (11b–11d) in either direction.
 - **Nullable collections are list-only** — only `EchoNullableList` exists, so nullable set,
@@ -889,6 +1031,10 @@ asymmetry is intended before treating it as a gap.
 
 - **Close the E5 gap** in C#, C++, Java, Lua and C-nano (small, no service change). Highest
   value — it is the only place the surface exists but a client omits the test.
+- **Cover Section J** in C#, C++, Java, Lua, C-nano and the two transport test-clients (small, no
+  service change). It guards a connection-level failure — a wedged connection breaks every later
+  call, not just the one that named a missing object — and the transports each implement the
+  recovery separately, so it is worth having everywhere rather than once.
 - **Land the consistency reorganization** — the `edit`/`remove` rows in the
   [change summary](#summary-of-proposed-changes): rename `EnumDefaultArg` → `EnumDefault`, break the
   `*Default` family out of `BlockingProcedure`/`OptionalArguments`, replace `EnumEcho`/`EnumReturn`
@@ -900,6 +1046,11 @@ asymmetry is intended before treating it as a gap.
   non-string scalar and `bytes` returns (`Bb1a`/`Bb1b`/`Bb1d`–`Bb1g`, `Bb3`), and object
   set/dict/tuple (`Ba11b`–`Ba11d`/`Bb11b`–`Bb11d`) —
   then regenerate the golden fixtures and add a round-trip test per client.
+- **Cover special numeric defaults (C6)** in C#, C++ and Lua (small, no service change) — call each
+  `<T>SpecialDefaults` with no arguments and assert the returned values. The generated spellings
+  are already pinned by the fixtures and compiled by the client builds, so this adds only the
+  value half; rank it below E5 and Section J, which guard genuine failure modes rather than
+  completing a row.
 - **Cover partial/named arguments (C5)** — add `TestClass.StaticOptionalArguments`, then test C5a
   (and C5b where the client has named arguments) on the service procedure, the instance method and
   the static method individually. Mostly a client-test gap today: only Python exercises the method
