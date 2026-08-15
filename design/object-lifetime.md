@@ -294,6 +294,15 @@ Destruction events ask for a sweep, but do not move the generation on. Nothing h
 nothing a proxy resolved before the event has to be resolved again. One sweep also covers a whole
 vessel coming apart, which destroys many parts in a single moment.
 
+The access path needs the same guard, which this design first stated for the sweep alone. A vessel
+missing from a list that is still being filled is not destroyed; it is one the game has not rebuilt
+yet, and a client calling in those frames, or a stream updating in them, would otherwise be told
+that its vessel is gone for good. Guarding only against a wholly empty list is not enough, because
+the list holds some vessels for most of the window. `GameState.Settled` therefore carries the
+answer to both sides: false from `Changed` until the sweep that follows it, and read by
+`FlightGlobalsExtensions.VesselsKnown`, which is what decides between destroyed and dormant for a
+vessel and for a part in flight.
+
 ## Infrastructure
 
 The following general infrastructure is provided for services to use, to implement semantics above
@@ -417,10 +426,11 @@ tells it about one, since only the addon sees `GameEvents`.
 
 | Member | Called by | Does |
 |---|---|---|
-| `Changed` | the addon, when a game is loaded, quickloaded or reverted, and on a scene change | moves `Generation` on and asks for a sweep |
+| `Changed` | the addon, when a game is loaded, quickloaded or reverted, and on a scene change | moves `Generation` on, clears `Settled` and asks for a sweep |
 | `RequestSweep` | the addon, on a destruction event (`onPartDie`, `onVesselDestroy`) | asks for a sweep, leaving the generation alone: what was destroyed is gone, but nothing has been rebuilt for a cache to look up again |
-| `Sweep` | the addon, from the first server update where the game has stopped adding vessels | runs the sweep and clears `SweepPending` |
+| `Sweep` | the addon, from the first server update where the game has stopped adding vessels | runs the sweep, clears `SweepPending` and sets `Settled` |
 | `Generation` | a proxy caching something it looked up, or classifying something that cannot outlive one game state | a `uint` that identifies the current game state |
+| `Settled` | an access path deciding whether the absence of a game object means it is gone | whether the game has finished building the state it moved to |
 
 Why a boundary asks for a sweep instead of running one is in
 [Triggering a sweep](#triggering-a-sweep). The two uses of `Generation` are the two consequences in
