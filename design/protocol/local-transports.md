@@ -1,6 +1,7 @@
 # A local socket transport, and what else the game's runtime can carry (issue #899)
 
-**Status:** in progress (2026-08-15) — built and tested, pull requests not yet raised.
+**Status:** in progress (2026-08-15). Built and tested on Linux, with one Windows build break
+outstanding; pull requests not yet raised.
 [Issue #899](https://github.com/krpc/krpc/issues/899) asks for more communication protocols; this
 settles which of them the game's runtime can actually carry, measures whether a cheaper local
 transport is worth having, and records what was built.
@@ -130,6 +131,9 @@ predicted issue numbers that need confirming when they are.
 2. **The server transport, and the Python client.** The byte transport, a `Protocol` enum entry, the
    settings and server-window surface, test server support, and `krpc.connect_local`.
 3. **The remaining clients.** C#, C++, Lua and cnano.
+4. **The Java client**, preceded by moving the build to JDK 25 so the JDK's own unix socket
+   address type is available. The JDK move is a breaking change for consumers and is worth keeping
+   as its own change ahead of the transport it enables.
 
 ### Design decisions
 
@@ -156,13 +160,85 @@ suites and by two server tests that check the response's exact byte length.
 | C++ | `krpc::connect_local` | `Connection` holds a protocol-agnostic asio socket. It is opened by connecting one of the specific protocol and handing over the descriptor, which keeps each endpoint type where it belongs and avoids a clang-analyzer false positive on asio's generic endpoint. |
 | Lua | `krpc.connect_local` | Uses luasocket's `socket.unix`, which it builds on the platforms that have unix sockets. |
 | cnano | `KRPC_COMMUNICATION_LOCALSOCKET` | A socket is read and written through the same calls as a serial port, so only opening it differs. Not auto-detected, as a serial port remains the usual choice where both exist. |
-| Java | **not supported** | `java.net.UnixDomainSocketAddress` needs JDK 16 or later and the build pins JDK 11. Supporting it means a project-wide JDK bump or a JNI/JNA dependency, neither of which belongs in this change. |
+| Java | `Connection.newLocalInstance` | `java.net.UnixDomainSocketAddress` needs JDK 16 or later, so the build moved from JDK 11 to 25 first. Breaking for consumers below that, and the reason the client's own sockets moved from `Socket` to `SocketChannel`. |
+
+## Windows
+
+The transport ships as Linux and macOS only, so there is no feature to test on Windows. What does
+need testing there is the collateral: making room for a second transport changed the connection
+layer of every client, and those changes reach Windows users over TCP.
+
+### Confirmed: the C++ client no longer builds on Windows
+
+`client/cpp/src/connection.cpp` names `asio::local::stream_protocol` unconditionally. asio defines
+`ASIO_HAS_LOCAL_SOCKETS` only off Windows, and `asio/local/stream_protocol.hpp` declares nothing
+without it, so the type does not exist under MSVC. Reproduced on Linux by disabling the same
+feature:
+
+```
+$ bazel build //client/cpp:krpc --copt=-DASIO_DISABLE_LOCAL_SOCKETS
+client/cpp/src/connection.cpp:56:28: error: no member named 'local' in namespace 'asio'
+client/cpp/src/connection.cpp:57:58: error: no member named 'local' in namespace 'asio'
+```
+
+`connection.cpp`, `krpc.cpp` and `connection.hpp` all ship in the release archive, so this breaks
+anyone building the released client on Windows, not just CI. The fix is to guard `LocalConnection`
+behind `ASIO_HAS_LOCAL_SOCKETS` and give `connect_local` a defined behavior where the guard fails.
+It has to land before any other Windows result means anything, since both Windows C++ jobs stop at
+the compile.
+
+### The Windows coverage that exists
+
+Four CI jobs run on `windows-latest`, all MSVC and vcpkg package builds of a release archive:
+cnano and C++, each by CMake and by vcpkg. Bazel never runs on Windows, so no client test suite,
+no core tests and no lint run there. Reproducing those jobs locally needs MSVC, vcpkg
+(`protobuf`, `asio`, `nanopb`), CMake and bash.
+
+### What has no Windows coverage at all
+
+| Change | Risk on Windows | How to test |
+| --- | --- | --- |
+| C#: `TcpClient` replaced by `Socket` plus `NetworkStream`, `StreamManager` takes a stream | The `net472` assembly is what a .NET Framework consumer uses and no suite runs it; the tests run the `net8.0` build | Connect, stream and dispose against the test server on .NET Framework |
+| Java: JDK 11 to 25, `Socket` to `SocketChannel` | Breaking for every consumer, not only on Windows | Build and connect with JDK 25 |
+| Python: buffered reads, one `recv` per message rather than one per byte of prefix | Platform independent, low risk; `connect_local` fails with `AttributeError` on `socket.AF_UNIX` rather than a kRPC error | Run the suite over TCP |
+| Lua, cnano | Both guard the new path (`require` inside the open call, an opt-in define excluded from auto-detect), so the Windows path is untouched | Covered by the cnano CI jobs |
+| Mod: the protocol list offers "Protobuf over local socket" everywhere | `LocalSocketServer.Start` catches only `SocketException` and `IOException`, so a `PlatformNotSupportedException` or `ArgumentException` from the runtime escapes into the UI | Select the protocol in a Windows KSP install and start the server |
+
+Filtering the protocol list per OS is already ruled out above, because the editor casts the combo
+box index straight to the enum. So the option stays visible on Windows and the requirement is that
+choosing it fails with a clear message rather than an unhandled exception.
+
+### Could AF_UNIX itself work on Windows
+
+Windows has had AF_UNIX since Windows 10 1803, but the pieces do not line up:
+
+| Piece | AF_UNIX on Windows |
+| --- | --- |
+| KSP's Mono, the server | Unknown. Needs the probe from [What the game's runtime can do](#what-the-games-runtime-can-do) run on a Windows install. |
+| .NET Framework, the C# client's `net472` build | **No.** Unix sockets arrived in .NET Core 2.1. |
+| .NET 8, the C# client's other build | Yes, on Windows 10 1803 or later. |
+| JDK 16 or later, the Java client | Yes. This is the one client that would work as written. |
+| asio, the C++ client | **No.** Compiled out, as above. |
+| CPython | **No.** `socket.AF_UNIX` is not exposed on Windows. |
+| luasocket | **No** `socket.unix` build. |
+| cnano | Would need `afunix.h` and winsock in place of `sys/un.h`. |
+
+So even a positive probe result buys only the Java client and a .NET 8 C# client. The named pipe
+fallback, deferred above, remains the route to Windows rather than AF_UNIX.
+
+### Loose ends found reading for this, not Windows specific
+
+- Python's `DEFAULT_RPC_PATH` and `DEFAULT_STREAM_PATH` are `/tmp/krpc/rpc` and `/tmp/krpc/stream`,
+  where the server and the C#, C++ and Java clients all derive `$XDG_RUNTIME_DIR/krpc/<name>`
+  falling back to `<tmpdir>/krpc-<user>/<name>`. The Python default can never match the server's.
+- The C# local socket path is exercised only on `net8.0`. The shipped `net472` assembly's copy of it
+  is untested on any platform.
 
 ## Open
 
-- **Windows is untested.** Whether Mono's AF_UNIX works under KSP on Windows is unknown, and the
-  named-pipe fallback has not been built. Both need someone running the probe on a Windows install.
-  The transport ships as Linux and macOS only until then, and TCP remains the default everywhere.
-- **Java** stays unsupported unless the JDK level moves.
+- **Windows.** See [Windows](#windows) above: one confirmed build break to fix, a regression surface
+  with no automated coverage, and the runtime probe still to run on a Windows install. The transport
+  ships as Linux and macOS only until then, and TCP remains the default everywhere.
+- **The named pipe fallback** has not been built, and is what Windows support would rest on.
 - **Batching** ([reverse-streams.md](reverse-streams.md)) remains the larger performance lever and is
   unaffected by any of this.
