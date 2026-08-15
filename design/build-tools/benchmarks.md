@@ -209,6 +209,7 @@ The suite is `tools/TestingTools/src/Benchmark.cs` plus `tools/benchmarks/`
 | multi-vessel scene | three copies of the reference craft, spaced 500 m apart on one orbit | no new craft needed, and the point is the number of *loaded vessels* the scan walks |
 | 300+ part station | `Station300.craft`: a pod carrying 320 cubic octagonal struts in 40 stacks | a fixture, not a spacecraft |
 | results recorded through a pytest fixture | a module-level list in `harness.py` | pytest cannot inject fixtures into `unittest`-style test methods; `conftest.py` keeps the `pytest_terminal_summary` hook and `--benchmark-json` |
+| report min and median over repeats, with the spread | one number per case on the terminal - the fastest sample with the empty loop subtracted - in a block per scenario, with the allocation figure beside it | median, spread, every sample and the iteration count are in `--benchmark-json`, so the terminal can be the answer rather than the working: the spread appears as a note under the block, and only for a case noisy enough to doubt, and the empty case is the range it was subtracted from rather than a row of its own |
 | ceiling of 5x the expected value | 5x, with a floor of 50 ns | five times a 4 ns case is inside the noise of subtracting the empty case |
 
 Two things the harness learned the hard way, both now asserted or commented in place: a stream
