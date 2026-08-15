@@ -1,13 +1,13 @@
 # Orbits from state vectors, and reference frames that coast
 
-**Status:** in progress. Phases 1 and 2 are implemented and verified in game; no PR opened and no
+**Status:** in progress. Phases 1 to 3 are implemented and verified in game; no PR opened and no
 issue filed yet, one should be filed. Where the implementation departed from what is proposed
 below, the section says so and
 [Departures from the design](#departures-from-the-design) collects them.
 
-Let a script construct an orbit from an initial position and velocity, and derive reference frames
-from it whose origin then coasts under gravity. This gives a frame that tracks where a vessel
-*would* have travelled had it existed, without that vessel existing.
+Let a script construct an orbit, from an initial position and velocity or from orbital elements, and
+derive reference frames from it whose origin then coasts under gravity. This gives a frame that
+tracks where a vessel *would* have travelled had it existed, without that vessel existing.
 
 ## Motivation
 
@@ -66,7 +66,7 @@ period, `PositionAt` and closest-approach-to-a-target for free, and adds no clas
 new `doc/api/space-center/*.tmpl` is needed, since `orbit.tmpl` renders the whole class and picks up
 new members on its own.
 
-### `Orbit.CreateFromStateVectors`
+### `Orbit.CreateFromPositionAndVelocity`
 
 A static `[KRPCMethod]`, alongside the existing static `ReferencePlaneNormal` and
 `ReferencePlaneDirection`, and mirroring the `ReferenceFrame.CreateRelative` / `CreateHybrid`
@@ -74,7 +74,7 @@ factory precedent.
 
 ```csharp
 [KRPCMethod]
-public static Orbit CreateFromStateVectors (
+public static Orbit CreateFromPositionAndVelocity (
     CelestialBody body, Tuple3 position, Tuple3 velocity, double ut,
     ReferenceFrame referenceFrame = null)
 ```
@@ -122,6 +122,42 @@ Validation: null arguments; a zero-magnitude relative position; a non-finite `se
 No `GameScene` restriction, matching `Orbit`, which carries none. Propagation needs only
 `Planetarium` and the body.
 
+### `Orbit.CreateFromOrbitalElements`
+
+> **Added after the design.** Not proposed originally. It arrived once the pair had to be named
+> together: an orbit stated as elements is the other half of the same feature, and naming the
+> position-and-velocity form without a sibling in view would have spent the obvious short name on it.
+
+The counterpart, stating the same conic the other way round. KSP has a constructor for exactly this
+shape, read from the disassembly:
+
+```
+Orbit(double inc, double e, double sma, double lan, double argPe, double mEp, double t,
+      CelestialBody body)  ->  SetOrbit(...)
+```
+
+| Finding | Consequence |
+| --- | --- |
+| `SetOrbit` assigns the seven fields and then calls `Init()` itself | Unlike the state-vector path, no explicit `Init()` is needed. `UpdateFromUT(epoch)` and `UTsoi = -1` still are, for the same reasons |
+| `SetOrbit` writes `inc`, `lan` and `argPe` straight into `Orbit.inclination`, `Orbit.LAN` and `Orbit.argumentOfPeriapsis`, which the service getters run through `ToRadians` | The game holds those three in **degrees**; the RPC takes radians and converts, so it round-trips against the getters |
+| `mEp` goes into `meanAnomalyAtEpoch`, which `Init()` divides by `meanMotion` (rad/s) to get `ObTAtEpoch`; the service getter returns it unconverted | The mean anomaly is in **radians** on both sides, so it is the one angle not converted |
+| `getObtAtUT(UT)` computes from `UT - epoch` | `epoch` is a **universal time**, not an offset. `Orbit.Epoch` documented it as "the time since the epoch", which is wrong and would have contradicted the new parameter; corrected in the same change |
+
+```csharp
+[KRPCMethod]
+public static Orbit CreateFromOrbitalElements (
+    CelestialBody body, double semiMajorAxis, double eccentricity,
+    double inclination, double longitudeOfAscendingNode,
+    double argumentOfPeriapsis, double meanAnomalyAtEpoch, double epoch)
+```
+
+Validation is stricter than the state-vector form, because elements that do not describe a conic can
+be stated directly rather than only arrived at: a null body, any non-finite element, a negative
+eccentricity, an eccentricity of exactly one (a parabola, which has no semi-major axis to give), and
+a semi-major axis whose sign disagrees with the eccentricity — an ellipse needs a positive one and a
+hyperbola a negative one. Getting this wrong is what `Debug.cs` warns about: a NaN conic reaching the
+patched-conic solver takes down the flight scene.
+
 ### `Orbit.VelocityAt`
 
 `Orbit.PositionAt(ut, referenceFrame)` exists with no velocity counterpart. Add one. Useful on its
@@ -148,8 +184,8 @@ return referenceFrame.VelocityFromWorldSpace (
 > This is not only a defect in the design. `ClosestApproach.Velocity` and
 > `ClosestApproach.TargetVelocity` are wrong in the same way in shipped code, and have been since
 > they were added. `ClosestApproach.RelativeVelocity` differences two of them, so the offset cancels
-> and it is correct, which is why the tests never caught it. That needs its own issue and its own
-> change; it is not fixed here.
+> and it is correct, which is why the tests never caught it. Fixed separately, on the
+> `fix-closest-approach-velocity` branch, which follows this one as its own pull request.
 
 ### Two new reference frame types
 
@@ -207,17 +243,26 @@ exactly the reason above. Both doc comments should say so.
 
 ### Object lifetime
 
-`Orbit.Equals` is reference equality on `InternalOrbit`, so every `CreateFromStateVectors` call
+`Orbit.Equals` is reference equality on `InternalOrbit`, so every `Orbit.CreateFromPositionAndVelocity` call
 yields a distinct `Orbit` and distinct frames, and each is retained for the server's lifetime —
 `ObjectStore` is cleared only when the last server stops. A script constructing an orbit per tick
 leaks steadily.
 
-This is the problem [`object-lifetime.md`](../object-lifetime.md) tracks; its
-[reference frames](../object-lifetime.md#reference-frames) section and phase 3h cover frame
-liveness, and `ClientOwnedObjects` — already used by the Drawing service and `Parts.Force` — is the
-eventual fix. Out of scope here, but the retention belongs in the `CreateFromStateVectors` doc
-comment so it is not a surprise, and `object-lifetime.md` should gain a pointer back to this doc as
-a new producer of retained frames.
+This is the problem [`object-lifetime.md`](../object-lifetime.md) tracks. It now carries the case
+under [constructed orbits](../object-lifetime.md#constructed-orbits), in phase 8, alongside `Force`.
+The retention belongs in the `Orbit.CreateFromPositionAndVelocity` and
+`Orbit.CreateFromOrbitalElements` doc comments meanwhile, so it is not a surprise.
+
+**Tying the orbits to the client that made them is the right model, and it does not work today.**
+Scoping it to constructed orbits is easy and correct — `ownerVessel`, `ownerBody` and `ownerNode`
+are all null for one, and orbits read off a vessel or body dedupe on `InternalOrbit` and are already
+bounded. The obstacle is underneath: `ClientOwnedObjects` releases the *game-side* resource, and
+`ObjectStore.RemoveInstance` has **no production caller anywhere in the tree**. For a drawing that
+frees the `GameObject` and leaves a small entry behind; for a constructed orbit the entry is the
+whole cost, so a collection on its own would release nothing. Nor can a service do it directly:
+`ObjectStore` is `internal` to the core assembly with no `InternalsVisibleTo`, so dropping a proxy
+needs a core API change. That change is phase 8's, which is why this waits rather than being
+attempted here.
 
 An alternative considered and rejected for now: key the frame on `(body, epoch, position, velocity)`
 and rebuild the KSP orbit lazily, so structurally equal frames dedupe in the store. It fixes the
@@ -239,12 +284,14 @@ Checked, all degrade acceptably; no changes needed.
 
 | Phase | Scope | State |
 | --- | --- | --- |
-| 1 | `Orbit.CreateFromStateVectors` and `Orbit.VelocityAt`. A constructed orbit is usable for prediction on its own, with no new frame types | Implemented |
+| 1 | `Orbit.CreateFromPositionAndVelocity` and `Orbit.VelocityAt`. A constructed orbit is usable for prediction on its own, with no new frame types | Implemented |
 | 2 | The `OrbitNonRotating` and `OrbitOrbital` frames | Implemented |
-| 3 | Not proposed yet: sphere-of-influence patching via `PatchedConics.CalculatePatch`; frame lifetime under `ClientOwnedObjects`, which belongs with the general work in [`object-lifetime.md`](../object-lifetime.md) | Open |
+| 3 | `Orbit.CreateFromOrbitalElements`, the counterpart to phase 1. Independent of phase 2 | Implemented |
+| 4 | Not proposed yet: sphere-of-influence patching via `PatchedConics.CalculatePatch`; frame lifetime under `ClientOwnedObjects`, which belongs with the general work in [`object-lifetime.md`](../object-lifetime.md) | Open |
 
 Phase 1 is independently useful and mergeable, and was checked to build and pass
-`//doc:check-documented` on its own before phase 2 was added on top. Phase 2 depends on it.
+`//doc:check-documented` on its own before phase 2 was added on top. Phase 2 depends on it. Phase 3
+depends on neither, and is ordered after them only because it was thought of later.
 
 ## Limitations to document
 
@@ -264,11 +311,42 @@ Phase 1 is independently useful and mergeable, and was checked to build and pass
   periapsis, eccentricity, inclination, longitude of ascending node, argument of periapsis and
   period, and states chosen by hand give exactly the circular, polar, equatorial and hyperbolic
   conics they should. `Debug.cs` was the wrong thing to copy, as the design suspected.
-- Whether `Debug.cs` is itself wrong here is **still open**. `Debug.SetPosition` and
-  `Debug.SetVelocity` pass an unsubtracted world velocity into `UpdateFromStateVectors`, which the
-  in-game result above says is not the convention that function wants. Its own tests pass, so if it
-  is wrong the error is small enough or masked enough not to show there. Worth a look; a separate
-  bug, a separate issue and a separate change.
+- ~~Whether `Debug.cs` is itself wrong here is **still open**.~~ **Investigated and closed: it is
+  correct.** `Debug.SetPosition` and `Debug.SetVelocity` do pass an unsubtracted world velocity into
+  `UpdateFromStateVectors`, and that is right, for a reason worth writing down because it is the
+  thing that makes the whole velocity story hang together.
+
+  A kRPC world velocity is **not absolute**. Every one of them is built from `Orbit.GetVel()` or
+  `CelestialBody.GetWorldVelocity()` (which is `body.GetOrbit().GetVel()`), and `GetVel()` is
+  `GetFrameVel()` minus the **active vessel's reference body's** frame velocity. So kRPC's world
+  space is already centered on the active vessel's reference body, and for that body `B`,
+  `B.GetWorldVelocity()` is identically **zero**: `CelestialBody.GetFrameVel()` and
+  `Orbit.GetFrameVel()` compute the same chain sum for the same body, so the difference cancels.
+
+  All three callers of `SetStateVectors` are therefore feeding it a body-relative velocity already:
+
+  | Caller | Velocity it passes | Why it is body-relative |
+  | --- | --- | --- |
+  | `SetFlight` | `Cross(body.angularVelocity, positionFromBody) + speed * flightPath` | Constructed body-relative from scratch, for whatever body was asked for. Never touches world space |
+  | `SetPosition` | `internalVessel.orbit.GetVel()` | The active vessel's velocity relative to its own reference body, which is the `celestialBody` being passed |
+  | `SetVelocity` | `frame.VelocityToWorldSpace(...)` | A world velocity, and world is relative to the active vessel's reference body, which is again the `celestialBody` being passed |
+
+  The subtraction `Orbit.CreateFromPositionAndVelocity` performs would be a subtraction of zero
+  here. It is needed there and not here because there the body is an arbitrary argument — building
+  an orbit around the Mun while the vessel orbits Kerbin has `Mun.GetWorldVelocity()` at some
+  hundreds of meters per second — whereas `Debug` always uses the active vessel's own body.
+
+  Confirmed in game, not only on paper. The existing `test_set_velocity` round-trips through
+  `kerbin.non_rotating_reference_frame`, whose own velocity term is zero, so it cannot tell the two
+  conventions apart. A throwaway test doing the same round trip through the **Mun's** non-rotating
+  frame, which carries hundreds of meters per second of its own motion, passes to within 5 m/s. That
+  test is not kept; it is recorded here as what was run.
+
+  So the three functions that look interchangeable are three different conventions, and this is the
+  distinction to keep straight: `GetFrameVel()`/`GetFrameVelAtUT()` are **absolute** (the chain sum
+  to the Sun) and are what `ClosestApproach` wrongly used; `GetVel()` is relative to the **active
+  vessel's** reference body and is what kRPC world space means; `GetRelativeVel()` and
+  `getOrbitalVelocityAtUT()` are relative to the **orbit's own** reference body.
 
 ## Departures from the design
 
@@ -277,6 +355,9 @@ Each is explained in place in the section it belongs to.
 
 | Departure | Why |
 | --- | --- |
+| The RPCs are named `Orbit.CreateFromPositionAndVelocity` and `Orbit.CreateFromOrbitalElements`, not `Orbit.CreateFromStateVectors` | The astrodynamics term was dropped on the vector side in favor of naming the two arguments outright, so the pair reads without the vocabulary. kRPC method names are unique per class, so there is no overloading to fall back on and the two had to be distinguished by name |
+| `Orbit.CreateFromOrbitalElements` exists at all | Not in the design; see the section above. The pair had to be named together, and an orbit stated as elements is the other half of the same feature |
+| `Orbit.Epoch` documentation corrected | It described a universal time as "the time since the epoch". The new `epoch` parameter takes the same quantity, so leaving it would have put two contradictory descriptions of one field in the same class |
 | `ut` is a required parameter, ahead of the optional `referenceFrame`, rather than defaulting to `NaN` for "now" | A `double` default is written into the generated client stubs as a bare `nan` literal, which does not compile |
 | `orbit.UpdateFromUT (ut)` is called after `Init ()` | Otherwise `Orbit.Speed` is zero: nothing fills in `orbitalSpeed` for an orbit no object is following |
 | `Orbit.VelocityAt` uses body-relative velocity plus the body's own motion, not `GetFrameVelAtUT` | The design recommended a pattern that is wrong by the active vessel's frame velocity, and that is a live bug in `ClosestApproach` too |
@@ -314,6 +395,13 @@ and `service/SpaceCenter/test/test_referenceframe.py`.
 | `reference_frame` axes | Axes fixed against `body.non_rotating_reference_frame`, and no angular velocity of its own |
 | Frame velocity | The body being orbited recedes at the orbit's own speed in the non-rotating frame |
 | Composition | Both frames compose with `create_hybrid` and `create_relative` |
+| **Elements against a position and velocity** | Build an orbit with `create_from_position_and_velocity`, rebuild it from the elements it reports, and assert the two agree in `position_at` and `velocity_at` over a range of UTs. This is the load-bearing check for the elements form: it pins the unit conversions and the epoch convention against a path already verified independently |
+| Elements recovered | The orbit reports back the seven elements it was built from. Catches the radians-to-degrees conversion on its own, since a raw radian value handed to a degree field comes back a factor of 180/pi out |
+| Shape from the elements | Apoapsis and periapsis are the semi-major axis scaled by one plus and one minus the eccentricity |
+| Inclination is physical | A quarter turn of inclination takes the orbit over the poles, reaching nearly its full radius along the non-rotating frame's y-axis, where an equatorial orbit stays near zero |
+| Mean anomaly at the epoch | `mean_anomaly` at construction is the value given, and `mean_anomaly_at_ut` a quarter period on has advanced by a quarter turn |
+| Elements round trip from a live vessel | Build from `vessel.orbit`'s own elements and assert `position_at` agrees over a range of UTs. Unlike the vector round trip every input comes from one orbit, so there is no physics frame between them and the tolerances are tight |
+| Elements that are not a conic | A negative eccentricity, an eccentricity of exactly one, an ellipse with a negative semi-major axis and a hyperbola with a positive one each raise |
 
 > **Two rows changed.** The design had the round trip from a live vessel as *the* load-bearing check.
 > It is not the one to lean on: `position`, `velocity` and `ut` come from three separate RPCs and the
@@ -327,11 +415,12 @@ and `service/SpaceCenter/test/test_referenceframe.py`.
 > substantially different orbit. Testing that they differ is the point; testing that they agree would
 > only pass if the frame were being ignored.
 
-Result: 133 tests pass across the two files. `bazel test //:test`, `//:lint`, `//doc:spelling` and
+Result: 144 tests pass across the two files. `bazel test //:test`, `//:lint`, `//doc:spelling` and
 `//doc:check-documented` all pass.
 
-**Not done:** the manual check outside the flight scene, in the space center and tracking station.
-No `GameScene` restriction is applied, matching `Orbit`, so those scenes are reachable and untested.
+**Out of scope, decided:** the check outside the flight scene, in the space center and tracking
+station. No `GameScene` restriction is applied, matching `Orbit`, so those scenes are reachable and
+stay untested. Flight is the scene this is for and is sufficient.
 
 ## Files touched
 
