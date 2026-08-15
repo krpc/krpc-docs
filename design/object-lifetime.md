@@ -1479,7 +1479,12 @@ per-instance reflection lookups to its one-time initialization takes about forty
    same kerbal loses that one too. Nothing but that setter renames a kerbal. The ways out are
    to name a kerbal by something the client cannot change, if the game offers one, to have the
    setter carry the object's identity forward with the rename, or to leave it and say that
-   renaming invalidates the objects for that kerbal.
+   renaming invalidates the objects for that kerbal. **Settled:** the last of the three. A
+   kerbal has nothing else to be named by, and carrying the identity forward would still strand
+   a second object taken before the rename, so it buys a partial answer for a mutable hash. What
+   the option asks for in return is that it be said, which the changelog and
+   [doc/src/object-lifetime.rst](https://github.com/krpc/krpc/blob/main/doc/src/object-lifetime.rst)
+   now do.
  * **Should a `CrewMember` rename be handled the way a `ServoGroup` rename is?** A servo group has
    the same problem, its name being both what identifies it and a settable property, and phase 12
    settles it: the object follows the name it is given, and the hash is taken from the vessel
