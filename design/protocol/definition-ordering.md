@@ -472,9 +472,10 @@ testable with enumerations alone.
 
 ## What was built
 
-All six phases landed, one commit each and in the order above, followed by two commits
-the phases turned out to need: the C++ encode and decode fix below, and the `TestService`
-procedure it unblocked. Where the implementation differs from the design:
+All six phases landed, one commit each and in the order above, with two commits the phases
+turned out to need in between, after phase five and before the changelogs: the C++ encode
+and decode fix below, and the `TestService` procedure it unblocked. Where the
+implementation differs from the design:
 
 | Design | Built |
 | --- | --- |
@@ -483,8 +484,9 @@ procedure it unblocked. Where the implementation differs from the design:
 | Lua gets "the equivalent" | two-phase registration, not a sort: with no edges between definitions the two answers are the same, and a sort in Lua would have nothing to order |
 | C++ renders `TestEnum::kValueC` | `TestService::TestEnum::value_c`. Generated C++ enumeration members are snake case, so that is what a default has to name |
 | nested enum default added to `TestService` | `TestService.EnumListDefault`, declared with `[KRPCDefaultValue]`, which sets a default that is not a compile-time constant and so can be a collection. Adding it meant fixing a C++ bug first, below |
-| rendering changes in the `docgen/csharp.py` and `docgen/cpp.py` overrides | only `docgen/csharp.py`. The C++ domain has no enumeration case of its own, so the language's rendering reaches it unchanged |
-| enum defaults render as named members | Python and Lua also had to learn to write a collection default in their own syntax. Python wrote `repr` of the decoded value, which happened to be Python syntax until it contained an enumeration member; Lua wrote the same, which was never Lua syntax |
+| rendering changes in the `docgen/csharp.py` and `docgen/cpp.py` overrides | for enumerations, only `docgen/csharp.py`: the C++ domain has no enumeration case of its own, so the language's rendering reaches it unchanged. `docgen/cpp.py`'s override went away entirely, over the unrelated collection defect below |
+| enum defaults render as named members | Python and Lua also had to learn to write a collection default in their own syntax. Python wrote `repr` of the decoded value, which happened to be Python syntax until it contained an enumeration member; Lua wrote the same, which was never Lua syntax, down to `True` and `False` for its booleans |
+| cnano's `build_collection_types` gives way to the shared helper | plus a dedupe cnano keeps for itself. The shared helper dedupes by kRPC type, and C needs it by C type: every class is a `krpc_object_t` and every enumeration a `krpc_enum_t`, so a list of one class and a list of another are one struct, which can only be declared once |
 
 ### The C++ client could not carry a collection of enumerations at all
 
@@ -507,6 +509,22 @@ unnoticed.
 `cpp.tmpl` now also declares each enumeration's `encode` and `decode` in `krpc::services`,
 forwarding to the ones in `krpc::encoder` and `krpc::decoder`, where argument dependent
 lookup finds them. It landed as its own commit before `EnumListDefault`.
+
+### C++ documentation wrote a collection default as a constructor call
+
+Also nothing to do with enumerations, and also found by looking closely at the defaults
+the rendering change touches. `docgen/cpp.py` wrapped a collection default's values in
+parentheses, so a list default came out as `std::vector<int32_t>(1, 2, 3)`, which is not
+the vector of those three values it appears to be but a constructor call that builds
+something else, where it compiles at all. A braced initializer list, `std::vector<int32_t>{1, 2, 3}`,
+is what such a default has to be written as. It predates this work and applies to every
+collection kind the domain renders.
+
+`lang/cpp.py` already wrote braces, which is why generated C++ compiled while its
+documentation did not, so the fix is to delete the domain's override and let the
+language's rendering through. The two differed only over a null value, which the templates
+never ask the domain to render: a parameter with no default is not written with one. The
+golden files are identical either way.
 
 One test in the list above was not written, deliberately. The JSON adapter does **not**
 produce the same `Definition` records the client builds from a `Services` message, so
