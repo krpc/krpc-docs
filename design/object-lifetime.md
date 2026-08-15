@@ -427,7 +427,7 @@ tells it about one, since only the addon sees `GameEvents`.
 | Member | Called by | Does |
 |---|---|---|
 | `Changed` | the addon, when a game is loaded, quickloaded or reverted, and on a scene change | moves `Generation` on, clears `Settled` and asks for a sweep |
-| `RequestSweep` | the addon, on a destruction event (`onPartDie`, `onVesselDestroy`) | asks for a sweep, leaving the generation alone: what was destroyed is gone, but nothing has been rebuilt for a cache to look up again |
+| `RequestSweep` | the addon, on a destruction event (`onPartDie`, `onVesselDestroy`); a collection of client-owned objects, on letting one go | asks for a sweep, leaving the generation alone: what was destroyed is gone, but nothing has been rebuilt for a cache to look up again |
 | `Sweep` | the addon, from the first server update where the game has stopped adding vessels | runs the sweep, clears `SweepPending` and sets `Settled` |
 | `Generation` | a proxy caching something it looked up, or classifying something that cannot outlive one game state | a `uint` that identifies the current game state |
 | `Settled` | an access path deciding whether the absence of a game object means it is gone | whether the game has finished building the state it moved to |
@@ -995,6 +995,7 @@ need. It goes where `ClientOwnedObjects` already lives:
 |---|---|---|
 | `ClientOwnedObjects.RemoveDestroyed` | server assembly, `KRPC.Utils` | drops the entries whose object is an `IGameObjectState` reporting destroyed, without running the release action: there is nothing left to tear down |
 | the addons' update loops | each service | call it, and then act only on what is live |
+| `ClientOwnedObjects` asking for a sweep | server assembly, `KRPC.Utils` | every path that lets an object go asks for one, since removing a line, a panel or a force destroys nothing the game raises an event for, and nothing else would take the object out of the store. A collection whose objects are never handed to a client, the instantaneous forces, says so and asks for nothing, so a client pushing a part every frame does not sweep the store every frame |
 
 `Force` is what makes this more than tidiness. The forces addon applies every force in its
 collection on every fixed update, through `Part.InternalPart`, so a force on a part the game has
