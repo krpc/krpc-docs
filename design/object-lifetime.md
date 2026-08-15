@@ -813,7 +813,10 @@ to look in, which says nothing about anyone, so that is dormant.
 
 A frame is as alive as everything it is defined against: its vessel, part, maneuver node, thruster
 or parent frames, and for a hybrid frame each of its components. A frame defined against a
-celestial body alone never dies.
+celestial body alone never dies, and neither does one defined against a constructed orbit, which
+names nothing the game can destroy. The frames on a constructed orbit are still a new producer of
+retained proxies, and are reclaimed with the orbit they belong to rather than on their own; see
+[constructed orbits](#constructed-orbits).
 
 `DockingPort.ReferenceFrame` captures its `ModuleDockingNode` and so can still raise a raw
 `NullReferenceException`. Giving part-relative reference frames the same id-based re-derivation the
@@ -1022,6 +1025,53 @@ reference frame that is not live makes it wait too, on the same grounds as a dra
 settable property, so the client can point the force at another one. `Force.Remove` then drops its
 object from the store rather than leaving it there for the session.
 
+#### Constructed orbits
+
+`Orbit.CreateFromPositionAndVelocity` and `Orbit.CreateFromOrbitalElements`
+([`services/orbits-from-state-vectors.md`](services/orbits-from-state-vectors.md)) put a third kind
+of thing in this category, and the purest one: an orbit a client asks for names **no game object at
+all**. Not a `GameObject` the mod made, as a drawing is, and not an instruction naming a part, as a
+`Force` is. It is arithmetic the server holds on the client's behalf.
+
+That makes it the one member of the category where only the reclamation half applies. There is no
+liveness question the game can answer, because there is nothing it can destroy: a constructed orbit
+is as valid on the last frame of the session as on the first, and every scene change leaves it
+alone. So it needs no dormant state and no addon walking it every frame. It needs exactly one
+thing, and it is the thing that is missing today: **the proxy leaving the store when the owning
+client goes.**
+
+What says so is the orbit recording that it has been let go of, exactly as a `Force` records having
+been removed. An orbit whose client is gone reports itself destroyed, and the sweep the collection
+already asks for on letting an object go is what takes it out. Nothing else can say it: the
+collection otherwise releases the *game-side* resource, destroying the drawable, canceling the
+transfer, stopping the force from being applied, and for a constructed orbit there is no such
+resource. The store entry **is** the whole cost, so a collection that only released would be
+bookkeeping that releases nothing.
+
+Three details for whoever builds it:
+
+- **Only constructed orbits.** Only the two constructors record the orbit as a client's. Orbits read
+  off a vessel, body or node are named by the thing whose orbit it is, so the store hands back one
+  object for each however often it is asked for, and they are bounded by the number of such objects
+  rather than accumulating. Recording those too would take a vessel's orbit proxy away from every
+  other client when the first one to ask for it disconnects.
+- **Three proxies, not one.** `Orbit.ReferenceFrame` and `Orbit.OrbitalReferenceFrame` are stored
+  too. They dedupe per orbit, since `ReferenceFrame.Equals` compares the orbit it is built on, so a
+  constructed orbit is at most three entries, and all three go together without anything saying so:
+  a frame is as alive as what it is defined against, so the orbit reporting itself destroyed covers
+  both of them, and a `CreateRelative` or `CreateHybrid` frame a client builds on either.
+- **The host.** Every collection today is a static field of a scene-scoped addon,
+  `PartForcesAddon` being `KSPAddon.Startup.Flight`. A constructed orbit carries no `GameScene`
+  restriction, matching `Orbit` itself, so it is reachable from the tracking station and the space
+  center and needs a host that is too. That host is not a `ClientCleanupAddon`, which gives its
+  collections up on entering a scene: an orbit is as valid in one scene as in the next, so only a
+  game ending takes it.
+
+Releasing on disconnect makes the id invalid for anyone else still holding it, which matters only if
+a client passes an id to another client out of band, since ids come from one sequence and one store.
+That is already true of drawings and forces, so a constructed orbit behaving the same way is
+consistent rather than new.
+
 ### Drawing
 
 `Line`, `Polygon`, `Text` and `NavballMarker` take the rule above: live while the drawable's game
@@ -1215,7 +1265,7 @@ adding to it. Splitting them off keeps the first pull request to the behavior ch
 | 5 | [The vessel in the editor](#the-vessel-in-the-editor) | Everything the editor's vessel needs, which is a second kind of thing a part can belong to rather than another kind of game object; see below. |
 | 6 | SpaceCenter records | [`Alarm`](#alarms), [`Contract`, `ContractParameter`](#contracts) and [`Waypoint`](#waypoints): the records the game keeps for the loaded game rather than for a vessel. Each gains an identity the game writes into the save and re-derives from it; each `Remove` leaves its object destroyed rather than holding something the game no longer has. |
 | 7 | SpaceCenter objects defined against others | [`CommLink`](#comm-links) is named by the vessel whose control path it is a hop in and the two nodes it joins, and finds that hop in the path as it stands, so it reports the link as it is rather than as it was when the object was made; [`ClosestApproach`](#close-approaches) takes the state getter alone. Needs 3a, 3h and 3i for what it defers to. |
-| 8 | [Objects kRPC creates for a client](#objects-krpc-creates-for-a-client) | `ClientOwnedObjects.RemoveDestroyed`, and `Force` as its first user: a destroyed part takes its forces with it, and an unloaded part, or a reference frame that cannot be measured in, makes them wait, instead of the physics step dereferencing a part that is gone. `Force.Remove` leaves the object gone, as removing a drawing does. Needs 3b and 3h. |
+| 8 | [Objects kRPC creates for a client](#objects-krpc-creates-for-a-client) | `ClientOwnedObjects.RemoveDestroyed`, and `Force` as its first user: a destroyed part takes its forces with it, and an unloaded part, or a reference frame that cannot be measured in, makes them wait, instead of the physics step dereferencing a part that is gone. `Force.Remove` leaves the object gone, as removing a drawing does. [Constructed orbits](#constructed-orbits) are the other user, and the one that needs only the store-dropping half. Needs 3b and 3h. |
 | 9 | [Drawing](#drawing) | `Line`, `Polygon`, `Text` and `NavballMarker` classify themselves from their game object and from having been removed, so that removing one twice reports it gone rather than not found, and the addon does not draw a drawable whose reference frame is not live. Needs 8 and 3h. |
 | 10 | [UI](#ui) | Every user interface object classifies itself and raises from the members that reach the game, removal included, with `Control` answering for the members its controls share; `RectTransform`, `Layout`, `LayoutElement` and `SizeFitter` gain a state, and an identity the store can dedup, so reading one repeatedly stops adding an object to the store per call. Needs 8. |
 | 11 | [RemoteTech](#remotetech), [LiDAR and DockingCamera](#lidar-and-dockingcamera) | `Antenna`, `Laser` and `Camera` defer to their part and are destroyed when a live part no longer carries their module; `Comms` names its vessel by the id its `Vessel` already holds. Three services, one shape, so one phase. Needs 3a and 3b. |
@@ -1290,6 +1340,9 @@ unit tests for the store and the generation:
   twice reports it gone rather than not found;
 * a force on a destroyed part leaves the store, rather than being applied on every physics step,
   and a removed force reports itself gone rather than the force it was applying;
+* an orbit a client constructed, and both of the reference frames on it, leave the store when that
+  client disconnects, while the orbit of a vessel, which is no one client's, survives another
+  client going;
 * the sweep survives a proxy whose state getter throws, keeping it and checking the rest;
 * a rect transform, a servo and a servo group each read twice are one object, not two.
 
