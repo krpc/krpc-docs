@@ -10,9 +10,10 @@ improvements. This document summarizes each linked issue as a starting point for
 each feature precisely in follow-up sessions.
 
 **Deliberately omitted** from this overview (out of scope for now):
-constructors ([#898](https://github.com/krpc/krpc/issues/898)),
-inheritance ([#905](https://github.com/krpc/krpc/issues/905)), and
-more communication protocols ([#899](https://github.com/krpc/krpc/issues/899)).
+constructors ([#898](https://github.com/krpc/krpc/issues/898)) and
+inheritance ([#905](https://github.com/krpc/krpc/issues/905)). More communication protocols
+([#899](https://github.com/krpc/krpc/issues/899)) was also omitted here, and is now covered by
+[local-transports.md](local-transports.md).
 
 ---
 
