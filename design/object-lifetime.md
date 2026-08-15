@@ -722,10 +722,26 @@ A proxy standing for several modules holds a reference to each rather than a lis
 `Engine` keeps one per mode, and `ResourceConverter` one per converter, in the order its index
 arguments count in. A list of modules is the same captured reference in another shape.
 
-`Decoupler` keeps its access path as it is and takes the state getter only, deferred to its part. Its
-per-access cost is reflection inside a compatibility wrapper shared with
-`PartExtensions.DecoupledAt`, so a cheaper module lookup buys nothing, and keeping that wrapper
-does not stop it being reclaimed.
+`Decoupler` was to keep its access path as it is and take the state getter only, deferred to its
+part, on the grounds that its per-access cost is already reflection inside a compatibility wrapper
+shared with `PartExtensions.DecoupledAt`, so a cheaper module lookup buys nothing. **That was
+wrong, and the implementation takes a `ModuleRef` like the rest.** The argument was about cost and
+missed what the reference is actually for. The wrapper resolves the module once, in its
+constructor; it uses reflection for the module's *members*, not to find it. So the proxy held a
+module from one game state, and a load left it:
+
+ * comparing unequal to a freshly obtained `Decoupler` for the same part, and hashing differently,
+   because both used the module instance. The store then kept one entry per load, which is the
+   accumulation this work exists to end.
+ * reading the destroyed module. `Decoupled` and `Impulse` returned the values it had before the
+   load, with no error, and `Decouple` threw out of the reflected call.
+ * reporting itself live throughout, since the state getter deferred to the part, and the part
+   really was alive.
+
+Deferring the state getter to the part is only sound for a proxy that re-derives; for one holding a
+captured module it reports the opposite of the truth. Wrapping whichever module the reference
+resolves to costs one small allocation per access, which is nothing beside the reflection the
+wrapper does anyway.
 
 ### A module's fields, events and actions
 
