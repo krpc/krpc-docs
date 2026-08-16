@@ -32,7 +32,7 @@ Three suites and a comparison tool, one `bazel run` target each.
 | Suite | Target | Needs | Measures |
 |---|---|---|---|
 | Server, game-less | `//tools/benchmarks:testserver` | nothing, seconds | what the server pays per remote procedure call, against `TestServer` |
-| Client, python | `//tools/benchmarks:python` | nothing, seconds | round-trip time for a call, and how often a stream arrives |
+| Client, one per language | `//tools/benchmarks:python`, `:cpp`, `:java`, `:csharp`, `:lua` | nothing, seconds | round-trip time for a call, and how often a stream arrives |
 | Server, in game | `//tools/benchmarks:server` | KSP, minutes | the same per-call cost against real `SpaceCenter` procedures, the object-access microbenchmarks, and stream cost over a few hundred parts |
 | A/B | `//tools/benchmarks:compare` | two result files | what moved, and whether it moved by more than the noise |
 
@@ -172,8 +172,31 @@ adaptive rate control bounds how much of an update goes to RPCs, so the report c
 A run warms up for a second before measuring anything. Without it the first case measured came out
 *slower* than the second, because the rate control was still adapting to the load.
 
-Python is the first client. The others follow the same shape: each emits the same rows, and the
-four `test_performance` files they have today are superseded as each lands.
+### One program per language
+
+Measuring what a client costs means timing it from inside that client, so each language has its
+own benchmark program. What they share is `run_client.py`: it starts the TestServer, hands the
+program the ports, and turns what it prints into the same table every other suite prints. The
+contract is one JSON document on standard output, holding a case name, a unit and the raw samples;
+the runner does the rest, including phrasing the rate a figure works out to, so that is worded once
+rather than five times.
+
+| Client | Cases | Note |
+|---|---|---|
+| python | all | the runner is the program, so it needs no separate one |
+| cpp, java, csharp | all | `cc_binary`, `java_binary`, `csharp_binary` |
+| lua | round trips only | **the lua client has no streams** |
+| cnano | none | speaks only serial, so a round trip would measure the link rather than the client, and the harness needs `socat` |
+
+Lua needed a `lua_binary` rule beside the existing `lua_test`, since that one hardcodes running the
+test suite. The benchmark script is run from outside the rock tree rather than installed into it,
+so it does not ship in the released rock; and building the tree is noisy, so that noise goes to
+stderr and standard output belongs to the script alone.
+
+The four `test_performance` files in the python, csharp, java and lua clients are superseded and
+gone. One of them was measuring the wrong thing outright: the lua one timed with `os.clock`, which
+is processor time, and so left out everything spent waiting for the server - which is most of a
+round trip.
 
 ## In-game suite
 
@@ -202,6 +225,11 @@ Two scenarios, one script each, because each sets up different state:
 | `module.of_type_to_list` | micro | the allocating LINQ pattern a concrete proxy can use to collect its modules |
 | `store.dedup` | micro | what returning an already-known proxy costs, over a private store holding one entry per part |
 | `stream update` | scene | `time_per_stream_update` with one stream per part: the realistic workload, server side, no round trip |
+
+A benchmark is not run by CI - it measures rather than asserts, and the in-game one needs the
+game - so a `build_test` compiles every benchmark program as part of `//:test`. Otherwise a
+program that stopped compiling would be found by whoever next went to measure something, which is
+exactly the moment not to be fixing the tool.
 
 ## As built
 
