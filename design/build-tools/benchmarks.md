@@ -226,10 +226,13 @@ Two scenarios, one script each, because each sets up different state:
 | `store.dedup` | micro | what returning an already-known proxy costs, over a private store holding one entry per part |
 | `stream update` | scene | `time_per_stream_update` with one stream per part: the realistic workload, server side, no round trip |
 
-A benchmark is not run by CI - it measures rather than asserts, and the in-game one needs the
-game - so a `build_test` compiles every benchmark program as part of `//:test`. Otherwise a
+No benchmark is run by CI - they measure rather than assert, and the in-game one needs the game -
+so a `build-benchmarks` job builds every one of them, the client programs included. Otherwise a
 program that stopped compiling would be found by whoever next went to measure something, which is
-exactly the moment not to be fixing the tool.
+exactly the moment not to be fixing the tool. A `build_test` inside `//:test` was the first
+attempt and does not work: CI names each package's test suite rather than the `//:test` aggregate,
+so it would never have run. For the same reason the benchmarks' lint target had to be named in the
+`test-tools` job beside the other tools'.
 
 ## As built
 
