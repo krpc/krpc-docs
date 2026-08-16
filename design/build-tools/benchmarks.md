@@ -50,7 +50,7 @@ no server-side number includes a round trip.
 
 Two kinds of case, and the difference between them is the point:
 
- * **End to end.** `BenchmarkCall (ProcedureCall call, uint iterations)` looks the procedure up
+ * **End to end.** `Benchmark.Call (ProcedureCall call, uint iterations)` looks the procedure up
    once and then loops `Services.ExecuteCall` followed by encoding the result: argument decode,
    dispatch, the procedure, result encode. Everything the server does per request except the
    socket. Because the client names the call - the python client already builds a `ProcedureCall`
@@ -61,17 +61,30 @@ Two kinds of case, and the difference between them is the point:
    object. These exist to be compared with each other within one session, which is the only
    comparison between them that holds.
 
-The same measurement is compiled into `TestingTools`, for the in-game suite, and into
-`TestServer`, for the game-less one, from one pair of source files in `tools/benchmarks/src/`
-listed in both assemblies' `srcs` and both `.csproj`s. Neither assembly ships with the mod, and
-`//:csproj-test` already tolerates a `<Compile Include="..\...">` shared with a sibling project.
+`Benchmark` is **an assembly of its own** (`tools/benchmarks/src/`, built as `KRPC.Benchmark.dll`),
+not code copied into each host. It is a service like any other, so it is loaded by whichever server
+it is installed beside: TestServer references it, and `krpctest`'s installer puts it into `GameData`
+next to `TestingTools`. An in-game number and a game-less one are then the same code rather than
+two builds of the same source, and both suites call the same `Benchmark.Call`. It does not ship
+with the mod - nothing in `//:krpc` lists it.
 
-In `TestServer` it is a **service of its own**, `Benchmark`, rather than a procedure on
-`TestService`. `TestService` is a fixture: its exact member list is asserted by the python and lua
-client tests, and its definitions drive the clientgen golden files for every language, so a
-procedure added to it churns those and then sits in them forever. A separate service touches none
-of it, and needs no clientgen either, since a client with no pre-generated stubs for a service
-builds it from the definitions the server hands over on connecting.
+Two consequences worth recording:
+
+ * **Not a procedure on `TestService`.** `TestService` is a fixture: its exact member list is
+   asserted by the python and lua client tests, and its definitions drive the clientgen golden
+   files for every language, so a procedure added to it churns all of those and then sits in them
+   forever. A separate service touches none of it, and needs no clientgen either, since a client
+   with no pre-generated stubs builds a service from the definitions the server hands over on
+   connecting. What it does cost is one line in each client test that asserts the full set of
+   services a connection exposes.
+ * **TestServer has to touch it before the scan.** Services are found by walking the assemblies
+   the runtime has loaded, and nothing in TestServer calls into the benchmark service, so it
+   would never be loaded. One statement naming a type from it, before the server starts, is
+   enough. The game has no such problem: KSP loads every assembly in `GameData`.
+
+The microbenchmarks stay in `TestingTools`, since they reach into KSP and SpaceCenter internals
+that a game-less assembly cannot see. They time their cases with `Benchmark`'s timer, which is
+public for exactly that, so their numbers are in the same units as its.
 
 Five pieces of hygiene are what make the numbers mean anything:
 
@@ -191,13 +204,13 @@ Where the implementation differs from what was first designed:
 | a per-getter case registry in C# | one `BenchmarkCall` taking a `ProcedureCall`; the registries keep only the object-access primitives | measuring a getter stopped needing a mod rebuild, and the eight hand-written whole-getter cases went with it. `BenchmarkModule` and its registry went too: a module getter is a call like any other |
 | entry points typed on the object under test | still true of the microbenchmarks; `BenchmarkCall` is typed on the call | the proxy is decoded before timing starts either way |
 | the suite asserts allocations, A/B ordering and a per-case ceiling | it asserts nothing | 29 ceilings across three scripts, guessed rather than derived, and a run that fails is a run that produced no table. Allocations are a reported column, and the A/B relations they asserted are read off the table |
-| server-side benchmarks only | plus a `Benchmark` service in `TestServer` and a client suite | a game-less run is seconds against 90+, which is the difference between prototyping a server change and not; and nothing measured a client |
-| a `TestingTools`-only `Benchmark.cs` | the timing and dispatch machinery is shared source compiled into `TestingTools` and `TestServer` | so an in-game number and a game-less one are the same measurement rather than two implementations of it |
+| server-side benchmarks only | plus a `Benchmark` service loaded by both servers, and a client suite | a game-less run is seconds against 90+, which is the difference between prototyping a server change and not; and nothing measured a client |
+| a `TestingTools`-only `Benchmark.cs` | an assembly of its own that both servers load | shared source compiled into two assemblies was the first shape; one assembly is a real dependency instead of a `<Compile Include="..\...">` in two `.csproj`s, and makes the two hosts run the same code rather than two builds of it |
 | results reported through a pytest fixture | a module-level list, and a shared `report.py` the three runners print through | pytest cannot inject fixtures into `unittest`-style test methods, and the client suites are not pytest at all |
 | a multi-vessel scenario, three copies of the reference craft | dropped | the station shows the same linear scan, and the three-vessel numbers fell on the same line |
 | spread as max over min | median over min | see [Reading a result](#reading-a-result) |
 | `--benchmark-json`, diffed by hand | `--json` and a `compare` target | a by-hand diff of two files of numbers is not a procedure anyone follows |
-| `TestingTools` became a `partial` class, and `core` gained `InternalsVisibleTo` | also for `TestServer` | a benchmark procedure has to be a member of a `[KRPCService]` class, and dispatch through `Services` is internal to core |
+| `TestingTools` became a `partial` class, and `core` gained `InternalsVisibleTo` | also for `KRPC.Benchmark` | a benchmark procedure has to be a member of a `[KRPCService]` class, and dispatch through `Services` is internal to core |
 | object-store sweep case | `store.dedup`, over a private store pre-filled with one entry per part | there is no sweep until object-lifetime's core infrastructure phase; the dedup path is what exists to measure |
 | 300+ part station | `Station300.craft`: a pod carrying 320 cubic octagonal struts | a fixture, not a spacecraft |
 
