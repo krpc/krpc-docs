@@ -98,11 +98,19 @@ Five pieces of hygiene are what make the numbers mean anything:
 
 ### Allocations
 
-Bytes per operation, measured around the same loop with
-`GC.GetAllocatedBytesForCurrentThread`, which is exact and unaffected by collections. The Mono KSP
-ships does provide it; the `GC.GetTotalMemory(false)` fallback is there for a runtime that does
-not, and is untested in practice. Which was used is reported alongside the figure, and a chunk
-taken with the coarse method that spans a collection is discarded and retried smaller.
+Bytes per operation, measured around the same loop. `GC.GetAllocatedBytesForCurrentThread` is
+exact and unaffected by collections, and .NET 8 has it, so the game-less suite gets exact figures.
+**KSP's Mono does not have it**, so every in-game figure is the `GC.GetTotalMemory(false)`
+fallback: the change in the size of the heap. (An earlier version of this doc claimed the opposite
+and called the fallback untested; it is in fact the only path in game.)
+
+A heap delta is meaningless across a collection, which freed memory as well as allocating it - over
+a case that allocates heavily it comes out negative, which is how the gap was found. So a chunk
+that spans one is retried smaller, and if it still spans one the figure is reported as **unknown**
+rather than as a number. Nothing is lost by that: the question these figures answer is whether a
+path is allocation free, and a path that cannot run the loop without triggering a collection has
+already answered it. Which method was used is recorded per result, and the report says so under any
+table with an inexact one.
 
 Not the Unity profiler API: it is restricted in non-development players, so it would report
 differently in a real KSP install than in a dev build.
@@ -214,12 +222,17 @@ Where the implementation differs from what was first designed:
 | object-store sweep case | `store.dedup`, over a private store pre-filled with one entry per part | there is no sweep until object-lifetime's core infrastructure phase; the dedup path is what exists to measure |
 | 300+ part station | `Station300.craft`: a pod carrying 320 cubic octagonal struts | a fixture, not a spacecraft |
 
-Two things the harness learned the hard way, both now asserted or commented in place: a stream the
-client has added but never read is not started, and the server skips it, so a stream case has to
-start its streams explicitly and check the server's stream count and rate before believing the
-reading; and a benchmarked call that fails comes back as a result carrying an error, which costs
-about what any other result costs, so `BenchmarkCall` makes the call once outside the loop and
-raises rather than quietly reporting the price of failing.
+Three things the harness learned the hard way, all now handled in place:
+
+ * A stream the client has added but never read is not started, and the server skips it, so a
+   stream case has to start its streams explicitly and check the server's stream count and rate
+   before believing the reading.
+ * A benchmarked call that fails comes back as a result carrying an error, which costs about what
+   any other result costs, so `Benchmark.Call` makes the call once outside the loop and raises
+   rather than quietly reporting the price of failing.
+ * KSP's Mono has no per-thread allocation counter, so in game the allocation figure is a heap
+   delta; a case that allocates heavily triggers a collection inside the window and the figure
+   came out **negative**. It is reported as unknown in that case. See [Allocations](#allocations).
 
 The runs that decided the object lifetime design are tabulated in
 [object-lifetime.md](../object-lifetime.md#measured), the design that asked for the suite. They are
