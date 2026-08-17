@@ -172,6 +172,106 @@ adaptive rate control bounds how much of an update goes to RPCs, so the report c
 A run warms up for a second before measuring anything. Without it the first case measured came out
 *slower* than the second, because the rate control was still adapting to the load.
 
+### Frame pacing and the round trip
+
+**Status:** built, 2026-08-17. `TestServer` takes `--no-frame-pacing`; the client runners measure
+the round trips against a server started with it and the streams against a paced one, and the
+report says which ran against which. PR not yet raised.
+
+`TestServer`'s 60 Hz loop is the subject of the in-game suite and a confound for the client one.
+A client round trip is served repeatedly inside one update for as long as the client answers
+within `RecvTimeout`, and the loop reaches the number two ways:
+
+ * **A plateau at 16.7 ms** as soon as a client's own turnaround crosses `RecvTimeout`, because
+   the server then serves it once per frame. This is the
+   [receive timeout cliff](../server/recv-timeout-cliff.md), and it is the one that survives
+   everything else. It is what the case sizes are chosen to stay clear of, and it is the failure
+   mode of the suite: it arrives exactly when the thing being measured gets expensive, which is
+   when the measurement matters.
+ * **A ramp at the start of a measurement.** Only `MaxTimePerUpdate` of each frame goes to RPCs,
+   so the rest is dead time that a mean per call is divided by. This one turns out to disappear on
+   its own for a client hammering flat out: adaptive rate control grows `MaxTimePerUpdate` by
+   100 us an update while the frame is inside its target, and at 16900 us it is past the 16.67 ms
+   frame, so the server serves continuously and there is no dead time left. It takes about two
+   seconds to get there. Measured over one second a round trip reads 0.024 ms, over the second
+   after that 0.015 ms.
+
+The fix is to stop `TestServer` pacing itself, **not** to change the receive timeout. The timeout
+only bites because the next update is a frame away; with the loop calling `core.Update ()` back to
+back, a poll that times out is followed immediately by another one. Measured with a probe client
+busy-waiting a controlled gap between calls, receive timeout left at its default:
+
+| client work between calls | paced, over one second | unpaced |
+|---|---|---|
+| 0 | 0.024 ms | 0.017 ms |
+| 600 us | 0.98 ms | 0.617 ms |
+| 1000 us | 16.39 ms | 1.018 ms |
+| 2000 us | 16.39 ms | 2.015 ms |
+| 5000 us | 16.39 ms | 5.004 ms |
+
+Unpaced, a round trip is the client's own cost plus 17 us at every point, with no quantization and
+nothing to wait for. That is the instrument a client benchmark wants.
+
+**What it is worth, in the suite's own numbers.** The cases as they stand barely move: the python
+`round trip` reads 0.01501 ms paced and 0.01506 ms unpaced, because they are sized to sit on the
+fast side of the cliff and each case settles for long enough that the ramp is over before anything
+is measured. What moves is what can be measured at all. Raising the list case from 100 values to
+1000 puts the client's own turnaround over the receive timeout:
+
+| python, list of 1000 values | paced | unpaced |
+|---|---|---|
+| round trip | 16.65 ms | 1.24 ms |
+
+Paced, that figure is the frame rate and says nothing about the client, which is why the case sizes
+have to be chosen around it. Nothing is lost by unpacing: a client whose unpaced round trip reaches
+1 ms is one that will be served once per frame in game, so the threshold becomes a way to read the
+result rather than a plateau baked into it, and the number now says how far over the line the
+client went.
+
+Constraints:
+
+ * **The stream cases must stay paced.** `stream interval` is a per-update property, pinned to
+   16.7 ms by the loop and meaningful only because of it. Unpaced it would measure how fast the
+   loop spins. So a run needs two server sessions, one unpaced for the round trips and one paced
+   for the streams, rather than one flag for the whole run.
+ * **Turn adaptive rate control off with the pacing.** It keys off frame time, which is
+   meaningless when there are no frames; unpaced it drifted `MaxTimePerUpdate` from 10000 to
+   16900 us, which is run-to-run variation for nothing. `MaxTimePerUpdate` itself stops
+   distorting once the pacing is gone, since it only chops the updates up and leaves no dead time
+   between them.
+ * **The mode belongs to `TestServer`, as a command-line flag.** Not a setting reachable over the
+   protocol: the game paces `FixedUpdate` itself and kRPC cannot opt out there, so an RPC for it
+   would be a procedure that only means something against one server.
+ * **The process spins a core continuously** in this mode, where the paced one idles at 0.19.
+ * The report header must carry the mode, for the same reason it already carries `recv_timeout`.
+   As built it carries a line per phase, naming the server that phase was measured against.
+ * The **dispatch benchmarks are unaffected** and need no mode: `Benchmark.Call` loops inside the
+   server over one RPC, so the frame loop is amortized to nothing.
+
+The case sizes were left alone: nothing forced a change, and the same list length across every
+client is what makes those figures readable against each other. A heavier case is now available
+if one is wanted, which it was not before.
+
+As built, each phase is asked for through `BENCHMARK_PHASE` in the benchmark program's
+environment, which is how one program measures one phase against the server started for it; the
+runner concatenates the phases into one report, and a client with nothing to measure in a phase
+(lua has no streams) contributes no block. The cases became blocks per phase rather than one
+list, since `Result` already groups by scenario.
+
+**A warmup came out of it.** Unpaced, the round trip is sharp enough that the server's cold start
+showed up as drift on whichever case went first: the first case of a run reported itself as
+"still settling" in two runs out of three, at 12 to 17 percent. Every case already settles itself,
+which covers the client and the load the case puts on the server, but not a server that has never
+executed a call. A second of discarded calls when a server starts fixed it, and tightened the
+spread on the cases after it as well. The same second went into the dispatch suite, whose first
+two cases were drifting 77 and 26 percent for the same reason and now sit at 0.1 and 0.3.
+
+This does not overlap with the in-game suite. The client suite answers "did the client library
+get slower", where the frame loop is noise to be removed; the in-game suite answers "what does a
+program actually get", where the frame loop is the whole subject and cannot be switched off. The
+in-game numbers being the ones that cannot have this option is the reason the client numbers
+should not try to be them.
+
 ### One program per language
 
 Measuring what a client costs means timing it from inside that client, so each language has its
