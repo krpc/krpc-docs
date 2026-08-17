@@ -774,10 +774,22 @@ covers the equality path itself.
 
 ## Interaction with planned protocol work (#906)
 
-* **#866 named tuples/structs**: adds a `STRUCT` type code and definitions. Extends naturally
-  here: a new `TypeCode.Struct` value, `Type.StructType(service, name)`, and
-  `Function.CreateStruct`/field access nodes; computed streams then return structs with no
-  further changes (runtime-typed encoding + client-declared/reported type both extend).
+* **#866 named tuples/structs**: adds a `STRUCT` type code and definitions. Extended naturally,
+  as expected, once the structure work landed: a `TypeCode.Struct` value,
+  `Type.StructType(service, name)`, `CreateStruct(type, fieldValues)` and
+  `GetField(value, name)`, with computed streams returning structures for free
+  (runtime-typed encoding + client-declared/reported type both extended). Beyond the sketch:
+
+  * A field is named to the server by the name it is declared with, since the wire type carries
+    only the structure's service and name. The python compiler therefore maps a pythonic
+    attribute name back to the declared one through the structure's position in the definitions.
+  * Both native-syntax compilers reach the new nodes: an attribute or member access on a
+    structure valued expression, and calling the structure type (python) or `new` (C#). A
+    structure a function captures becomes a `CreateStruct` of constants, as a tuple already did.
+  * The C++ client could not decode a value of a type a service defines through a stream at all:
+    a stream looks its decoder up where its template is written, and the generated decoder for an
+    enumeration or a structure is declared after it. The lookup was made unqualified, which finds
+    it from the type being decoded.
 * **#877 stream invalidation**: builds on per-stream error results, which
   `FunctionStream`/hardened `EventStream` now emit in the same shape as `ProcedureCallStream`;
   the removal convention can layer on unchanged.
