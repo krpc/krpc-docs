@@ -113,6 +113,11 @@ difference has to pay for it, either continuously or by probing.
 
 ## Recommendation
 
+A control loop, which is the shape that suffers most, has since been given a way out:
+[holding a physics tick](tick-hold.md) lets a client keep the game on one tick while it computes,
+so its reads and writes land in the same tick instead of one call per tick. That does not change
+anything below, which is about what the server does for a client that has not asked for a hold.
+
 In order of cost:
 
 1. **Document the cliff.** `doc/src/internals.rst` already explains blocking receives and the
