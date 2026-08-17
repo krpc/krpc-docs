@@ -1,6 +1,6 @@
 # Structure types (issue #866)
 
-**Status:** proposal, design agreed, not yet implemented. Written 2026-07-03, revised
+**Status:** implemented, see *What was built* below. Written 2026-07-03, revised
 2026-08-09 against `main` after the v0.6.0 release and
 [PR #1017](https://github.com/krpc/krpc/pull/1017) (nullable values). Issue
 [#866](https://github.com/krpc/krpc/issues/866) is milestoned 0.7.0.
@@ -361,12 +361,32 @@ First-adoption candidates (separate follow-up work, per the issue): a
 `Body` and `EditorFacility` properties and no mutable state, so the 1 + 3n cost and the
 worked example both still hold.
 
+## What was built
+
+Everything above landed, in the order under *Implementation order*, with the server moved
+after the schema so that a commit adding a definition kind never precedes the consumers that
+read it. Where the implementation differs from the design:
+
+| Design | Built |
+| --- | --- |
+| `[KRPCProperty]`-marked properties with get+set are the fields | a marked property that is not a public instance property with both accessors is a scanner error rather than being quietly left out. Field order is by metadata token, since reflection promises no order for the properties of a type |
+| a scanner-time cycle check | built, but with no unit test: every `[KRPCStruct]` type in an assembly is found by the scanner, so a deliberately cyclic one would break every test in the suite rather than only its own. The cycle check that is tested is the consumer-side one in `krpc/definitions.py`, over hand-built definitions |
+| Python `StructType.set_fields(fields)` | plus an optional python type to use instead of a new named tuple, which is how the pre-generated stubs register theirs. The field *types* come from the service definition either way, so the same code decodes a structure whether its stubs were generated ahead of time or not |
+| C# generated `struct` with properties | plus a constructor taking the fields in order, value equality and the `==` operators, which the C# analyzers require of a struct. A structure valued default is not a compile-time constant, so such a parameter takes the nullable form `T?` and the default is applied where the value is encoded, as a collection valued default already was |
+| C++ generated `struct` with `operator==` | plus a default constructor and one taking the fields in order: a field of a class type has an explicit constructor, which value-initializing an aggregate cannot reach. The declarations sit after the nested class definitions, as a field of a class type needs the class complete |
+| Java generated immutable POJO instantiated via a `Types.createStruct` registration | the wire type names a structure but does not carry its fields, so the generated class supplies them: `fieldTypes` and `fromFieldValues` statics that the encoder finds by the name the type carries, and a `RemoteStruct` interface for reading a value's fields |
+| cnano keyed by the struct's declared name with named members | structures join the collection types in the ordered list of declarations, and the template switches on a `kind` field rather than on the prefix of a type's name. A tuple and a structure now share one declaration and one codec, with the members named for their position or for the field they carry |
+| the ordering the structs need | the shared `collection_types` helper counts a structure as a structural type, and clientgen orders a service's structures by what their fields carry, which C and C++ both need |
+| a struct default with a class-handle field | not expressible: no language can write a default naming an object that only exists on a running server, which is already true of a tuple or a list holding a class handle. `TestService.TestStruct` therefore has no class field, and `TestNestedStruct`, which is not used as a default, carries one |
+
+The graceful degradation for the dynamic clients landed as designed: an unknown type code
+skips the procedure, property or class member that names it, with a warning, and a structure
+whose field types are not all known is skipped as a whole.
+
 ## Open questions
 
 1. **Mutable or immutable client types**: namedtuple (Python) and immutable POJOs
    (Java) are proposed; if structs later become common as *arguments*, builder-style
    or mutable variants may be friendlier. Defer until adoption shows the need.
-2. **`coerce_to` behavior** (Python/Lua): whether a plain tuple/list of the right
-   arity is accepted where a struct is expected (the dynamic clients already coerce
-   tuple↔list). Proposed: yes, positional coercion — cheap and convenient; confirm
-   during implementation.
+2. **`coerce_to` behavior** (Python/Lua): settled as proposed. A tuple or list with one
+   element per field coerces to the structure, in both dynamic clients.
