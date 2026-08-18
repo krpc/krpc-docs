@@ -2,7 +2,7 @@
 
 **Status:** proposal — design sketch; no GitHub issue filed yet.
 
-Follow-on to [`design/protocol/server-side-functions.md`](server-side-functions.md). That work lets a client build and run a function on
+Follow-on to [server side functions](server-side-functions.md). That work lets a client build and run a function on
 the server, but the function can only call *RPCs* — the curated surface kRPC chose to expose. This
 proposal adds an opt-in mode in which a function can call arbitrary CLR members, so a client can
 reach game and mod state that no kRPC service wraps.

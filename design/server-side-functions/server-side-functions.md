@@ -1,20 +1,34 @@
 # Server-side functions: completing the feature
 
-**Status:** in progress — implemented but not yet merged; umbrella issue [#679](https://github.com/krpc/krpc/issues/679).
+**Status:** in progress — implemented, not yet merged; umbrella issue [#679](https://github.com/krpc/krpc/issues/679).
+The sections below describe the design as decided; where the implementation went a different way,
+the section says so.
 
-The feature is named "server side functions"
-throughout the user-facing API and documentation, and the service class is named to match: the
-`KRPC.Expression` class is renamed to `KRPC.Function`, so the thing a client builds and the thing
-the feature is called are the same word. A function is the whole program the client assembles —
-statements, control flow and side effects included — rather than only a tree that computes a
-value, which is what the old name implied and what the node algebra has outgrown. The feature was
-experimental, so the rename is breaking and no compatibility shim is kept.
+## Naming
 
-This frees `Function` as a factory name, so the node that builds a lambda is named for what it
-actually constructs: `Expression.Function(parameters, body)` becomes `Function.Lambda(parameters,
-body)`. Everything named after the class follows it (`AddFunctionStream`, `FunctionStream`,
-`CompileFunction`, `krpc/functioncompiler.py`, …). "Expression" survives only as ordinary English
-for a node in value position, and in the LINQ type names the implementation is built on.
+The feature is named "server side functions" throughout the user-facing API and documentation.
+The service class that builds one is still `KRPC.Expression`, and the factory that builds a lambda
+is still `Expression.Function(parameters, body)`.
+
+**Decided, deferred:** rename the class to `KRPC.Function`, so the thing a client builds and the
+thing the feature is called are the same word. A function is the whole program the client
+assembles — statements, control flow and side effects included — rather than only a tree that
+computes a value, which is what the old name implies and what the node algebra has outgrown. The
+rename frees `Function` as a factory name, so the node that builds a lambda can be named for what
+it constructs: `Function.Lambda(parameters, body)`. Everything named after the class follows it
+(`AddFunctionStream`, `FunctionStream`, `CompileFunction`, `krpc/functioncompiler.py`,
+`FunctionCompilationError`, `FunctionTreePrinter`, …). "Expression" would survive only as ordinary
+English for a node in value position, and in the LINQ type names the implementation is built on.
+The feature is experimental, so the rename is breaking and no compatibility shim is needed.
+
+It is deferred because it is a mechanical change across the server, all six clients, their tests,
+the generated documentation and every golden tree dump, and is much easier to review on its own
+than folded into the work that added the feature. **It should land before the feature is
+announced as stable**, since after that the rename costs users rather than reviewers.
+
+Two smaller naming questions fall out of it and are deferred with it: whether a client should
+reach the factories through a builder object (`conn.Function.Not(…)`) rather than through the
+class, and whether the class is better named `FunctionBuilder`.
 
 Issue [#679](https://github.com/krpc/krpc/issues/679) (umbrella), with linked issues
 [#517](https://github.com/krpc/krpc/issues/517) (per-element calls in predicates),
@@ -44,7 +58,7 @@ statements and control flow, and returning any serializable kRPC value to the cl
 
 Three architectures were considered:
 
-* **Extend the existing remote expression-tree API** (chosen). `KRPC.Function` /`KRPC.Type` are
+* **Extend the existing remote expression-tree API** (chosen). `KRPC.Expression` /`KRPC.Type` are
   ordinary kRPC remote classes whose static factory RPCs build a `System.Linq.Expressions` tree
   server-side; `AddEvent` compiles it with `.Compile()` (real JIT, native speed, already proven
   under KSP's Mono). This is the LINQ-provider pattern: a language-neutral tree assembled via
@@ -63,7 +77,7 @@ Three architectures were considered:
 
 The state of the feature before this work, which the design below addresses:
 
-* `Function.Call` (`core/src/Service/KRPC/Function.cs`) decodes the embedded `ProcedureCall`'s
+* `Expression.Call` (`core/src/Service/KRPC/Expression.cs`) decodes the embedded `ProcedureCall`'s
   arguments at build time and bakes the instance and argument values in as
   `LinqExpression.Constant` nodes. A call therefore always re-invokes the same object with the
   same arguments — it can never be applied to a lambda parameter (`Select`/`Where`/`Any`/`All`
@@ -127,7 +141,7 @@ streams):
 * Instance properties on `Type`: `Code` (TypeCode), `Service` (string; empty unless
   class/enumeration), `Name` (string; empty unless class/enumeration), `Types`
   (`IList<Type>`; generic arguments, empty otherwise).
-* `Function.ReturnType` (property) — the `Type` an expression evaluates to. Throws for types
+* `Expression.ReturnType` (property) — the `Type` an expression evaluates to. Throws for types
   that cannot be returned to a client (e.g. the lazy `IEnumerable<T>` produced by
   `Select`/`Where`; the fix is to wrap in `ToList`/`ToSet`, and the error message says so).
 
@@ -137,7 +151,7 @@ typed clients don't need this — the user supplies the expected type as a gener
 
 ### 3. Object constants ([#503](https://github.com/krpc/krpc/issues/503))
 
-`Function.ConstantObject(ulong value)` — a constant object reference, passed as its object
+`Expression.ConstantObject(ulong value)` — a constant object reference, passed as its object
 identifier (the same `uint64` the protocol already uses to encode class instances; `0` is null,
 which is rejected here). The server recovers the instance via `ObjectStore.GetInstance(id)` and
 uses its most-derived `KRPCClass` type as the node's static type — so no protocol change and no
@@ -148,12 +162,12 @@ expose the identifier (`RemoteObject.id` in C#, `_object_id` in Python, `Object:
 `ConstantEnum` is not added: `Cast(ConstantInt(value), Type.EnumerationType(...))` covers it and
 is documented.
 
-> [!IMPORTANT]
-> We should add `ConstantEnum` as this is cleaner API than using a cast.
+**Open:** `ConstantEnum(service, name, value)` would be a cleaner API than the cast and should be
+added. Listed under "Gaps to close".
 
 ### 4. Expression-valued calls (#517)
 
-`Function.CallWithArguments(ProcedureCall call, IDictionary<int, Function> arguments)` — like
+`Expression.CallWithArguments(ProcedureCall call, IDictionary<int, Expression> arguments)` — like
 `Call`, but the entries of `arguments` supply the call's arguments as sub-expressions, keyed by
 the position of the parameter each one supplies (position 0 is the instance for class members).
 A position with no entry falls back to the argument encoded in `call`, then to the parameter's
@@ -161,27 +175,19 @@ default value; a position outside the procedure's parameter list is an error. Ea
 static type must be assignable to the parameter's CLR type (checked at build time). This makes
 per-element calls work:
 
-> [!IMPORTANT]
-> Do we need the old `Call`? That is for calling a procedure from it's serialized arguments,
-> to allow a procedure call compiled by the client to be called. We could just substitute with the
-> the single `CallWithArguments` form
+**Decided: both are kept.** `CallWithArguments` subsumes `Call` — passing an empty dictionary is
+exactly `Call` — and the two share one implementation, so the second factory costs a signature and
+nothing else. `Call` stays because it is the common case and the one a client can build without
+knowing anything about parameter positions: a client already holds an encoded `ProcedureCall` for
+any RPC it can make, and passing it is the whole call. Removing it would make every embedded call,
+including the ones with no computed arguments at all, pass an empty collection.
 
 ```
-param    = Function.Parameter("e", Type.ClassType("SpaceCenter", "Engine"))
+param    = Expression.Parameter("e", Type.ClassType("SpaceCenter", "Engine"))
 hasFuel  = CallWithArguments(get_call(any_engine.has_fuel), {0: param})
-predicate= Function.Lambda([param], Function.Not(hasFuel))
-anyOut   = Function.Any(Function.Call(get_call(parts.engines)), ...)
+predicate= Expression.Function([param], Expression.Not(hasFuel))
+anyOut   = Expression.Any(Expression.Call(get_call(parts.engines)), ...)
 ```
-> [!IMPORTANT]
-> `Function.Not(...)` is confusing. We should maybe use an alias such as:
->
-> ```
-> builder = conn.Function
-> builder.Not(...)
-> ```
->
-> or even reconsider the name of this service, calling it something like `FunctionBuilder`
-
 (The client builds the template `ProcedureCall` from any convenient instance — only the procedure
 identity is used for overridden positions.)
 
@@ -220,14 +226,20 @@ Semantics match an ordinary RPC exactly via two lean static helpers emitted arou
 
 ### 5. Computed streams (goal 2) + event error hardening
 
-> [!IMPORTANT]
-> Can we unify these into a single `AddStream` function?
+**Decided: not unified on the server, unified in the clients where the language allows.**
+`AddStream` takes an encoded `ProcedureCall` and `AddExpressionStream` takes an `Expression`
+object; kRPC procedures are not overloaded, so one procedure would have to take both and reject
+one of them at runtime, replacing a signature that says what it accepts with an error that says
+what it did not. The clients whose type systems overload do so: C# has an
+`AddStream<T>(Expression)` overload and java an `addStream(Expression)` overload, so a user of
+those writes the same call for either. Python and C++ name them separately, matching how those
+clients name everything else.
 
-* New `KRPC.AddFunctionStream(Function function, bool start = true)` returning a `Stream`
+* New `KRPC.AddExpressionStream(Expression expression, bool start = true)` returning a `Stream`
   message, symmetric with `AddStream`. Validates at creation time that the expression's type is a
   serializable kRPC type (`TypeUtils.IsAValidType` on the expression's static type, with an error
   message pointing at `ToList`/`ToSet` for lazy enumerables).
-* New `FunctionStream : Stream` in `core/src/Service/`: compiles
+* New `ExpressionStream : Stream` in `core/src/Service/`: compiles
   `Lambda<Func<object>>(Convert(expr, object))` once; `UpdateInternal` evaluates it, with
   `YieldException` → skip tick, any other exception → `Result.Error` (mirroring
   `ProcedureCallStream`'s behavior, including value-change detection via `ValueUtils.Equal` so
@@ -253,30 +265,44 @@ this; the work is exposing it as factories with kRPC-shaped semantics:
   methods and rewritten to `goto` against the enclosing loop's labels when the loop node is built.
   Binding to the nearest enclosing loop falls out of trees being built innermost-first.
 * Early exit: `Return(value)`/`ReturnNothing()` are likewise markers, bound to a label wrapped
-  around the function body by `Function`, so a return anywhere in a nested block leaves the whole
+  around the function body by `Expression.Function`, so a return anywhere in a nested block leaves the whole
   function.
 * Side effects: calls to procedures with no return value (including property setters) are
   ordinary statement expressions, and collections can be built imperatively —
   `CreateEmptyList`/`CreateEmptySet`/`CreateEmptyDictionary` plus `ListAdd`, `ListSet`, `SetAdd`
   and `DictionarySet`.
 
+`ForEach` desugars to an enumerator loop wrapped in a `try`/`finally` that disposes the enumerator,
+matching what a C# `foreach` statement compiles to. It matters for a loop over a lazy sequence,
+whose enumerator holds the enumerator of its source.
+
 Void-typed nodes are the reason several things below are special-cased: an expression whose type
 is `void` has no return type to report, cannot be streamed, and is only meaningful under
 `RunFunction`.
 
+**A loop is not interruptible, and this is a hazard.** `MaxTimePerUpdate` is checked between
+continuations in the execution loop, never inside one evaluation, so a `While` whose condition
+never becomes false hangs the game's main thread with no recovery. Loops are what make that
+reachable, and closing it needs its own design — an iteration or time budget checked inside the
+loop costs something on every iteration of every loop, which is a trade worth deciding
+deliberately. It is documented as a limitation for now.
+
 ### 7. Run-once functions
 
 Events and streams re-evaluate their expression on every update, which makes them the wrong home
-for a function with side effects — it would re-run every tick. `KRPC.RunFunction(Function)`
+for a function with side effects — it would re-run every tick. `KRPC.RunFunction(Expression)`
 compiles the expression, invokes it exactly once inside the calling tick, and returns its result.
 
-> [!IMPORTANT]
-> Says that `RunFunction` compiles and runs the function. The function should already be compiled,
-> so we don't pay the compilation cost on every call. Functions can be eagerly compiled when created.
+**Resolved:** the compiled delegate is cached on the `Expression` object, so a function is
+compiled the first time it is run and reused on every later call. It is not compiled eagerly when
+the object is created: most expression objects are interior nodes of a larger tree and are never
+run on their own, so compiling every one of them would pay the cost hundreds of times over for a
+single function. Checking the tree for unbound `Break`/`Continue`/`Return` markers is cached the
+same way.
 
 The return value is a `bytes` payload rather than a typed value: the procedure's declared return
 type cannot depend on the expression, so the server encodes the value with the runtime-typed
-`Encoder.Encode` and the client decodes it using `Function.ReturnType` (dynamic clients) or a
+`Encoder.Encode` and the client decodes it using `Expression.ReturnType` (dynamic clients) or a
 user-supplied type parameter (static clients). A void-typed function returns an empty payload.
 
 `YieldException` is turned into a plain error: a procedure that pauses and resumes on a later
@@ -307,12 +333,18 @@ Expression building needs no client work (the factories are ordinary generated/d
 stubs). Running an expression as a stream or as a one-shot function needs a small helper per
 client, in each case decoding a value whose type the server reports rather than the stub declares:
 
-* **Python** (dynamic): `Client.add_function_stream(expression)` and the
+Each client's helper introspects the type once per expression and keeps it: walking
+`ReturnType` is a round trip per property of every type it is built from, and `run_function` would
+otherwise pay all of them on every call, which is the opposite of what the procedure is for. The
+type an expression returns cannot change, so it is cached against the expression's object
+identifier.
+
+* **Python** (dynamic): `Client.add_expression_stream(expression)` and the
   `Client.function_stream(...)` context manager — call the RPC, walk `function.return_type` to
   rebuild the protobuf `Type`, and wrap the stream id with `Stream.from_stream_id(client, id,
   types.as_type(...))` (all existing machinery). `Client.run_function(expression)` decodes the
   `RunFunction` payload the same way, returning `None` for a void function.
-* **C#**: `Connection.AddStream<T>(Services.KRPC.Function expression)` and
+* **C#**: `Connection.AddStream<T>(Services.KRPC.Expression expression)` and
   `Connection.RunFunction<T>(...)` overloads — the user supplies `T`; a non-generic
   `RunFunction` overload covers functions with no result.
 * **Java** / **C++**: equivalent typed helpers matching each client's existing
@@ -329,7 +361,7 @@ client, in each case decoding a value whose type the server reports rather than 
   example conventions.
 * Reference documentation for the `StdLib` service and for each client's compiler: what subset
   of the language is accepted, and the semantics that differ from running the code locally.
-* Improved XML doc summaries on every `Function`/`Type` member (these feed the generated API
+* Improved XML doc summaries on every `Expression`/`Type` member (these feed the generated API
   reference in all languages).
 
 ## Error handling
@@ -338,7 +370,7 @@ Constructing an invalid program fails in one of three places, in increasing orde
 mistake travels before it is reported:
 
 1. **In the client compiler**, before any RPC is sent, for constructs the compiler does not accept
-   (`FunctionCompilationError` in python, `FunctionCompilationException` in C#). These name the
+   (`ExpressionCompilationError` in python, `ExpressionCompilationException` in C#). These name the
    offending source construct.
 2. **At tree construction**, which is where the majority of errors are caught and is the main
    ergonomic benefit of one RPC per node: the factory call that builds the bad node is the call
@@ -347,21 +379,17 @@ mistake travels before it is reported:
    procedure parameter, an assignment to something that is not a variable, an empty block, a
    `Return` whose type does not match the function's result type.
 3. **At use**, when the tree is finally compiled: `AddEvent` requires a bool-typed expression, and
-   `AddFunctionStream`/`RunFunction` require a serializable return type via
+   `AddExpressionStream`/`RunFunction` require a serializable return type via
    `GetValidReturnType()`. Anything the node algebra did not check falls through to LINQ's own
    validation in `Compile()`, whose messages are not written for kRPC users.
 
-**Known gap: unbound `Break`/`Continue` are deferred to evaluation.** The marker methods are only
-rewritten when a loop node is built, and nothing checks for markers left unbound afterwards —
-`Lambda()` binds the return target but passes null break/continue targets. A `Break` with no
-enclosing loop therefore compiles successfully and throws
-`InvalidOperationException("break used outside of a loop")` when the function runs. For a stream
-that means an error on every update rather than one failure at creation. `Return` does not have
-this problem, since it is bound and type-checked at `Lambda()` build time.
-
-The fix is a check for residual marker calls, which has to run at each point the tree is compiled
-rather than only in `Function()` — a block can be handed straight to `RunFunction` without a
-`Lambda()` wrapper.
+**Unbound `Break`/`Continue` are reported when the function is built.** The marker methods are
+only rewritten when a loop node is built, so a `Break` with no enclosing loop is left as an
+ordinary call to a method that throws: it compiles, and fails only when the function is evaluated —
+on every update, for a stream. The tree is therefore checked for residual marker calls at each
+point it is compiled, rather than only in `Expression.Function()`, since a block can be handed
+straight to `RunFunction` without a lambda wrapper. `Return` never had this problem, since it is
+bound and type-checked when the lambda is built.
 
 ## Yielding procedures inside a function
 
@@ -375,12 +403,10 @@ These are not obscure procedures. `Control.ActivateNextStage`, `SpaceCenter.Warp
 `SpaceCenter.LaunchVessel`, `Part.Separate`, `AutoPilot.Wait` and vessel switching all yield, which
 is to say the actions people most want a function to perform are exactly the ones that do this.
 
-### What happens today
+### What happens
 
-* `RunFunction` catches `YieldException` and converts it into an error saying a procedure that
-  pauses execution cannot be used.
-* A stream or event catches it and skips the update. The expression is evaluated again from
-  scratch on the next update, and the procedure's continuation is discarded.
+A yield is reported as an error, uniformly: by `RunFunction` as an RPC error, and by a stream or
+event as an error result on the stream. Nothing retries.
 
 ### Why the yield cannot simply be honored
 
@@ -390,14 +416,14 @@ had reached — lives on the .NET stack of a compiled delegate, and is destroyed
 unwinds. There is no expression-level continuation to park, so there is nothing for the core's
 existing retry machinery to resume.
 
-### The problem this now creates
+### Why streams do not retry
 
-Re-evaluating from scratch used to be merely wasteful: expressions were pure, so recomputing them
-produced the same answer. Functions can now have side effects, and a retry repeats them. A function
-that stages, then waits on the result of staging, re-stages on every update for as long as the call
-keeps yielding. This is silent and destructive, and it is a consequence of adding side effects
-rather than a pre-existing quirk — which makes it the part of this section that needs resolving
-regardless of which direction is taken.
+Skipping the update and evaluating the expression again from scratch on the next one was the
+original behavior, and it was merely wasteful while expressions were pure. Once functions can have
+side effects, the retry repeats them: a function that stages, then waits on the result of staging,
+re-stages on every update for as long as the call keeps yielding. That is silent and destructive,
+and it is a consequence of adding side effects rather than a pre-existing quirk, so the retry was
+removed rather than kept behind a guard.
 
 ### The real question is atomicity, not mechanism
 
@@ -489,8 +515,21 @@ the repeated-side-effect problem outright, because the function no longer aborts
 
 Staged, since these compose rather than compete:
 
-1. Close the correctness problem first, with option 2's guard and option 1's precise refusal. This
-   is small and stops functions silently repeating side effects.
+1. **Done: option 1, applied everywhere.** A yield is an error in a stream and an event as well as
+   in `RunFunction`. This is what closes the silent repetition of side effects.
+
+   The design originally proposed gating the retry on the function being side-effect free, keeping
+   it for functions that are. That guard was dropped as unsound: the property is not decidable from
+   the tree the way the option assumed. "Void calls, assignments and collection mutation" are the
+   *visible* effects, but a procedure that returns a value can change the game just as well —
+   `ActivateNextStage`, `Undock` and `Part.Separate` all return what they produced and are exactly
+   the procedures that yield. A guard that calls those side-effect free would keep the destructive
+   retry for precisely the cases it exists to prevent, so there is no guard, and nothing retries.
+
+   The refusal does not name the procedure that yielded. `YieldException` does not carry it, and
+   the only way to attribute one is to wrap each embedded call, which would evaluate the arguments
+   into temporaries and cost the JIT the inlining that the direct-call emission exists for. The
+   message says what happened and why instead.
 2. Add deferred calls. Small, independently useful, and covers triggering an action without waiting.
 3. Build option 3 on the journal-and-replay strategy when waiting on a result is actually wanted.
    Scope it to `RunFunction` initially — a stream that suspends across updates raises its own
@@ -517,13 +556,13 @@ simply absent, so the server uses the parameter's default.
 
 ### Python
 
-`Client.compile_function` compiles a lambda or a function from its source; `add_event`,
-`add_function_stream` and `run_function` accept functions directly.
+`Client.compile_expression` compiles a lambda or a function from its source; `add_event`,
+`add_expression_stream` and `run_function` accept functions directly.
 
-* Expressions (`krpc/functioncompiler.py`): operators including floor division, true-division
+* Expressions (`krpc/expressioncompiler.py`): operators including floor division, true-division
   semantics and the bitwise operators; comprehensions (list/set/dict, nested) and generator
   expressions; `any`/`all`/`sum`/`min`/`max`/`len`/`sorted`/`abs`/`round`/`int`/`float`/`str`;
-  subscripts and slices; f-strings; conditional expressions via `Function.Conditional`;
+  subscripts and slices; f-strings; conditional expressions via `Expression.Conditional`;
   assignment expressions; parameterless lambdas and local function calls; and `math` module
   calls mapped onto `StdLib`.
 * Statements (`krpc/functionstatements.py`): `if`/`elif`/`else`, `while` and `for` with
@@ -533,7 +572,7 @@ simply absent, so the server uses the parameter's default.
 
 ### C#
 
-`Connection.CompileFunction` translates a LINQ expression tree — which the compiler hands the
+`Connection.CompileExpression` translates a LINQ expression tree — which the compiler hands the
 client for free from an `Expression<Func<TResult>>` lambda — into the same server tree.
 `AddEvent` accepts a boolean lambda, `AddStream` compiles compound lambdas instead of rejecting
 them, and `RunFunction` accepts `Expression<Action>` lambdas so side-effecting functions can be
@@ -626,7 +665,7 @@ one request and would help any chained calls, not just functions. It is rejected
 because it is a protocol bump touching every client's encoder, and it needs new semantics for
 mid-batch failure and for the yield-and-retry path in `RequestContinuation`. Level-ordered batching
 gets most of the win for none of that; this is the follow-up if measurement shows depth dominating.
-A single `Function.BuildTree(bytes)` RPC taking a serialized tree is rejected outright: it
+A single `Expression.BuildTree(bytes)` RPC taking a serialized tree is rejected outright: it
 duplicates every factory in a second encoding and discards the per-node error reporting that the
 extend-the-tree approach was chosen for in the first place.
 
@@ -642,15 +681,16 @@ default comparer — so any class overriding `Equals`/`GetHashCode` is deduplica
 That is what `Equatable<T>` (`core/src/Utils/Equatable.cs`) exists for, and what the SpaceCenter
 classes use.
 
-Neither `KRPC.Type` nor `KRPC.Expression` overrides it. Both fall back to reference equality, and
-every factory returns a freshly constructed instance, so every call mints a new id. Nothing is ever
-released either: `RemoveInstance` has no callers anywhere in `core/`, `server/` or `service/`, and
+Before this work neither `KRPC.Type` nor `KRPC.Expression` overrode it. Both fell back to
+reference equality, and every factory returned a freshly constructed instance, so every call minted
+a new id. Nothing is ever released either: `RemoveInstance` has no callers anywhere in `core/`, `server/` or `service/`, and
 `ObjectStore.Clear()` runs only from `Server.Stop()` (`core/src/Server/Server.cs:114`). Compiling
 one function that asks for `Type.Double()` five hundred times therefore leaves five hundred
 permanent entries describing a single type.
 
-That second property is about to change, which sets the ordering for this work — see "Sequencing
-against #894" below.
+Types and value constants are shared, as described below. Interior nodes are not; the last two
+subsections say why that is enough. The never-released property changes with #894, which sets the
+ordering for this work — see "Sequencing against #894" below.
 
 ### Types
 
@@ -660,10 +700,13 @@ instance between clients is safe. No protocol or client change is involved.
 
 Composite types collapse for free: the CLR interns constructed generic types, so `MakeGenericType`
 returns the same `System.Type` for the same arguments, and `ListType(Double())` reduces to one id
-provided the nested `Double()` did. Two things to check when implementing — `Equatable<T>` brings
-`operator ==`/`!=` with it, so existing `== null` comparisons on `KRPC.Type` change path (they stay
-correct, since those operators are null-safe), and the `ReferenceEquals` guards at
-`Type.cs:160-187` are unaffected.
+provided the nested `Double()` did. `Equatable<T>` brings `operator ==`/`!=` with it, so `== null`
+comparisons on a `KRPC.Type` change path; they stay correct, since those operators are null-safe,
+and the code that builds trees compares with `ReferenceEquals` throughout in any case.
+
+The client half matters as much as the server half, because each factory call is also a round trip.
+The python compiler shares one cache of the objects naming each type across every function compiled
+for a connection, so a type is named to the server once rather than once per mention.
 
 ### Constants
 
@@ -791,7 +834,7 @@ covers the equality path itself.
     enumeration or a structure is declared after it. The lookup was made unqualified, which finds
     it from the type being decoded.
 * **#877 stream invalidation**: builds on per-stream error results, which
-  `FunctionStream`/hardened `EventStream` now emit in the same shape as `ProcedureCallStream`;
+  `ExpressionStream`/hardened `EventStream` now emit in the same shape as `ProcedureCallStream`;
   the removal convention can layer on unchanged.
 * **#903 reverse streams / batched calls**: independent of the tree-construction round trips —
   rung 1 batches calls whose results are not needed until the batch completes, which is the wrong
@@ -806,7 +849,7 @@ covers the equality path itself.
 
 ## Testing
 
-* `core/test/Service/KRPC/FunctionTest.cs`: promotion cases for every binary op; the `Call`
+* `core/test/Service/KRPC/ExpressionTest.cs`: promotion cases for every binary op; the `Call`
   test implemented against the scanned core `TestService` (plus `CallWithArguments`,
   `ConstantObject`, class-typed `Parameter`, per-element `Any`/`Select` with real RPC calls,
   error propagation, `ReturnType` on every node kind); and the statement nodes — block scoping,
@@ -823,28 +866,33 @@ covers the equality path itself.
   existing event/stream test structure.
 * Compiler tests per client covering the accepted language subset and the diagnostics raised for
   unsupported constructs.
+* **Each client names its test files explicitly**, so a new one is invisible until it is listed:
+  `client_tests` in `client/python/BUILD.bazel`, the `srcs` of `test-KRPC.Client` in
+  `client/csharp/BUILD.bazel`, `test_srcs` in `client/cpp/BUILD.bazel`, and the `SuiteClasses` of
+  `client/java/test/krpc/client/TestSuite.java`. Only the C# `src` tree and the core test assembly
+  are globbed.
 * **Golden expression-tree tests.** A deterministic tree printer
-  (`core/src/Service/KRPC/FunctionTreePrinter.cs`: indented `NodeType<Type> detail` lines;
+  (`core/src/Service/KRPC/ExpressionTreePrinter.cs`: indented `NodeType<Type> detail` lines;
   sequential ids for parameters/variables/labels; invariant round-trip numeric formatting;
   object constants printed as type name only, so no run-to-run identity leaks) is exposed
-  through a test-only `DumpFunctionTree(Function)` RPC on TestServer's `TestService` and
+  through a test-only `DumpExpressionTree(Expression)` RPC on TestServer's `TestService` and
   mirrored on the in-game `TestingTools` service. Three golden suites compare dumps against
   expected strings, verifying the exact trees the API generates without depending on the
   (brittle) compiled IL:
-  - `core/test/Service/KRPC/FunctionTreePrinterTest.cs` — factory API: the direct-call
+  - `core/test/Service/KRPC/ExpressionTreePrinterTest.cs` — factory API: the direct-call
     emission (scene check, null-return check only for non-nullable reference returns), numeric
     promotion `Convert` insertion, `While`/`ForEach` desugaring, marker→goto rewriting, label
     binding of early returns.
-  - `client/python/krpc/test/test_functiontree.py` — python compiler output end-to-end (both
+  - `client/python/krpc/test/test_expressiontree.py` — python compiler output end-to-end (both
     stub modes): getter null-check blocks, true-division converts, `math.sqrt`→`StdLib.Sqrt`,
     statement functions as `Invoke(Lambda)`, loops with declared variables, void setter
     functions, comprehensions as `Select`+`ToList` with per-element narrowing converts.
-  - `client/csharp/test/FunctionTreeTest.cs` — C# LINQ compiler output: `Math.Sqrt` mapping,
+  - `client/csharp/test/ExpressionTreeTest.cs` — C# LINQ compiler output: `Math.Sqrt` mapping,
     folded captured collections, string `+` → `String.Concat`, ternary conditionals.
   Sets are deliberately excluded from goldens (client-side set iteration order is
   nondeterministic). Generated C++ service headers don't include cross-service headers, so the
   C++ test sources include `krpc/services/krpc.hpp` before `services/test_service.hpp` for the
-  new RPC's `KRPC::Function` parameter.
+  new RPC's `KRPC::Expression` parameter.
 
 ## Gaps to close
 
@@ -861,6 +909,13 @@ constant, because `Get` evaluates the index expression when the node is built in
 property. Tuple elements are differently typed, so an index computed at evaluation time has no
 static type to give the resulting node.
 
+### Constants
+
+`ConstantEnum(service, name, value)`, so that a member of a service's enumeration can be named
+directly rather than as `Cast(ConstantInt(value), Type.EnumerationType(service, name))`. The cast
+works and is documented, but it makes the caller spell out a conversion that carries no
+information.
+
 ### Collections
 
 Creation, mutation by addition, and the query surface are covered. Missing:
@@ -876,22 +931,17 @@ Creation, mutation by addition, and the query surface are covered. Missing:
 
 ### Strings
 
-**Strings are deliberately not collections.** They should be rejected by the collection operations
-with a clear message saying so, and given their own operations instead.
+**Strings are deliberately not collections.** They are rejected by the collection operations with a
+message saying so, and are to be given their own operations instead.
 
-They are currently accepted and then fail internally, because `CheckIsEnumerable` tests
-`IEnumerable`, which `string` satisfies:
+The guard is done. Before it, a string was accepted and then failed inside the algebra, because
+`CheckIsEnumerable` tests `IEnumerable`, which `string` satisfies: `Count` threw
+`ArgumentNullException` looking for a `Count` property a string does not have, `Contains` threw
+`IndexOutOfRangeException` indexing the empty `GetGenericArguments()` of a non-generic type, and
+`Get` threw on a missing method. Reaching for `Count` to get a string's length is the obvious thing
+to try, so the guard was worth having ahead of the operations below.
 
-* `Count` throws `ArgumentNullException` on the `property` parameter — `string` has `Length`, not
-  `Count`.
-* `Contains` throws `IndexOutOfRangeException` — `GetGenericArguments()[0]` indexes an empty array
-  for a non-generic type.
-* `Get` throws `ArgumentNullException` on the `method` parameter.
-
-Reaching for `Count` to get a string's length is the obvious thing to try, so the guard is worth
-having independently of the operations below.
-
-Beyond `ConstantString`, `ConcatStrings` and `ConvertToString`, string handling needs: length,
+The operations themselves are still missing. Beyond `ConstantString`, `ConcatStrings` and `ConvertToString`, string handling needs: length,
 case conversion, substring, character access, index of, replace, split, join, trim, and the
 `StartsWith`/`EndsWith`/`Contains` predicates.
 
@@ -1007,3 +1057,7 @@ internal exception.
 * Batched tree construction, which would cut the one-RPC-per-node cost of building a tree. Designed
   in "Batched tree construction" above; client-side only, and gated on measuring real tree sizes
   first.
+* The rename to `KRPC.Function`, decided in "Naming" above and deferred to its own change.
+* Bounding the time a loop can run for, so that a runaway function cannot hang the game.
+* The remaining gaps in the node algebra, listed in "Gaps to close": string operations, collection
+  removal and enumeration, `ConstantEnum`, and raising and handling exceptions.
