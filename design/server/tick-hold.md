@@ -1,6 +1,8 @@
 # Holding a physics tick for a control loop
 
-**Status:** in progress (2026-08-17) — implemented, PR not yet raised. A deliberate stopgap for
+**Status:** in progress (2026-08-22) — raised as
+[#1070](https://github.com/krpc/krpc/pull/1070), together with
+[the auto-pilot's update timing](../autopilot/update-timing.md). A deliberate stopgap for
 [#251](https://github.com/krpc/krpc/issues/251), to be retired once real tick synchronization
 lands in the protocol rewrite.
 
