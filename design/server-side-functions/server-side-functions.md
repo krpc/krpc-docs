@@ -209,9 +209,9 @@ on the method, and only the latter types the call. No `object[]` allocation, no 
 38.4 → 7.8 ns/call with gen-0 collections eliminated, which matters under Unity's Boehm GC).
 Semantics match an ordinary RPC exactly via two lean static helpers emitted around the call:
 
-* `Services.CheckFunctionGameScene(procedure)` before every invocation (same scene-mask
+* `Services.CheckExpressionGameScene(procedure)` before every invocation (same scene-mask
   check and `RPCException` as the ordinary dispatch path);
-* `Services.CheckFunctionReturnValue(procedure, value)` after invocation, emitted only for
+* `Services.CheckExpressionReturnValue(procedure, value)` after invocation, emitted only for
   reference-typed returns where null is not permitted (a direct typed call can only violate
   the declared return type by returning null, so the per-evaluation `IsInstanceOfType`
   reflection check of the boxed dispatch path is provably unnecessary);
@@ -338,6 +338,10 @@ Each client's helper introspects the type once per expression and keeps it: walk
 otherwise pay all of them on every call, which is the opposite of what the procedure is for. The
 type an expression returns cannot change, so it is cached against the expression's object
 identifier.
+
+**Diverged:** the type is what tells a function with no result from one that returns an empty
+collection, since both encode to an empty payload. `Expression.HasReturnType` reports which it is,
+and a client that decodes by payload length rather than by type gets `None` for an empty list.
 
 * **Python** (dynamic): `Client.add_expression_stream(expression)` and the
   `Client.function_stream(...)` context manager — call the RPC, walk `function.return_type` to
@@ -565,7 +569,7 @@ simply absent, so the server uses the parameter's default.
   subscripts and slices; f-strings; conditional expressions via `Expression.Conditional`;
   assignment expressions; parameterless lambdas and local function calls; and `math` module
   calls mapped onto `StdLib`.
-* Statements (`krpc/functionstatements.py`): `if`/`elif`/`else`, `while` and `for` with
+* Statements (`krpc/expressionstatements.py`): `if`/`elif`/`else`, `while` and `for` with
   `break`/`continue`, early `return`, local variables including augmented and annotated
   assignment, assignment to remote properties and to collection elements, `pass`, and calls
   evaluated purely for their effects.
@@ -689,8 +693,8 @@ one function that asks for `Type.Double()` five hundred times therefore leaves f
 permanent entries describing a single type.
 
 Types and value constants are shared, as described below. Interior nodes are not; the last two
-subsections say why that is enough. The never-released property changes with #894, which sets the
-ordering for this work — see "Sequencing against #894" below.
+subsections say why that is enough. The never-released property changes with the object store
+sweep — see "Against the object store sweep" below.
 
 ### Types
 
@@ -728,42 +732,41 @@ than a value tuple, matching the codebase (`core/src/Configuration.cs:37`).
 **`ConstantObject` is deliberately excluded.** Interning it would key a permanent, static, strong
 reference on an arbitrary service object — a destroyed vessel or part kept alive for the life of
 the server. That is the exact leak shape [#771](https://github.com/krpc/krpc/issues/771) is about,
-and it would defeat the reclamation #894 introduces for precisely those objects. The value
+and it would defeat the object store sweep for precisely those objects. The value
 constants pin nothing but a boxed primitive or a string, so they are safe; object constants are
 not. The saving was small anyway, and the interaction is discussed below.
 
-### Sequencing against #894
+### Against the object store sweep
 
-[PR #894](https://github.com/krpc/krpc/pull/894) (`fix-objectstore-771`, open) gives the object
-store a reclamation sweep, and **it should land before the server-side function work**. The
-function work adds a new population to the store and a new way to hold references to service
-objects, so it wants to be written against the store's final shape rather than retrofitted onto it.
-It also touches `core/src/Service/ObjectStore.cs`, `CallContext.cs` and `Core.cs`, which is where
-the conflicts would be.
+The object store reclaims what the game has destroyed, designed in
+[object-lifetime.md](../object-lifetime.md) and merged as
+[PR #1051](https://github.com/krpc/krpc/pull/1051). The function work is written on top of it: it
+adds a new population to the store and a new way to hold references to service objects, so it wants
+the store's final shape rather than a retrofit.
 
-What #894 actually does: `ObjectStore.RemoveDead()` walks the registered instances, and evicts
-those implementing the new `KRPC.Utils.ITrackedObject` whose `IsAlive` is false, driven from the
-game-state load boundary. It is **liveness eviction, not reference counting or reachability** —
-instances that do not implement `ITrackedObject` are explicitly skipped.
+What the sweep does: `ObjectStore.Sweep()` walks the registered instances and drops those
+implementing `KRPC.Utils.IGameObjectState` that report `GameObjectState.Destroyed`, driven from the
+game state load boundary. It is **liveness eviction, not reference counting or reachability** —
+instances that do not implement the interface are kept.
 
 Three consequences here:
 
-* **Types and constants are unaffected, for free.** They wrap no game object, have no liveness to
-  test, and will not implement `ITrackedObject`, so the sweep skips them. The "never released"
-  property this section relies on survives #894 without a special case — it stops being "nothing is
-  ever removed" and becomes "nothing removes *these*", which is the property actually wanted.
-* **Object constants are not reclaimed by it**, which is the answer to the obvious hope.
-  `RemoveDead` drops the store's entry, but a `ConstantObject` node holds the instance through
+* **Types and constants are unaffected, for free.** They stand for nothing in the game, have no
+  state to report, and do not implement `IGameObjectState`, so the sweep keeps them. The "never
+  released" property this section relies on is not "nothing is ever removed" but "nothing removes
+  *these*", which is the property actually wanted.
+* **Object constants are not reclaimed by it**, which is the answer to the obvious hope. The sweep
+  drops the store's entry, but a `ConstantObject` node holds the instance through
   `LinqExpression.Constant`, and the tree is a second and stronger root: the object stays alive in
   the CLR for as long as the function does. Eviction from the store is not collection.
-* **What the client sees is nonetheless right, thanks to #894.** A function holding a constant for
-  a since-destroyed part re-derives on access and raises the new `ObjectDestroyedException` per
-  evaluation, instead of reading stale data or throwing a bare `NullReferenceException`. This is a
-  good reason to build the function work on top of #894 rather than alongside it — the behavior
-  falls out instead of needing its own handling.
+* **What the client sees is nonetheless right.** A proxy for a game object the game has destroyed
+  raises `ObjectDestroyedException` on access, so a function holding a constant for a
+  since-destroyed part reports that per evaluation rather than reading stale data or throwing a
+  bare `NullReferenceException`. The behavior falls out of #1051 instead of needing its own
+  handling.
 
 **Rejected: reclaiming trees that hold a dead object.** Making `Expression` implement
-`ITrackedObject`, alive only while every service object it closes over is alive, would bound the
+`IGameObjectState`, destroyed once any service object it closes over is, would bound the
 growth described below. It is wrong for three reasons, recorded because it is an easy idea to
 arrive at twice.
 
@@ -775,7 +778,7 @@ arrive at twice.
 * **A dead constant does not mean a dead tree.** The object may be referenced only from a branch
   that never runs, or from the handler that exists to cope with its absence. Liveness of one leaf
   says nothing about whether the tree can still evaluate.
-* **It does not fit the interface.** `ITrackedObject.IsAlive` is specified to return false only
+* **It does not fit the interface.** `IGameObjectState` is specified to report `Destroyed` only
   when the underlying object is definitively gone, so that objects a client legitimately still
   holds are not discarded. An expression has no underlying game object; it is a client-authored
   program whose continued usefulness is a matter of the client's intent, which the server cannot
@@ -800,11 +803,11 @@ concern. Nothing here affects it, and it still needs doing.
 **What deduplication does not bound.** Interior nodes — every operator, call, block and lambda —
 are not deduplicated, and they are the population that actually grows: one compile of a moderate
 function is hundreds of permanent entries, and a program that recompiles inside a loop, or
-repeatedly creates function streams, grows without limit. #894 does not reach them either, and for
-the reasons above should not be made to. This is close to a pre-existing property of the object
-store
-rather than something the function work introduces — every `Vessel` and `Part` ever encoded is
-pinned the same way, which is what #771 and #894 are about — and it is left alone here. The
+repeatedly creates function streams, grows without limit. The sweep does not reach them either,
+and for the reasons above should not be made to. This is close to a pre-existing property of the
+object store rather than something the function work introduces — every `Vessel` and `Part` ever
+encoded is pinned the same way, which is what #771 and #1051 are about — and it is left alone
+here. The
 conclusion above is that types and constants need no refcounting, not that the object store as a
 whole is bounded.
 
