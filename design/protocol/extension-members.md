@@ -1,6 +1,7 @@
 # Extension members for other services' classes (issues #305 + #900)
 
-**Status:** proposal — design agreed, not yet implemented (2026-07-03).
+**Status:** proposal — design agreed, not yet implemented. Written 2026-07-03, revised
+2026-08-22 against `krpc` at version 0.7.0.
 
 ## Context
 
@@ -20,30 +21,34 @@ What exploration established:
   `SpaceCenter.Vessel`/`Part`/`CelestialBody` heavily (e.g.
   `service/RemoteTech/src/Comms.cs:15,46,103`). All clients render foreign class types
   service-qualified, and the Python stub generator even emits cross-service imports
-  (`clientgen/python.py:160-209`).
+  (`clientgen/python.py:194-242`).
 - **Class-level redirection already exists**: `[KRPCClass(Service = "X")]` lets a class
   declared in any assembly join service X's namespace
-  (`TypeUtils.ValidateKRPCClass`, `TypeUtils.cs:362-386`; documented in
-  `doc/src/extending.rst:175-234`). What's missing is the member-level equivalent.
+  (`TypeUtils.ValidateKRPCClass`, `core/src/Service/TypeUtils.cs:449-473`; documented in
+  `doc/src/extending.rst:180-238`). What's missing is the member-level equivalent.
 - **Class members are just procedures with naming conventions** in the owning
   service's definition: `Parts_WithFailure`, `Parts_get_Failed`,
-  `Parts_static_X` (`ServiceSignature.AddClassMethod`,
-  `core/src/Service/Scanner/ServiceSignature.cs:186-232`; re-parsed by
-  `ProcedureSignature.cs:116-143`). Every consumer — Python/Lua dynamic clients,
-  clientgen, docgen — resolves the bare class-name prefix **within the procedure's own
-  service** (`client/python/krpc/service.py:432-439`, `service.lua:136-160`,
-  `clientgen/generator.py:152-156`, `docgen/nodes.py:55-65`).
+  `Parts_static_X` (`ServiceSignature.AddClassMethod` / `AddClassProperty`,
+  `core/src/Service/Scanner/ServiceSignature.cs:252-311`). Every consumer — Python/Lua
+  dynamic clients, clientgen, docgen — resolves the bare class-name prefix **within the
+  procedure's own service** (`client/python/krpc/service.py:429-479`,
+  `client/lua/krpc/service.lua:302-330`, `clientgen/generator.py:245-320`,
+  `docgen/nodes.py:68-70`). `ProcedureSignature` re-parses the same convention
+  (`ProcedureSignature.cs:134-161`) but nothing reads the result, so it is not a
+  consumer to keep in step.
 - **Member binding is by declaring type only**: `TypeUtils.ValidateKRPCMethod`
-  (`TypeUtils.cs:433-448`) requires the method to be declared in the class (or a base);
+  (`TypeUtils.cs:626-641`) requires the method to be declared in the class (or a base);
   `[KRPCMethod]` has no redirection property; C# extension methods
   (`ExtensionAttribute`) are nowhere handled. A `[KRPCMethod]` on a plain static class
-  is silently ignored today.
+  is silently ignored today, because the scanner only looks for it on `[KRPCClass]` and
+  `[KRPCService]` types.
 - **Service discovery is AppDomain-wide reflection** (`Reflection.AllTypes`,
   `core/src/Utils/Reflection.cs:10-26`): any mod DLL in GameData is scanned — the
   distribution story for third-party extensions already exists.
-- **Python client stub short-circuit**: when a pre-generated stub exists for a service,
-  `client.py:53-63` uses it wholesale and ignores the live definition's procedures —
-  so runtime-added members on SpaceCenter would be invisible to stub users.
+- **Python client stub short-circuit**: a service whose stubs were generated ahead of
+  time has its types registered from the stubs and never goes through `create_service`
+  (`client/python/krpc/client.py:129-150`), so the live definition's procedures are
+  ignored — runtime-added members on SpaceCenter would be invisible to stub users.
 
 ## Decisions
 
@@ -52,14 +57,14 @@ What exploration established:
   changes.** A TestFlight extension method on `Parts` becomes an ordinary
   `Parts_WithFailure` procedure in *SpaceCenter's* service definition, executing
   TestFlight's static method. Every client, clientgen, and docgen then attaches it
-  exactly like a native member — `vessel.parts.with_failure(...)` in all seven client
+  exactly like a native member — `vessel.parts.with_failure(...)` in all six client
   languages for free.
   **Rejected: extension procedures living in the extending service's definition** with
   service-qualified class targeting. That needs a schema extension (the bare-name
   prefix can't carry a service) plus new attachment logic in every dynamic client,
   clientgen restructuring, and docgen changes — and Java/C++ cannot even express
   instance members added from another generated file (no extension methods; nested /
-  closed classes). The chosen design turns a seven-client problem into a
+  closed classes). The chosen design turns a six-client problem into a
   server-scanner problem.
 - **Authoring syntax: C# extension methods.** `[KRPCMethod]` on a public static
   extension method (compiler-emitted `ExtensionAttribute`) in any public static class
@@ -80,11 +85,25 @@ What exploration established:
   `AttributeUsage(AttributeTargets.Method)` for extension methods named `GetX` /
   `SetX` — getter = `this` only, non-void; setter = `this` + one parameter, void;
   emitted as `Class_get_X` / `Class_set_X`. Mismatched name/shape is a scanner error.
+- **Classes only.** Extension members target `[KRPCClass]` types. `[KRPCStruct]` types
+  are serialized by value and have only fields, so there is nothing to attach a member
+  to; a struct as the `this` parameter is a scanner error. Structs are valid parameter
+  and return types of an extension member, through `IsAValidType`, like any other type.
+- **Nullability and deprecation compose as for native members.** `Nullable` on
+  `[KRPCMethod]`/`[KRPCProperty]` and `[KRPCNullable]` on parameters carry through
+  unchanged; an extension property setter's value parameter is its second parameter and
+  is marked nullable directly, rather than through the synthesized-parameter route
+  `AddClassPropertyMethod` needs. `[Obsolete]` on an extension member must reach the
+  signature the same way `TypeUtils.GetDeprecated` /
+  `TypeUtils.GetPropertyDeprecated` do for native members.
 - **#900 is a documented pattern on top of #305, not a new mechanism.** A mod defines
   `[KRPCClass(Service = "TestFlight")] FailureModule` wrapping its `PartModule`, plus a
   nullable extension property `Part.failure_module` (built via
   `part.InternalPart.Modules` — the same public-accessor route the bundled services
-  use). Nullability of "this part has no such module" composes with #843's `is_null`.
+  use). The wrapper implements `IGameObjectState`, as `SpaceCenter.Module` does, so the
+  object store drops it once the game destroys what it stands for. Nullability of "this
+  part has no such module" composes with the null-value support from
+  [#843](https://github.com/krpc/krpc/issues/843).
   **Rejected: the issue's `ISupportsKRPC` / `Module.GetRepresentation()` bridge** — with
   inheritance (#905) explicitly out of scope, a generic `GetRepresentation` has no
   expressible static return type in the kRPC type system. Revisit only if #905 lands.
@@ -99,27 +118,39 @@ What exploration established:
 ## Server changes (`core/`)
 
 1. **Scanner pass** (`core/src/Service/Scanner/Scanner.cs`): a new pass, after all
-   services/classes are registered, over public static classes' methods carrying
+   services and classes are registered, over public static classes' methods carrying
    `[KRPCMethod]` or `[KRPCProperty]` + `ExtensionAttribute` (today silently ignored —
    no behavior change for existing code that would suddenly get picked up, but audit
    for accidental matches). For each: validate, resolve the target class from the
    first parameter (`TypeUtils.IsAClassType` + `GetClassServiceName`), and add to the
    *target's* `ServiceSignature` via new `AddClassExtensionMethod` /
    `AddClassExtensionProperty` methods emitting the standard
-   `Class_Member` / `Class_get_X` / `Class_set_X` names.
+   `Class_Member` / `Class_get_X` / `Class_set_X` names. The pass follows the
+   conventions the other passes now use: set `Scanner.CurrentAssembly` so a
+   `ServiceException` is attributed to the mod that caused it, and report failures
+   through `HandleError` so one bad extension is collected for the server window
+   rather than aborting the whole scan.
 2. **Validation** (`TypeUtils.cs`): `ValidateKRPCExtensionMethod` — public static,
    `ExtensionAttribute` present, first parameter a `[KRPCClass]` type, remaining
    parameter/return types `IsAValidType`, target service exists (`ServiceException`
    otherwise), property shape rules above.
-3. **Handler**: new `ClassExtensionMethodHandler`
-   (beside `core/src/Service/ClassMethodHandler.cs`) — parameters are the method's own
-   parameters with the first renamed to `"this"` (matching the synthetic parameter
-   `ClassMethodHandler.cs:23` inserts, so client-side positional binding is
-   identical); invocation is a plain static call, no instance cast needed. Reuses the
-   existing continuation/one-tick machinery via `ProcedureHandler`-style invoker
-   compilation.
-4. **GameScene resolution** for extension members per the decision above (extend the
-   `TypeUtils.Get*GameScene` family with a target-class-relative variant).
+3. **Handler**: reuse `ClassStaticMethodHandler`
+   (`core/src/Service/ClassStaticMethodHandler.cs`), which already compiles a plain
+   static invoker and takes its parameters straight off the `MethodInfo` — an
+   extension member is a static call whose first argument is the instance. It needs
+   only the first parameter renamed to `"this"`, matching the synthetic parameter
+   `ClassMethodHandler.cs:23` inserts, so client-side positional binding is identical.
+   `HasInstance` stays **false**: parameter 0 then remains in the argument array,
+   which is what a static call wants, and `Services.SetArguments`
+   (`Services.cs:252`) and `KRPC.Expression.Call` (`Expression.cs:118`) — the only two
+   readers of the flag — split off an instance only when it is true. Nothing keys
+   instance-ness off `HasInstance` or off the parameter name: the clients use the
+   `Class_Member` naming convention and drop parameter 0 by position
+   (`clientgen/generator.py:249`).
+4. **GameScene resolution** for extension members per the decision above. No new API is
+   needed: `TypeUtils.GetClassGameScene`, `GetMethodGameScene` and
+   `GetClassPropertyGameScene` already take the class type, so passing the *target*
+   class gives the intended semantics.
 5. Documentation flows unchanged: XML doc comments on the extension method are picked
    up by `DocumentationExtensions.GetDocumentation` from the mod's own doc XML, and
    cref resolution already handles cross-assembly kRPC names.
@@ -133,14 +164,22 @@ indistinguishable from native members downstream.
   third parties regenerate stubs from their server's definitions, the documented
   clientgen workflow in `extending.rst`; bundled stubs are unaffected because bundled
   definitions contain no third-party extensions).
-- **Python: stub/definition merge** (the one real client work item). After
-  registering a pre-generated stub's types (`client.py:53-63`), diff the live
-  definition's procedures against the stub and dynamically attach any missing ones —
-  reusing the existing `_add_service_class_method` / `_add_service_class_property` /
-  procedure machinery pointed at the stub's classes (they are ordinary Python classes;
-  the dynamic path already attaches via `setattr`). This also fixes the general
-  version-skew gap where a newer server's added members are invisible to older stubs.
-  Foreign return types (e.g. `TestFlight.FailureModule`) resolve through
+- **Python: stub/definition merge** (the one real client work item). A service with
+  pre-generated stubs contributes only `_stub_definitions` and is never passed to
+  `create_service`, so the live definition's procedures are dropped
+  (`client/python/krpc/client.py:129-150`). After `register_all` has registered every
+  service's types, diff the live definition's procedures against the stub service and
+  attach any that are missing, reusing the `_add_service_class_method` /
+  `_add_service_class_static_method` / `_add_service_class_property` machinery that
+  `create_service` uses — the stub's classes are ordinary Python classes and the
+  dynamic path already attaches via `setattr`. Run each attachment through
+  `_skipping_unknown_types` (`service.py:352`), so a member naming a type the client
+  does not know is skipped with a warning rather than failing the connection; that is
+  the same treatment the dynamic path gives it, and the struct field-count warning in
+  `_stub_definitions` is the existing precedent for tolerating skew this way. This also
+  fixes the general version-skew gap where a newer server's added members are invisible
+  to older stubs; until it lands, `Client(use_pregenerated_stubs=False)` is the
+  workaround. Foreign return types (e.g. `TestFlight.FailureModule`) resolve through
   `types.py` `class_type(service, name)`, which creates types on demand and is keyed
   globally by (service, name) — no ordering hazard.
 
@@ -151,8 +190,8 @@ indistinguishable from native members downstream.
   `this`-parameter rule, GameScene semantics, collision behavior.
 - A worked #900 example: wrapping a mod `PartModule` as a `[KRPCClass]` +
   nullable extension property on `SpaceCenter.Part`, with the
-  `InternalPart` access pattern and a pointer from the `Module` class docs to this
-  pattern for mod authors.
+  `InternalPart` access pattern, `IGameObjectState` on the wrapper, and a pointer from
+  the `Module` class docs to this pattern for mod authors.
 
 ## Tests
 
@@ -160,19 +199,24 @@ indistinguishable from native members downstream.
   adding an extension method, a read-only extension property, and a read/write
   extension property pair onto `TestClass`, plus an extension returning a class from
   a second service (cross-service return) — appearing in TestService's definition.
+  TestServer declares only one service today, so the cross-service case needs a second
+  one added there; `core/test/Service/TestService2.cs` and `TestService3.cs` are the
+  precedent on the scanner side.
 - **Core scanner tests** (`core/test/Service/ScannerTest.cs`): registration under the
-  standard names; validation errors (first param not a KRPCClass, non-static,
-  missing `this`, bad property shape, name collision with a native member, target
-  service missing); GameScene inheritance from the target class.
-- **Handler test**: `ClassExtensionMethodHandler` invocation with the instance as
-  parameter 0 (beside `ClassMethodHandlerTest.cs`).
+  standard names; validation errors (first param not a KRPCClass, first param a
+  KRPCStruct, non-static, missing `this`, bad property shape, name collision with a
+  native member, target service missing); GameScene inheritance from the target class;
+  deprecation and nullability carried through.
+- **Handler test**: extension member invocation with the instance as parameter 0
+  (beside `ClassMethodHandlerTest.cs`).
 - **Client tests**: Python/Lua dynamic — extension members callable and
   indistinguishable from native ones; Python stub-merge — a stub lacking a member
-  present in the live definition gains it at connect (can be tested against
-  TestService's stub by adding the extension only to the live TestServer).
+  present in the live definition gains it at connect. TestService's Python stubs are
+  bundled (`services-testservice` in `client/python/BUILD.bazel`), so this is tested by
+  adding the extension only to the live TestServer.
 - **krpctools**: clientgen golden fixtures regenerate (extension members appear as
-  ordinary members in all five languages); docgen fixture showing the member on the
-  target class's page.
+  ordinary members in all five generated languages); docgen fixture showing the member
+  on the target class's page.
 
 ## Implementation order
 
@@ -181,7 +225,7 @@ indistinguishable from native members downstream.
    needed to pass).
 3. Python stub/definition merge + tests.
 4. `extending.rst` sections + the #900 worked example.
-5. CHANGES.txt entries (core, python client, docs) as the final pre-merge commit.
+5. `CHANGELOG.md` entries (core, python client, docs) as the final pre-merge commit.
 
 ## Follow-ups (out of scope)
 
