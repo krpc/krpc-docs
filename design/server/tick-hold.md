@@ -60,6 +60,7 @@ while True:
 | Exclusive | One holder at a time | What a hold offers is that nothing else happens, which two clients cannot both be given. Two holders would also livelock: one releases, re-reads the same unchanged tick and recomputes until the other lets go |
 | `ReleaseTick` with no hold | Tolerant no-op | Always safe to call from a `finally`, which is how a hold must be released |
 | `HoldTick` while held | Refused | Re-arming would let a client renew before its deadline and hold the game for as long as it liked |
+| `HoldTick` after a release in the same tick | Yields to the next tick | One hold per tick, whoever asks. A tick that has been held and let go has done its waiting, and a client looping on hold and release, or two passing it between them, could otherwise defer it for as long as they kept asking. Yielding rather than refusing means a control loop just gets its next tick, with no retry to write |
 | Client libraries | None | The two RPCs work from every client as they are |
 
 ### How the update loop honors it
@@ -81,8 +82,13 @@ Three things fall out of that and are easy to get wrong:
    that has one in flight — so the client waits for a response that cannot arrive until the update
    ends, which the hold prevents, until the timeout fires. The hold is released instead, with a
    warning, and the call finishes in the next tick.
- * **The update ends when a hold ends.** Otherwise a client could take a new hold in the same
-   update and defer the tick indefinitely, one hold at a time.
+ * **The update ends when a hold ends, and a second hold in the same update is refused.** The
+   update ending covers a client whose release is the last call of the update. It does not
+   cover a release and a hold sent in one request, which run in one continuation: the release
+   cannot end the update before the hold behind it executes, and the hold arrives to find the
+   tick free. `HoldTick` therefore turns itself down when the update has already held a tick,
+   which is the check that holds for both. Without it, one request repeated is enough to defer
+   the tick for as long as a client keeps asking.
 
 ### Ways a hold ends
 
@@ -142,7 +148,14 @@ under the mechanism from PR #926.
    released only after the server has polled for them enough times, so "the client is thinking" is
    counted in polls rather than measured on a clock. The discriminating pair: four scripted calls
    take one update with a hold and one call per update without. Also covers the timeout, a client
-   that goes away mid-hold, the refusal outside a call, and the tolerant release.
+   that goes away mid-hold, the refusal outside a call, the tolerant release, and one hold per
+   tick both ways round, the second of which needs the scripted client to send several calls in
+   one request.
+
+   Two things the tests got wrong at first, since both hid real failures: a call that fails is
+   reported in its own result rather than on the response, so asserting on the response alone
+   passed however the calls went; and the game scene the calls are gated on was left to whichever
+   fixture happened to run first, which put every call one error away from being noticed.
  * `service/SpaceCenter/test/test_tick_hold.py` proves the physics tick: universal time does not
    change at all across a wait inside a hold, and changes again once released.
  * Measured end to end against `TestServer` with a probe that busy-waits between calls, which is
