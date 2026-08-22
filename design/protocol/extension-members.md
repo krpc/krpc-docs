@@ -1,7 +1,22 @@
 # Extension members for other services' classes (issues #305 + #900)
 
-**Status:** proposal — design agreed, not yet implemented. Written 2026-07-03, revised
-2026-08-22 against `krpc` at version 0.7.0.
+**Status:** in progress — built on a branch, not yet opened as a PR. Written 2026-07-03,
+revised 2026-08-22 against `krpc` at version 0.7.0.
+
+Everything below landed as designed, with three differences:
+
+- **The scanner pass covers every `[KRPCMethod]`/`[KRPCProperty]` method in a public
+  static class, not only extension methods.** A member that forgets `this` is then a
+  scanner error rather than silently ignored, which is the more useful outcome for the
+  mistake most likely to be made. Classes annotated `[KRPCService]` are skipped, as the
+  service pass already reports a class member declared in one.
+- **The clientgen and docgen fixtures do not change.** The TestServer extension members
+  are built into the server but not into the assembly the service definitions come from,
+  so the bundled stubs lack them — which is what makes the Python stub merge testable.
+  Nothing in clientgen or docgen can tell an extension member from a native one, so there
+  is nothing there to cover separately.
+- **The Python merge covers class members only.** Service-level procedures and properties
+  are not merged; service-level extension procedures are out of scope anyway.
 
 ## Context
 
