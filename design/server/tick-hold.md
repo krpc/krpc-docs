@@ -53,6 +53,28 @@ while True:
         conn.krpc.release_tick()
 ```
 
+That loop gets whole ticks but not consecutive ones. The hold opening an iteration is a call the
+server has to be waiting for when it looks, so a client slower than `RecvTimeout` between one
+release and the next hold is not there, and the game advances without it. `KRPC.NextTick` closes
+that gap: it releases the held tick and takes the one after it.
+
+```python
+try:
+    while True:
+        conn.krpc.next_tick()
+        pitch = vessel.flight().pitch
+        vessel.control.pitch = control_law(pitch)
+finally:
+    conn.krpc.release_tick()
+```
+
+This is also not new machinery, and needs no new state or setting. `NextTick` is `ReleaseTick`
+followed by `HoldTick`, and the existing one-hold-per-tick rule makes the second call yield. A
+yield writes no response and parks the `RequestContinuation`, which the end-of-update list swap
+makes the next update's first entry, executed before anything the server has to be polled for. So
+the game advances exactly one tick per call, and each tick's hold is bounded by `TickHoldTimeout`
+as before.
+
 ### Decisions
 
 | Decision | Choice | Why |
@@ -63,7 +85,10 @@ while True:
 | `ReleaseTick` with no hold | Tolerant no-op | Always safe to call from a `finally`, which is how a hold must be released |
 | `HoldTick` while held | Refused | Re-arming would let a client renew before its deadline and hold the game for as long as it liked |
 | `HoldTick` after a release in the same tick | Yields to the next tick | One hold per tick, whoever asks. A tick that has been held and let go has done its waiting, and a client looping on hold and release, or two passing it between them, could otherwise defer it for as long as they kept asking. Yielding rather than refusing means a control loop just gets its next tick, with no retry to write |
-| Client libraries | None | The two RPCs work from every client as they are |
+| Client libraries | None | The three RPCs work from every client as they are |
+| Consecutive ticks | `NextTick`, one call | A release and a hold as two calls cannot close the gap between them from the client side, whatever the client does. Batching them into one request (#903) would, but that is six clients' worth of API work for what one procedure does |
+| `NextTick` with no hold | Holds the soonest tick | Makes it the only call the loop needs, with no opening `HoldTick` to forget |
+| A missed tick | Not reported | Matches the tolerant release: a loop has no error path to write, and a program that has to know it kept up can read the game clock. Also forced, in part: `CheckReturnValue` rejects the null a `YieldException<Action>` resumes with, so a procedure that yields has to be void |
 
 ### How the update loop honors it
 
@@ -146,6 +171,11 @@ under the mechanism from PR #926.
 
 ## Tests
 
+ * `NextTick` is covered by a discriminating pair in `core/test/TickHoldTest.cs`, scripted so a
+   client is never ready on the first poll: the same loop written as a release and a hold misses
+   the tick after the release, and written as `NextTick` takes it. In game,
+   `test_tick_hold.py` reads universal time inside two holds twenty iterations apart and asks
+   for exactly twenty ticks of it.
  * `core/test/TickHoldTest.cs` drives `Core.Update()` with a scripted client whose requests are
    released only after the server has polled for them enough times, so "the client is thinking" is
    counted in polls rather than measured on a clock. The discriminating pair: four scripted calls
