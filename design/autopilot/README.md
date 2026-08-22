@@ -22,6 +22,7 @@ oscillation layer damps structural modes the inner loop would otherwise excite.
 | Oscillation mitigation | [oscillation.md](oscillation.md) | Notch / low-pass structural-mode suppression, its in-game calibration, MechJeb comparison and detection limits, the superseded flexible-craft latch fix, and one negative result (adaptive TimeToPeak). |
 | Special maneuvers | [antipodal-flip.md](antipodal-flip.md) | Deterministic 180° flip handling and the out-of-plane-instability fix. |
 | Testing | [test-plan.md](test-plan.md) | The KSP-in-the-loop test craft matrix, metrics, and corner-case catalog. *(In progress.)* |
+| Update timing | [update-timing.md](update-timing.md) | Where in a physics tick the loop runs relative to a program's calls, and the modes that choose it. *(In progress.)* |
 
 ## Proposed extensions (not built)
 
