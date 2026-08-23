@@ -1023,10 +1023,10 @@ differs from LINQ's, the C# compiler does not map `GroupBy` onto it.
 are unreachable from the C# compiler: `Enumerable.MinBy` arrived in .NET 6 and the client targets
 net472, so there is no syntax to map. Python reaches them through `min(key=...)`/`max(key=...)`.
 
-### Strings
+### Strings — done
 
 **Strings are deliberately not collections.** They are rejected by the collection operations with a
-message saying so, and are to be given their own operations instead.
+message saying so, and have their own operations instead.
 
 The guard is done, and covers every collection operation: `CheckIsNotAString` is reached either
 directly or through `CheckIsEnumerable`, which `GetEnumerableValueType` calls, so all of `Count`,
@@ -1036,11 +1036,10 @@ tests `IEnumerable`, which `string` satisfies: `Count` threw `ArgumentNullExcept
 `Count` property a string does not have, `Contains` threw `IndexOutOfRangeException` indexing the
 empty `GetGenericArguments()` of a non-generic type, and `Get` threw on a missing method.
 
-**The guard's message promises operations that do not exist**, which is what makes the rest of this
-section urgent rather than a nice-to-have. `len(s)`, `s[0]`, `s[1:3]` and `x in s` are all ordinary
-python that the compiler happily maps onto `Count`, `Get`, `Skip`/`Take` and `Contains`, and every
-one of them now fails with "use the string operations instead" naming operations there is no way to
-reach. A string is currently a value a function can pass through and concatenate, and nothing else.
+The guard is what made the operations below urgent rather than a nice-to-have: `len(s)`, `s[0]`,
+`s[1:3]` and `x in s` are all ordinary python that the compiler maps onto `Count`, `Get`,
+`Skip`/`Take` and `Contains`, so until they existed every one of those failed with a message naming
+operations there was no way to reach.
 
 #### The operations
 
@@ -1089,8 +1088,8 @@ readout for the player, so it wants one answer everywhere; `ConvertToStringHelpe
 Both compilers already track the static type of every subexpression locally, so choosing between a
 string operation and its collection counterpart is a client-side decision needing no round trip:
 `len`, `[i]`, `[a:b]`, `in`, `.upper()`, `.split()` in python, and `.Length`, `.Substring`,
-`.ToUpper`, `.Contains` in C#, dispatch on it. Python slicing is the one that changes shape rather
-than name: it compiles to `Skip`/`Take` today and becomes `StringSubstring`.
+`.ToUpper`, `.Contains` in C#, dispatch on it. Python slicing is the one that changed shape rather
+than name: it compiled to `Skip`/`Take` and became `StringSubstring`.
 
 #### Characters are single-character strings
 
@@ -1116,12 +1115,12 @@ Two alternatives were considered:
   overloads to be usable at all; and as a Unicode code point it does not correspond to the UTF-16
   code unit that C# and java call `char`, losing the fidelity that motivated the idea.
 
-### Exceptions
+### Exceptions — done
 
-A function cannot raise an exception. There is no `Throw` node, so the only errors a function can
-produce are the ones evaluation happens to hit — an RPC that fails, a null dereference, a marker
-left unbound. A function that validates its inputs, or that wants to signal a condition to the
-client, has no way to say so.
+A function could not raise an exception. Without a `Throw` node the only errors it could produce
+were the ones evaluation happened to hit — an RPC that fails, a null dereference, a marker left
+unbound — so a function that validates its inputs, or that wants to signal a condition to the
+client, had no way to say so.
 
 **The delivery half is already built.** Any exception raised while evaluating an expression is
 passed to `Services.HandleException`, which produces an `Error` carrying the service and name of
@@ -1214,28 +1213,32 @@ unaffected — the same approach already taken for classes, enumerations and str
 
 ### Client compilers
 
-Each addition needs the corresponding native syntax mapped in both compilers to be reachable from
-compiled code; the string half is set out under "Compiler mapping" above. Until then these are
-factory-only. The diagnostic a user meets differs by addition, which is worth knowing when
-prioritizing: a missing collection operation is an unsupported-construct error naming the syntax,
-whereas the string operations are reached by syntax the compilers already accept and translate, so
-those fail on the server instead, pointing at operations that do not exist yet.
+Each addition needs the corresponding native syntax mapped in a compiler to be reachable from
+compiled code; without it the node is factory-only. The strings are mapped in both, as set out
+under "Compiler mapping" above, which is what the guard's message required.
+
+The collection additions are mapped where the language names them. C# reaches `Distinct`,
+`Reverse`, `Zip`, `Union`, `Intersect`, `Except`, `First`, `Last` and `ElementAt` through the LINQ
+operators of the same names; `GroupBy` is deliberately not mapped, since the node's result type
+differs from LINQ's, and `MinBy`/`MaxBy` have no syntax at net472. Python reaches `MinBy`/`MaxBy`
+through `min`/`max` with a `key`, `Reverse` through `reversed`, and removal and clearing through
+the list, set and dictionary methods; the reshaping operations stay factory-only there, and meet a
+user as an unsupported-construct error naming the syntax.
 
 Exceptions are asymmetric between the two. Python `raise` and `try`/`except` map onto the nodes
-directly, and the statement compiler needs to handle both. C# cannot reach either: an
-expression-tree lambda may neither contain a throw expression nor a statement body, so exceptions
-stay factory-only there, consistent with that compiler already being limited to single-expression
-lambdas.
+directly, and the statement compiler handles both. C# cannot reach either: an expression-tree
+lambda may neither contain a throw expression nor a statement body, so exceptions stay factory-only
+there, consistent with that compiler already being limited to single-expression lambdas.
 
 ### Testing
 
-Each addition needs core coverage of the operation itself. Three cases beyond that are where the
-behavior is decided rather than merely implemented:
+Each addition has core coverage of the operation itself. Three cases beyond that are where the
+behavior is decided rather than merely implemented, and each is covered:
 
 * the collection operations reject a string with the intended message rather than an internal
-  exception (already covered for the guard; extend as the string operations land);
-* case conversion and comparison are invariant, tested by evaluating under a culture that differs
-  from the invariant one rather than by inspecting the emitted call;
+  exception;
+* case conversion and comparison are invariant, tested by evaluating under a Turkish culture rather
+  than by inspecting the emitted call;
 * a `TryCatch` naming a kRPC exception catches the mapped CLR exception an RPC actually throws, and
   a `TryCatchAll` around a yielding procedure still reports the pause rather than handling it.
 
