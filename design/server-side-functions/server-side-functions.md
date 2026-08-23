@@ -2,8 +2,8 @@
 
 **Status:** in progress — implemented, not yet merged; umbrella issue [#679](https://github.com/krpc/krpc/issues/679).
 The sections below describe the design as decided; where the implementation went a different way,
-the section says so. The string operations and the exception nodes described under "Gaps to close"
-are now implemented as designed there.
+the section says so. Everything under "Gaps closed" is now implemented as
+designed there.
 
 Linked issues:
 [#517](https://github.com/krpc/krpc/issues/517) (per-element calls in predicates),
@@ -220,11 +220,10 @@ self-describing wire value is needed, which is what blocked [#503](https://githu
 expose the identifier (`RemoteObject.id` in C#, `_object_id` in Python, `Object::_id` in C++,
 `RemoteObject.id` in Java).
 
-`ConstantEnum` is not added: `Cast(ConstantInt(value), Type.EnumerationType(...))` covers it and
-is documented.
-
-**Open:** `ConstantEnum(service, name, value)` would be a cleaner API than the cast and should be
-added. Listed under "Gaps to close".
+`ConstantEnum` was not added at first, on the grounds that
+`Cast(ConstantInt(value), Type.EnumerationType(...))` covers it. It is added now, under
+"Gaps closed": the cast works, but it makes the caller spell out a conversion that carries no
+information, and it cannot check the value against the enumeration's members.
 
 ### 4. Expression-valued calls (#517)
 
@@ -958,10 +957,10 @@ covers the equality path itself.
   C++ test sources include `krpc/services/krpc.hpp` before `services/test_service.hpp` for the
   new RPC's `KRPC::Expression` parameter.
 
-## Gaps to close
+## Gaps closed
 
-The node algebra is intended to cover tuples, collections and strings completely. It does not yet,
-and the gaps below are all planned rather than deliberate omissions.
+The node algebra is intended to cover tuples, collections and strings completely. These are the
+gaps it had, and how each was closed.
 
 ### Tuples — complete
 
@@ -973,25 +972,36 @@ constant, because `Get` evaluates the index expression when the node is built in
 property. Tuple elements are differently typed, so an index computed at evaluation time has no
 static type to give the resulting node.
 
-### Constants
+### Constants — done
 
-`ConstantEnum(service, name, value)`, so that a member of a service's enumeration can be named
-directly rather than as `Cast(ConstantInt(value), Type.EnumerationType(service, name))`. The cast
-works and is documented, but it makes the caller spell out a conversion that carries no
-information.
+`ConstantEnum(service, name, value)` names a member of a service's enumeration directly rather
+than as `Cast(ConstantInt(value), Type.EnumerationType(service, name))`. The cast works and is
+documented, but it makes the caller spell out a conversion that carries no information. The value
+is checked against the enumeration's members when the node is built, and the node is interned like
+the other constants.
 
-### Collections
+### Collections — done
 
-Creation, mutation by addition, and the query surface are covered. Missing:
+Creation, mutation by addition and the query surface were covered; the rest is now added.
 
-* **Removal and clearing** — `ListRemove`, `SetRemove`, `DictionaryRemove`, and a `Clear` for each.
-  Collections are currently build-up-only: elements can be added and overwritten but never taken
-  away, which is the most conspicuous asymmetry in the algebra.
-* **Dictionary enumeration** — `Keys` and `Values`. Without them a dictionary cannot be iterated
-  with `ForEach` at all, which makes dictionaries substantially weaker than lists inside a
-  function, rather than merely less convenient.
-* **Element selection** — `First`, `Last`, `ElementAt`, and min/max by key selector.
-* **Reshaping** — `Distinct`, `Reverse`, `GroupBy`, `Zip`, and `Union`/`Intersect`/`Except`.
+* **Removal and clearing** — `ListRemove`, `ListRemoveAt`, `SetRemove` and `DictionaryRemove`,
+  each reporting whether the value was there, and `ListClear`, `SetClear` and `DictionaryClear`.
+* **Dictionary enumeration** — `DictionaryKeys` and `DictionaryValues`, each producing a list.
+  A list rather than the `KeyCollection`/`ValueCollection` the CLR returns, because those are
+  nested generic types whose first type argument is the dictionary's key type either way, so a
+  value collection would have reported the wrong element type to everything downstream.
+* **Element selection** — `First`, `Last`, `ElementAt`, and `MinBy`/`MaxBy`, which give back the
+  value producing the smallest or largest key rather than the key.
+* **Reshaping** — `Distinct`, `Reverse`, `Zip`, `Union`/`Intersect`/`Except`, and `GroupBy`.
+
+`GroupBy` produces `IDictionary<K, IList<T>>` rather than LINQ's `IEnumerable<IGrouping<K,T>>`,
+since `IGrouping` is not a type kRPC can carry and a dictionary is what the result is wanted for.
+Its key type is checked against the dictionary key rules when the node is built. Because it
+differs from LINQ's, the C# compiler does not map `GroupBy` onto it.
+
+`MinBy`/`MaxBy` and `GroupBy` are single-pass helpers rather than LINQ calls, and `MinBy`/`MaxBy`
+are unreachable from the C# compiler: `Enumerable.MinBy` arrived in .NET 6 and the client targets
+net472, so there is no syntax to map. Python reaches them through `min(key=...)`/`max(key=...)`.
 
 ### Strings
 
@@ -1219,5 +1229,3 @@ behavior is decided rather than merely implemented:
   first.
 * The function/expression rename, decided in "Naming" above and deferred to its own change.
 * Bounding the time a loop can run for, so that a runaway function cannot hang the game.
-* The remaining gaps in the node algebra, listed in "Gaps to close": string operations, collection
-  removal and enumeration, `ConstantEnum`, and raising and handling exceptions.
