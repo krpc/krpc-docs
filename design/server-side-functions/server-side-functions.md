@@ -53,8 +53,19 @@ every language describes itself.
 `Invoke`d or handed to `Select`/`Where`, and it collides with the feature's own word for the
 whole. `Lambda` says what it constructs and matches the LINQ node it maps to.
 
-Test files and the per-client test registrations (`client_tests`, `test_srcs`, `SuiteClasses`, the
-C# `.csproj`) follow their subjects.
+Test files follow their subjects: `test_expressioncompiler.py`, `ExpressionCompilerTest.cs`,
+`ExpressionStreamTest.cs` (client and core), `ExpressionStreamTest.java` and
+`test_expression_stream.cpp`. `client/python/krpc/test/test_expression.py` covers the stream and
+run-once helpers rather than the algebra, so it becomes `test_function.py`. The per-client test
+registrations follow them: `client_tests` in `client/python/BUILD.bazel`, `srcs` of
+`test-KRPC.Client` in `client/csharp/BUILD.bazel`, `test_srcs` in `client/cpp/BUILD.bazel`, the
+`SuiteClasses` of `client/java/test/krpc/client/TestSuite.java`, and the C# test `.csproj`.
+
+Two things carry the names that are easy to miss, because they are prose rather than code:
+
+* the hand-written client documentation, `doc/src/{python,csharp,cpp,java}/client.rst` and
+  `doc/src/communication-protocols/messages.rst`, which name the helpers directly;
+* the per-component `CHANGELOG.md` entries, which are unreleased and so describe what will ship.
 
 ### What does not rename
 
@@ -92,8 +103,8 @@ their tests and the generated documentation, and is much easier to review on its
 into the work that added the feature. The feature is experimental, so it is breaking and needs no
 compatibility shim.
 
-`ConcatStrings` is renamed to `StringConcat` by the string work (see "Strings" under "Gaps to
-close"), and should ride along here rather than wait for the operations it joins.
+**Nothing of it is done.** `ConcatStrings` was renamed to `StringConcat` by the string work, which
+is the only piece that has landed, and it was a member name rather than part of this rename.
 
 The rest of this document uses the current names, so that it describes names that exist.
 
