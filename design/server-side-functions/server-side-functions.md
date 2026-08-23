@@ -2,39 +2,100 @@
 
 **Status:** in progress — implemented, not yet merged; umbrella issue [#679](https://github.com/krpc/krpc/issues/679).
 The sections below describe the design as decided; where the implementation went a different way,
-the section says so.
+the section says so. The string operations and the exception nodes described under "Gaps to close"
+are now implemented as designed there.
 
-## Naming
-
-The feature is named "server side functions" throughout the user-facing API and documentation.
-The service class that builds one is still `KRPC.Expression`, and the factory that builds a lambda
-is still `Expression.Function(parameters, body)`.
-
-**Decided, deferred:** rename the class to `KRPC.Function`, so the thing a client builds and the
-thing the feature is called are the same word. A function is the whole program the client
-assembles — statements, control flow and side effects included — rather than only a tree that
-computes a value, which is what the old name implies and what the node algebra has outgrown. The
-rename frees `Function` as a factory name, so the node that builds a lambda can be named for what
-it constructs: `Function.Lambda(parameters, body)`. Everything named after the class follows it
-(`AddFunctionStream`, `FunctionStream`, `CompileFunction`, `krpc/functioncompiler.py`,
-`FunctionCompilationError`, `FunctionTreePrinter`, …). "Expression" would survive only as ordinary
-English for a node in value position, and in the LINQ type names the implementation is built on.
-The feature is experimental, so the rename is breaking and no compatibility shim is needed.
-
-It is deferred because it is a mechanical change across the server, all six clients, their tests,
-the generated documentation and every golden tree dump, and is much easier to review on its own
-than folded into the work that added the feature. **It should land before the feature is
-announced as stable**, since after that the rename costs users rather than reviewers.
-
-Two smaller naming questions fall out of it and are deferred with it: whether a client should
-reach the factories through a builder object (`conn.Function.Not(…)`) rather than through the
-class, and whether the class is better named `FunctionBuilder`.
-
-Issue [#679](https://github.com/krpc/krpc/issues/679) (umbrella), with linked issues
+Linked issues:
 [#517](https://github.com/krpc/krpc/issues/517) (per-element calls in predicates),
 [#503](https://github.com/krpc/krpc/issues/503) (object constants),
 [#521](https://github.com/krpc/krpc/issues/521) (multiplication/mixed-type arithmetic),
 [#608](https://github.com/krpc/krpc/issues/608) (documentation).
+
+## Naming
+
+Two things are named here, and the confusion in the current names is that they are not
+distinguished:
+
+* an **expression** is a node of the algebra: `Add`, `Not`, `ConstantInt`, `While`, `Block`,
+  `Break`. Control flow included, this is an expression algebra, and every node is one.
+* a **function** is the whole program a client assembles out of them, and the only thing it
+  ever runs, streams or compiles.
+
+**Decided:** the algebra keeps the name `Expression`; everything a user invokes is named for the
+function. That is already the feature's name in the documentation, and it is what
+`RunFunction`, `run_function` and `runFunction` are called, so this makes the rest agree with them
+rather than introducing a new word.
+
+The class does not rename. Renaming it makes every value node read as a function
+(`Function.ConstantInt(1)`, `Function.Not(x)`), and `System.Linq.Expressions`, which the
+implementation compiles to directly, keeps the name `Expression` for a factory class with `Block`,
+`Loop`, `Goto` and `TryCatch` in it. A user builds a function out of expressions, which is how
+every language describes itself.
+
+### What renames
+
+| Now | Becomes |
+| --- | --- |
+| `Expression.Function(parameters, body)` | `Expression.Lambda(parameters, body)` |
+| `KRPC.AddExpressionStream` | `KRPC.AddFunctionStream` |
+| `core/src/Service/ExpressionStream.cs`, class `ExpressionStream` | `FunctionStream.cs`, `FunctionStream` |
+| python `Client.compile_expression` | `Client.compile_function` |
+| python `Client.add_expression_stream` | `Client.add_function_stream` |
+| python `Client.expression_stream` (context manager) | `Client.function_stream` |
+| python `ExpressionCompilationError` | `FunctionCompilationError` |
+| python `krpc/expressioncompiler.py`, `krpc/expressionstatements.py` | `krpc/functioncompiler.py`, `krpc/functionstatements.py` |
+| C# `Connection.CompileExpression` | `Connection.CompileFunction` |
+| C# `ExpressionCompilationException`, `src/ExpressionCompiler.cs` | `FunctionCompilationException`, `src/FunctionCompiler.cs` |
+| C++ `krpc/expression_stream.hpp`, `add_expression_stream<T>` | `krpc/function_stream.hpp`, `add_function_stream<T>` |
+| `doc/src/scripts/client/*/ExpressionStream.*`, `CompiledExpression.*` | `FunctionStream.*`, `CompiledFunction.*` |
+
+`Expression.Function` is the one actively misleading name: it builds a lambda, which is then
+`Invoke`d or handed to `Select`/`Where`, and it collides with the feature's own word for the
+whole. `Lambda` says what it constructs and matches the LINQ node it maps to.
+
+Test files and the per-client test registrations (`client_tests`, `test_srcs`, `SuiteClasses`, the
+C# `.csproj`) follow their subjects.
+
+### What does not rename
+
+* `KRPC.Expression` and every node factory on it, and `ReturnType`/`HasReturnType`.
+* `ExpressionTreePrinter`, the test-only `DumpExpressionTree` RPC and the golden suites: they
+  print the expression tree, which is what they are for.
+* python `krpc/expressionutils.py` and C# `src/ExpressionUtils.cs`. Both are helpers over
+  expressions, and the C# one operates on `System.Linq.Expressions` specifically.
+* `doc/api/krpc/expressions.tmpl`, the generated reference for the class.
+* `KRPC.RunFunction`, `KRPC.AddEvent`, and the C# `AddStream`/java `addStream` overloads, which
+  are already right.
+
+Prose, error messages and XML doc summaries follow the same split: a node is an expression, the
+whole is a function. The tutorial already reads this way.
+
+Under this split the smaller question of whether a client should reach the factories through a
+builder object (`conn.Expression.Not(…)`) rather than through the class is unaffected and stays
+open; naming the class `FunctionBuilder` is moot.
+
+### Rejected
+
+* **Rename the class to `KRPC.Function` wholesale**, so that the feature is one word. It is the
+  largest diff of the three, touching every golden dump and the generated reference in six
+  languages, and it buys the worst reading at the point of use.
+* **A separate `KRPC.Function` remote class** wrapping a lambda, taken by `RunFunction`,
+  `AddFunctionStream` and `AddEvent`. The runnable thing is not always a lambda: a block goes
+  straight to `RunFunction`, and `AddEvent` takes a bool valued node. Requiring a wrapper would add
+  a node to every use to buy type safety the return type check already provides.
+
+### Timing
+
+Its own change, landing **before the feature is announced as stable**, since after that the rename
+costs users rather than reviewers. It is mechanical but spread across the server, all six clients,
+their tests and the generated documentation, and is much easier to review on its own than folded
+into the work that added the feature. The feature is experimental, so it is breaking and needs no
+compatibility shim.
+
+`ConcatStrings` is renamed to `StringConcat` by the string work (see "Strings" under "Gaps to
+close"), and should ride along here rather than wait for the operations it joins.
+
+The rest of this document uses the current names, so that it describes names that exist.
 
 ## Goals
 
@@ -937,20 +998,69 @@ Creation, mutation by addition, and the query surface are covered. Missing:
 **Strings are deliberately not collections.** They are rejected by the collection operations with a
 message saying so, and are to be given their own operations instead.
 
-The guard is done. Before it, a string was accepted and then failed inside the algebra, because
-`CheckIsEnumerable` tests `IEnumerable`, which `string` satisfies: `Count` threw
-`ArgumentNullException` looking for a `Count` property a string does not have, `Contains` threw
-`IndexOutOfRangeException` indexing the empty `GetGenericArguments()` of a non-generic type, and
-`Get` threw on a missing method. Reaching for `Count` to get a string's length is the obvious thing
-to try, so the guard was worth having ahead of the operations below.
+The guard is done, and covers every collection operation: `CheckIsNotAString` is reached either
+directly or through `CheckIsEnumerable`, which `GetEnumerableValueType` calls, so all of `Count`,
+`Get`, `Contains`, `Select`, `Where`, `Skip`, `Take`, `ForEach` and the rest refuse a string.
+Before it, a string was accepted and then failed inside the algebra, because `CheckIsEnumerable`
+tests `IEnumerable`, which `string` satisfies: `Count` threw `ArgumentNullException` looking for a
+`Count` property a string does not have, `Contains` threw `IndexOutOfRangeException` indexing the
+empty `GetGenericArguments()` of a non-generic type, and `Get` threw on a missing method.
 
-The operations themselves are still missing. Beyond `ConstantString`, `ConcatStrings` and `ConvertToString`, string handling needs: length,
-case conversion, substring, character access, index of, replace, split, join, trim, and the
-`StartsWith`/`EndsWith`/`Contains` predicates.
+**The guard's message promises operations that do not exist**, which is what makes the rest of this
+section urgent rather than a nice-to-have. `len(s)`, `s[0]`, `s[1:3]` and `x in s` are all ordinary
+python that the compiler happily maps onto `Count`, `Get`, `Skip`/`Take` and `Contains`, and every
+one of them now fails with "use the string operations instead" naming operations there is no way to
+reach. A string is currently a value a function can pass through and concatenate, and nothing else.
 
-Names must not collide with the collection operations that share a concept — the algebra already
-avoids collisions this way (`ConvertToString`, `ConcatStrings`, `BuildDictionary`), and string
-length, containment and indexing all need distinguishing from their collection counterparts.
+#### The operations
+
+One `String`-prefixed family, following `ListAdd`/`SetAdd`/`DictionarySet`. The prefix is what keeps
+`StringLength`, `StringGet` and `StringContains` distinct from the collection operations of the same
+concept, and it makes the family sort together in the generated reference and in `doc/order.txt`.
+
+| Node | Returns |
+| --- | --- |
+| `StringLength(s)` | `int` |
+| `StringGet(s, index)` | `string` of length one |
+| `StringSubstring(s, start, length)` | `string` |
+| `StringIndexOf(s, value)` | `int`, `-1` when absent |
+| `StringContains`, `StringStartsWith`, `StringEndsWith` | `bool` |
+| `StringToUpper(s)`, `StringToLower(s)` | `string` |
+| `StringTrim(s)`, `StringTrimStart(s)`, `StringTrimEnd(s)` | `string` |
+| `StringReplace(s, old, new)` | `string` |
+| `StringSplit(s, separator)` | `IList<string>` |
+| `StringJoin(separator, strings)` | `string` |
+
+`ConcatStrings` is renamed `StringConcat` to join them. The feature is experimental, so this costs
+nothing now and is not available later.
+
+`StringIndexOf` returns `-1` rather than a nullable `int`. Nullable values exist since
+[PR #1017](https://github.com/krpc/krpc/pull/1017) and would be the more honest type, but `-1` is
+what `str.find` and `String.IndexOf` return in the languages both compilers translate from, so it
+keeps the mapping transparent. `StringTrim` trims whitespace and takes no character set, matching
+the no-argument form of both.
+
+#### Every one of these is culture sensitive, and must be pinned
+
+`ToUpper`/`ToLower` are culture sensitive in C#, and so are the default `IndexOf`, `StartsWith`,
+`EndsWith` and `Replace` overloads. Left alone they would make the same function return different
+answers on a German or Turkish game, which is the class of bug the
+[locale hardening](../locale-hardening.md) work fixed by hand and the
+[culture analyzers](../build-tools/culture-analyzers.md) rules `CA1307`, `CA1310` and `CA1311`
+exist to catch. So `ToUpperInvariant`/`ToLowerInvariant`, and `StringComparison.Ordinal` on every
+comparison overload.
+
+The nodes take no culture argument. A server side function is a program a client wrote, not a
+readout for the player, so it wants one answer everywhere; `ConvertToStringHelper` already pins
+`InvariantCulture` for the same reason and is the precedent to follow.
+
+#### Compiler mapping
+
+Both compilers already track the static type of every subexpression locally, so choosing between a
+string operation and its collection counterpart is a client-side decision needing no round trip:
+`len`, `[i]`, `[a:b]`, `in`, `.upper()`, `.split()` in python, and `.Length`, `.Substring`,
+`.ToUpper`, `.Contains` in C#, dispatch on it. Python slicing is the one that changes shape rather
+than name: it compiles to `Skip`/`Take` today and becomes `StringSubstring`.
 
 #### Characters are single-character strings
 
@@ -986,14 +1096,17 @@ client, has no way to say so.
 **The delivery half is already built.** Any exception raised while evaluating an expression is
 passed to `Services.HandleException`, which produces an `Error` carrying the service and name of
 the exception type alongside its description, so the client reconstructs the correct typed
-exception. Streams catch and report it as an error result; `RunFunction` propagates it as an
-ordinary RPC error. Nothing about that pathway needs changing — the gap is only the node that
-constructs and raises the exception.
+exception. `ExpressionStream` and the hardened `EventStream` catch and report it as an error
+result; `RunFunction` propagates it as an ordinary RPC error. Nothing about that pathway needs
+changing — the gap is only the nodes that raise and handle.
 
 Handling is needed alongside raising, not after it: a function that calls an RPC which can fail has
 no way to respond to that today, and the whole function is abandoned.
 
-**Raising.** `Throw(service, name, message)`, evaluating as a statement.
+#### Raising
+
+`Throw(service, name, message)`, evaluating as a statement, with `message` an expression so that a
+function can build it rather than only name a constant.
 
 Only exceptions registered with `[KRPCException]` can be raised, which keeps the boundary well
 defined and gives the client a typed exception it can catch, applying the same principle as return
@@ -1006,39 +1119,77 @@ throw. The typed form LINQ offers, for a throw in a value position such as one b
 `IfThenElse`, is not proposed: trees are built innermost-first, so there is no surrounding context
 to infer the type from and it would have to be supplied explicitly at every use.
 
-**Handling.** `TryCatch(body, service, name, message, handler)` for a named exception,
-`TryCatchAll(body, message, handler)` for any, and `TryFinally(body, finalizer)` for cleanup that
-runs either way. Body and handler are evaluated as statements through the existing `AsStatement`, so
-they need not produce values of the same type.
+**There are five exceptions to choose from and no service defines its own**: `ArgumentException`,
+`ArgumentNullException`, `ArgumentOutOfRangeException`, `InvalidOperationException` and
+`ObjectDestroyedException`, all in the KRPC service. Signalling a condition therefore means throwing
+a generic type and putting the meaning in the message. That is enough to make the node useful the
+day it lands, and it is worth documenting rather than leaving users to work out that there is no
+custom exception type to define.
+
+#### Handling
+
+`TryCatch(body, service, name, message, handler)` for a named exception, `TryCatchAll(body,
+message, handler)` for any, and `TryFinally(body, finalizer)` for cleanup that runs either way.
+Body and handler are evaluated as statements through the existing `AsStatement`, so they need not
+produce values of the same type.
 
 `message` is an optional string variable that the caught exception's message is assigned to before
 the handler runs. **The exception object itself is never exposed.** Binding only the message keeps
 exceptions out of the value algebra entirely — nothing needs an exception-typed entry in
-`KRPC.Type`, and no value that cannot cross the boundary can be carried toward it.
+`KRPC.Type`, and no value that cannot cross the boundary can be carried toward it. LINQ's `Catch`
+binds the exception rather than its message, so the implementation catches into a synthesized
+variable and assigns `.Message` from it as the first statement of the handler.
+
+**A name must resolve to every CLR type that reaches the client under it.** This is the one thing
+that has to be right, and the obvious implementation gets it wrong.
+`[KRPCException(MappedException = ...)]` maps a CLR exception type onto a kRPC one, and
+`HandleException` applies that mapping on the way out; four of the five kRPC exceptions have one.
+Services throw the CLR types, not the kRPC ones — `service/SpaceCenter/src` has 145
+`throw new InvalidOperationException`, 73 `ArgumentException`, 46 `ArgumentNullException` and 22
+`ArgumentOutOfRangeException`, and no service file imports the kRPC exception namespace, so every
+one of those is a `System.*` type. A `TryCatch` resolving `("KRPC", "InvalidOperationException")`
+to the kRPC type alone would therefore catch almost nothing an RPC actually throws, while the same
+exception escaping the function arrives at the client as `KRPC.InvalidOperationException`. Catch and
+delivery would disagree, which is worse than not having the node at all.
+
+So a name resolves to a **set**: the kRPC type plus every type mapped onto it, obtained by
+inverting `Services.MappedExceptionTypes`, with one LINQ catch block emitted per type over a shared
+handler. The set is fixed when the scanner runs.
+
+**An RPC failure is not nameable, and should be documented as such.** Direct call emission means
+there is no `ExecuteCall` wrapper, so a procedure's own exception propagates as it is, and the two
+checks emitted around a call — the game scene mask and the null return from a non-nullable
+procedure — throw `RPCException`, an internal sealed class with no `[KRPCException]`. Both can only
+be caught by `TryCatchAll`, and both reach the client as an untyped error. Making `RPCException` a
+kRPC exception would fix it, but it would also change what an ordinary failing RPC looks like to
+every client, so it belongs to error reporting rather than to this work.
 
 **A catch-all must not swallow `YieldException`.** A procedure that pauses execution unwinds by
-throwing it, and the stream evaluating the expression resumes the procedure on a later update.
-Catching it would silently break any such procedure used inside a `TryCatchAll`, turning a paused
-call into a handled error. The catch-all therefore needs a filter excluding it so that it continues
-to propagate. Named catches are not affected, since `YieldException` is not a `[KRPCException]` and
-so cannot be named.
+throwing it, and the stream evaluating the expression reports the pause. Catching it would turn
+that into a handled error and silently break any such procedure used inside a `TryCatchAll`. An
+exception filter would express this directly, but LINQ filters are worth not depending on under
+KSP's Mono: a `YieldException` handler whose body is a bare `Rethrow`, emitted ahead of the
+catch-all handler, does the same job with primitives the algebra already compiles. Named catches
+are unaffected, since `YieldException` is not a `[KRPCException]` and so cannot be named.
 
 **Semantics per context** are worth documenting rather than leaving to be discovered: an exception
 that escapes a function surfaces immediately as an RPC error from `RunFunction`, but from a stream
 or event it becomes an error result on every update for as long as the condition holds.
 
 **Implementation note.** `ExceptionSignature` does not record the CLR type of the exception, unlike
-`ClassSignature` and `EnumerationSignature`, so resolving `(service, name)` to a type it can
-construct requires adding an `UnderlyingType` to it and threading it through
+`ClassSignature`, `EnumerationSignature` and `StructSignature`, so resolving `(service, name)` to a
+type it can construct requires adding an `UnderlyingType` to it and threading it through
 `ServiceSignature.AddException`. It is not serialized, so the service-definitions JSON is
-unaffected — the same approach already taken for classes and enumerations.
+unaffected — the same approach already taken for classes, enumerations and structures.
 
 ### Client compilers
 
 Each addition needs the corresponding native syntax mapped in both compilers to be reachable from
-compiled code — `len(s)`, `s.upper()`, slicing and `in` in python; `.Length`, `.ToUpper()`,
-`.Substring()` and `.Contains()` in C#. Until then these are factory-only, and a user writing the
-natural thing gets an unsupported-construct error.
+compiled code; the string half is set out under "Compiler mapping" above. Until then these are
+factory-only. The diagnostic a user meets differs by addition, which is worth knowing when
+prioritizing: a missing collection operation is an unsupported-construct error naming the syntax,
+whereas the string operations are reached by syntax the compilers already accept and translate, so
+those fail on the server instead, pointing at operations that do not exist yet.
 
 Exceptions are asymmetric between the two. Python `raise` and `try`/`except` map onto the nodes
 directly, and the statement compiler needs to handle both. C# cannot reach either: an
@@ -1048,9 +1199,15 @@ lambdas.
 
 ### Testing
 
-Each addition needs core coverage of the operation itself, and the string work additionally needs
-tests that the collection operations reject a string with the intended message rather than an
-internal exception.
+Each addition needs core coverage of the operation itself. Three cases beyond that are where the
+behavior is decided rather than merely implemented:
+
+* the collection operations reject a string with the intended message rather than an internal
+  exception (already covered for the guard; extend as the string operations land);
+* case conversion and comparison are invariant, tested by evaluating under a culture that differs
+  from the invariant one rather than by inspecting the emitted call;
+* a `TryCatch` naming a kRPC exception catches the mapped CLR exception an RPC actually throws, and
+  a `TryCatchAll` around a yielding procedure still reports the pause rather than handling it.
 
 ## Out of scope (follow-up candidates)
 
@@ -1060,7 +1217,7 @@ internal exception.
 * Batched tree construction, which would cut the one-RPC-per-node cost of building a tree. Designed
   in "Batched tree construction" above; client-side only, and gated on measuring real tree sizes
   first.
-* The rename to `KRPC.Function`, decided in "Naming" above and deferred to its own change.
+* The function/expression rename, decided in "Naming" above and deferred to its own change.
 * Bounding the time a loop can run for, so that a runaway function cannot hang the game.
 * The remaining gaps in the node algebra, listed in "Gaps to close": string operations, collection
   removal and enumeration, `ConstantEnum`, and raising and handling exceptions.
