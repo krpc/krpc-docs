@@ -103,10 +103,19 @@ their tests and the generated documentation, and is much easier to review on its
 into the work that added the feature. The feature is experimental, so it is breaking and needs no
 compatibility shim.
 
-**Nothing of it is done.** `ConcatStrings` was renamed to `StringConcat` by the string work, which
-is the only piece that has landed, and it was a member name rather than part of this rename.
+**Done**, in its own commit, as decided. Two things came out of it that the inventory did not
+anticipate:
 
-The rest of this document uses the current names, so that it describes names that exist.
+* `Lambda` is a python keyword, so the generated python client names it `lambda_`, as it already
+  does `not_`, `break_` and `except_`. That in turn exposed a docgen bug: a cross reference built
+  from a `<see cref>` was not keyword escaped, so it pointed at a name the generated reference
+  does not declare. Fixed alongside.
+* The section headings of the hand written client documentation name the helpers too
+  ("Expression Streams", "Compiling Python Functions to Expressions"), as do the labels they are
+  referenced by.
+
+The rest of this document uses the names from before the rename, so the sections describing what
+was built describe the names it was built with.
 
 ## Goals
 
@@ -1238,5 +1247,4 @@ behavior is decided rather than merely implemented:
 * Batched tree construction, which would cut the one-RPC-per-node cost of building a tree. Designed
   in "Batched tree construction" above; client-side only, and gated on measuring real tree sizes
   first.
-* The function/expression rename, decided in "Naming" above and deferred to its own change.
 * Bounding the time a loop can run for, so that a runaway function cannot hang the game.
