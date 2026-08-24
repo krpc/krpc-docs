@@ -1,8 +1,9 @@
 # Object lifetime, destroyed objects and object-store reclamation
 
-**Status:** in progress. Phases 1 to 14 are built; no PR is raised yet. Phases 15 and 16, the
-benchmarking, are a pull request of their own and are not built here; the numbers under
-[Performance](#performance) were measured on a build that carried them. Covers issues
+**Status:** in progress. Phases 1 to 14 are built, 8a included; no PR is raised yet, and
+[#1072](https://github.com/krpc/krpc/issues/1072) is the number its changelog entries predict for
+it. Phases 15 and 16, the benchmarking, are a pull request of their own and are not built here; the
+numbers under [Performance](#performance) were measured on a build that carried them. Covers issues
 [#885](https://github.com/krpc/krpc/issues/885),
 [#764](https://github.com/krpc/krpc/issues/764),
 [#771](https://github.com/krpc/krpc/issues/771) and the follow-up left open by
@@ -767,6 +768,14 @@ exactly as live, dormant or destroyed as the vessel or part it was reached throu
 resolves by resolving that owner and then picking itself out with a resource id, a stage number or
 nothing at all.
 
+Two of them answer to something else as well. A `Flight` expresses every quantity it reads in the
+reference frame it was asked for, so it is `LeastAlive` of its vessel and that frame: a flight
+measured in a frame the client has removed has nothing left to be expressed against. And a
+`ResourceTransfer` is also an object a client asks the server to build, so it has a `Remove` and a
+client owns it; what follows from that is with the rest of them in
+[Objects kRPC creates for a client](#objects-krpc-creates-for-a-client), and what follows from its
+parts is below.
+
 `Stage` names its vessel by id rather than holding the KSP vessel, so resolving is a lookup by
 that id. Reading `.id` off a captured Unity object inside `Equals` is the one thing
 [Identity](#identity) forbids.
@@ -1051,7 +1060,9 @@ need. It goes where `ClientOwnedObjects` already lives:
 |---|---|---|
 | `ClientOwnedObjects.RemoveDestroyed` | server assembly, `KRPC.Utils` | drops the entries whose object is an `IGameObjectState` reporting destroyed, without running the release action: there is nothing left to tear down |
 | the addons' update loops | each service | call it, and then act only on what is live |
+| the store's sweep | server assembly, `KRPC.Addon` | calls it on every collection, through `ClientOwnedState`, so that a collection never holds more than the store does. An addon that does nothing to its objects per frame needs only this: classifying may search as widely as it needs to, so it is not a thing to do to a whole collection every frame, and without it an object let go of by what it was built on would sit in the collection until its client went |
 | `ClientOwnedObjects` asking for a sweep | server assembly, `KRPC.Utils` | every path that lets an object go asks for one, since removing a line, a panel or a force destroys nothing the game raises an event for, and nothing else would take the object out of the store. A collection whose objects are never handed to a client, the instantaneous forces, says so and asks for nothing, so a client pushing a part every frame does not sweep the store every frame |
+| `ClientOwnedObjects.RemoveOwnedByCaller` | server assembly, `KRPC.Utils` | the whole of a client removal: refuses an object that is not the caller's, saying it is not among the ones this client created, and takes it out otherwise. One place, so that all five kinds refuse it alike; the teardown a drawing and an interface element need is passed in, and runs only once the object is known to be the caller's |
 
 `Force` is what makes this more than tidiness. The forces addon applies every force in its
 collection on every fixed update, through `Part.InternalPart`, so a force on a part the game has
@@ -1130,6 +1141,28 @@ The server builds hybrid frames of its own, `Drawing.AddDirectionFromCom` being 
 go through a factory that does not register them with the collection: the frame belongs to the line
 it holds, not to the caller.
 
+Neither kind of created frame means anything without a frame to be defined against, and the
+defaulting that fills in a hybrid frame's other three components from its position frame belongs
+with the building rather than with the client call, or the server's own factory hands back a frame
+with nothing behind three of them. A frame built against nothing is refused where it is built: it
+could not answer even for what it is worth without dereferencing nothing, and a classifier may not
+throw.
+
+#### Resource transfers
+
+A `ResourceTransfer` is the one member of this category that also stands for something the game can
+destroy. It is [named against its two parts](#anything-named-against-a-vessel-or-a-part) and takes
+its state from them, and it is equally an object a client asked the server to build: it runs from
+the fixed update on that client's behalf, and nothing in the game retires one that has finished,
+which goes on standing for a pair of parts the game may keep for the rest of the flight. So it has
+both halves. The parts retire it, and `ResourceTransfer.Remove` does too.
+
+Its collection is the one held by a `ClientCleanupAddon`, and a flight-only one, so leaving the
+flight scene lets go of every transfer as well. That and a client removing one look the same to the
+object, and unlike the disconnect there is a client still there to be told which happened, so it
+records the game state it was started in: the state having moved on is what says the flight was
+left rather than that this client removed anything.
+
 ### Drawing
 
 `Line`, `Polygon`, `Text` and `NavballMarker` take the rule above: live while the drawable's game
@@ -1143,6 +1176,13 @@ destroyed, so one destroyed vessel turns into an exception per drawable per fram
 frame is not live is not drawn, rather than positioned: the frame is a settable property, so a
 client can point the drawable at another one, and destroying the drawing because the thing it was
 measured against went away would take that away.
+
+Removing a drawing another client made, or one the server no longer holds, reported a bad argument
+and said only that the object was not found. It is not the argument that is wrong: the client is
+holding the object and the object exists, but it belongs to somebody else or the collection has let
+go of it. It is refused the way every other created object refuses it, which the UI objects also
+move onto; see [Objects kRPC creates for a client](#objects-krpc-creates-for-a-client). That
+changes the error a client catches, so it is breaking.
 
 ### UI
 
@@ -1322,8 +1362,9 @@ adding to it. Splitting them off keeps the first pull request to the behavior ch
 | 4 | Event-driven reclamation | Subscribe to `onPartDie` / `onVesselDestroy` so obviously dead proxies leave the store immediately rather than at the next load boundary. Pure latency improvement over the sweep from phase 1. |
 | 5 | [The vessel in the editor](#the-vessel-in-the-editor) | Everything the editor's vessel needs, which is a second kind of thing a part can belong to rather than another kind of game object; see below. |
 | 6 | SpaceCenter records | [`Alarm`](#alarms), [`Contract`, `ContractParameter`](#contracts) and [`Waypoint`](#waypoints): the records the game keeps for the loaded game rather than for a vessel. Each gains an identity the game writes into the save and re-derives from it; each `Remove` leaves its object destroyed rather than holding something the game no longer has. |
-| 7 | SpaceCenter objects defined against others | [`CommLink`](#comm-links) is named by the vessel whose control path it is a hop in and the two nodes it joins, and finds that hop in the path as it stands, so it reports the link as it is rather than as it was when the object was made; [`ClosestApproach`](#close-approaches) takes the state getter alone. Needs 3a, 3h and 3i for what it defers to. |
+| 7 | SpaceCenter objects defined against others | [`CommLink`](#comm-links) is named by the vessel whose control path it is a hop in and the two nodes it joins, and finds that hop in the path as it stands, so it reports the link as it is rather than as it was when the object was made; [`ClosestApproach`](#close-approaches) names which approach it is instead of the moment it was estimated at, solves from the orbits on access, and takes the state getter alone. Needs 3a, 3h and 3i for what it defers to. |
 | 8 | [Objects kRPC creates for a client](#objects-krpc-creates-for-a-client) | `ClientOwnedObjects.RemoveDestroyed`, and `Force` as its first user: a destroyed part takes its forces with it, and an unloaded part, or a reference frame that cannot be measured in, makes them wait, instead of the physics step dereferencing a part that is gone. `Force.Remove` leaves the object gone, as removing a drawing does. [Constructed orbits](#constructed-orbits) are the other user, and the one that needs only the store-dropping half. Needs 3b and 3h. |
+| 8a | The rest of what a client creates | [Created reference frames](#created-reference-frames), which need an identity per instance as well as a `Remove`, and [resource transfers](#resource-transfers), which already had a collection and needed the `Remove`. With them, everything a client asks the server to build is removed through one path, and the sweep drops what a collection is still holding. The auto-pilot joins the drawables and the forces in waiting for a frame it can measure in, being the last thing in a frame loop that reads one. Needs 8, 3e and 3h. |
 | 9 | [Drawing](#drawing) | `Line`, `Polygon`, `Text` and `NavballMarker` classify themselves from their game object and from having been removed, so that removing one twice reports it gone rather than not found, and the addon does not draw a drawable whose reference frame is not live. Needs 8 and 3h. |
 | 10 | [UI](#ui) | Every user interface object classifies itself and raises from the members that reach the game, removal included, with `Control` answering for the members its controls share; `RectTransform`, `Layout`, `LayoutElement` and `SizeFitter` gain a state, and an identity the store can dedup, so reading one repeatedly stops adding an object to the store per call. Needs 8. |
 | 11 | [RemoteTech](#remotetech), [LiDAR and DockingCamera](#lidar-and-dockingcamera) | `Antenna`, `Laser` and `Camera` defer to their part and are destroyed when a live part no longer carries their module; `Comms` names its vessel by the id its `Vessel` already holds. Three services, one shape, so one phase. Needs 3a and 3b. |

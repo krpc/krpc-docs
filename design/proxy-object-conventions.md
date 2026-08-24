@@ -109,8 +109,9 @@ public void Remove ()
         throw new InvalidOperationException (
             "Only a reference frame created by CreateRelative or CreateHybrid " +
             "can be removed");
-    // the collection holding it for its client, which asks for the sweep itself and
-    // refuses a caller the object does not belong to
+    // the collection holding it for its client. It asks for the sweep itself, and
+    // refuses a caller the object does not belong to through
+    // ClientOwnedObjects.RemoveOwnedByCaller, so the message is written once
     CreatedReferenceFramesAddon.Remove (this);
     removed = true;
 }
@@ -147,9 +148,13 @@ public GameObjectState GameObjectState {
 | R6 | Say in the `<remarks>` who else the removal affects, and say on the member that builds the object what becomes of one that is never removed. | A created `ReferenceFrame`, a constructed `Orbit`, a `ResourceTransfer` and a `Force` each belong to the client that asked for them and go when it disconnects, so removal affects nobody else. A client reading `CreateRelative` or `Start` learns there that it has an object to account for. |
 | R7 | Where the disconnect path has teardown of its own, give the collection an `internal Release ()` rather than pointing it at the RPC. | `Remove` is a client call and checks; release is not, and may have to stop something as well as let go. |
 | R8 | An addon acting on its objects every frame calls `ClientOwnedObjects.RemoveDestroyed ()` first, then acts only on what is `Live`. | There is no client call in the frame loop to attribute a failure to, so a destroyed object is dropped, and a dormant one waits. |
+| R8a | An addon that does **not** act on its objects every frame calls it nowhere: the object store's sweep does it for every collection. | Classifying may search as widely as it needs to (C7), so it is not a thing to do to a whole collection on every frame. The sweep is where it is both meaningful and already being paid for. |
+| R8b | Anything the game drives every update that reads a client's `ReferenceFrame` waits while that frame is not `Live`, rather than failing or giving the object up. | A drawable, a `Force` and the auto-pilot's control loop all do. The frame is a settable property, so the client can point the thing at another one; failing there has no call to raise at, and gives up something the client never asked to lose. |
 | R9 | A collection whose objects are never handed to a client passes `givenToClients: false`. | Otherwise a client pushing a part every frame sweeps the store every frame. |
 | R10 | Building one of these objects never hands back one that has been removed: each call returns a new object, per I1. | The store is keyed on the proxy, so a created class that compares by value hands the next creation the instance that was removed. Every use of it then raises, until the sweep drops the id and leaves the client holding a dangling one. |
 | R11 | Where the server builds one of these types for its own use, it does so through a factory that does not take client ownership. | `Drawing.AddDirectionFromCom` builds a hybrid frame per call to hold a line against the active vessel. It is the line's, not the caller's, and registering it would grow the collection once per call. |
+| R12 | Whatever the object cannot be built without is required where it is **built**, not where the client calls, and so is any defaulting of what it may be left out of. | Both callers get it, the server's factory included, and the object never exists in a state its own classifier cannot answer for. A created `ReferenceFrame` needs a frame to be defined against; a hybrid one takes its other three components from its position frame. |
+| R13 | Where more than one thing lets an object go, and a client is still there to be told, the object says which happened. | Only a `ResourceTransfer` has this: leaving the flight scene releases one, and so does its client removing it. It records the game state it was started in, and the state having moved on is what tells them apart. |
 
 ## Exceptions
 
@@ -203,6 +208,10 @@ What an audit looks for first. The first four have each been a real leak.
 9. If a client asks the server to build it: is there a `Remove`, does every member check, and does
    something ask for a sweep?
 10. Is a new proxy built fresh on each call to a getter?
-11. Does an addon's frame loop reach into an object that may be destroyed?
+11. Does an addon's frame loop reach into an object that may be destroyed, or into a
+    `ReferenceFrame` it does not first find `Live`?
 12. Is the object's life tied to game state or to a client connection, or to neither?
 13. Can building one hand back an object that has already been removed?
+14. Can it be built without something it cannot answer for, or does the defaulting of what may be
+    left out sit on the client call rather than on the building?
+15. Does more than one thing let it go, and if so does it tell a client which happened?

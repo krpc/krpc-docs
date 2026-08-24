@@ -130,9 +130,8 @@ position in the tick could be chosen without touching the control law.
   recent and latches exactly the deflection the hold time exists to release. The tick the loop
   was last tried at and the tick it last completed at are therefore separate: the first
   answers "has it already run this tick", the second answers "is there an output to fly with".
-  Landed with the object lifetime work,
-  [#1072](https://github.com/krpc/krpc/pull/1072), which made the case easy to reach by giving
-  a client a way to remove the reference frame the loop measures in; see
+  Built with the object lifetime work rather than here, that being what made the case easy to
+  reach: it gives a client a way to remove the reference frame the loop measures in. See
   [object-lifetime.md](../object-lifetime.md#reference-frames).
 * **Pinning the order moves every call, not just the auto-pilot's.** Reads are unaffected, as
   the physics step runs after all of them, and kRPC's control writes are applied at the game's
