@@ -827,6 +827,16 @@ retained proxies, and are reclaimed with the orbit they belong to rather than on
 `NullReferenceException`. Giving part-relative reference frames the same id-based re-derivation the
 other part frames use closes it.
 
+A frame a client hands to something the game drives every update is read from that update rather
+than from a call, so there is nobody there to raise at and each such consumer has to decide for
+itself what a frame that is not live means. There are three, and they give the same answer on the
+same grounds: the frame is a settable property, so the client can point the thing at another one,
+and only waiting lets it. A drawable whose frame is not live is not drawn, a `Force` whose frame is
+not live is not applied, and the auto-pilot's control loop does not run, which lets its output hold
+time expire and so releases the controls rather than leaving the last command latched on the
+vessel. The auto-pilot stays engaged throughout: a frame that cannot be measured in says nothing
+about whether the client still wants the vessel flown.
+
 ### Comm nodes
 
 Nothing identifies a comm node, so the proxy holds the game's own object, and it is live while that
