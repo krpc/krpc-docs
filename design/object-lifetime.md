@@ -959,16 +959,30 @@ values a client reads a link for. The three states fall out of that:
 ### Close approaches
 
 A `ClosestApproach` names which of the successive approaches between two `Orbit` objects it is, and
-solves the time and distance from the orbits on each access. It needs the state getter alone,
-`LeastAlive` of its two orbits, exactly as a reference frame combines what it is defined against.
+solves the time and distance from the orbits rather than holding them. It needs the state getter
+alone, `LeastAlive` of its two orbits, exactly as a reference frame combines what it is defined
+against.
 
 The estimated time was originally part of what the object stood for. That made it a snapshot, and
 since the estimate is solved from the current time it also made every call build an object that
 compared equal to none before it, so a script polling the approach to a target filled the store, per
 [Ways the store grows](proxy-object-conventions.md#ways-the-store-grows). Naming the approach rather
-than describing it fixes both: the same approach asked for twice is one object, and it goes on
-naming the next approach once the one it named has passed. Members read one after another can differ
-a little, which is the cost.
+than describing it fixes both: the same approach asked for twice is one object, and the estimate
+follows the orbits instead of describing the moment the object was made.
+
+Two things fall out of solving on access, one a cost and one a limit.
+
+The solve is a search over an orbital period sampling both orbits at some seventy points, which is
+far more than any member that reads it costs, and a client reading four members would have paid for
+four searches. Nothing the search reads moves within a physics tick, so it is solved once per tick,
+scoped to `GameState.Generation` as anything else a proxy caches is. The members read in a tick then
+share one search and describe one moment.
+
+The limit is the search itself, which is unchanged and is its own problem. It runs forward over one
+period from now, and its first sample is now, so once an approach has passed and the two orbits are
+separating the minimum in that window is the current instant: the object then reports the approach
+as now, at the current separation, rather than naming the next one. A snapshot hid this by never
+looking again.
 
 ### What SpaceCenter leaves out
 
