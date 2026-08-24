@@ -538,7 +538,7 @@ objects defined against others.
 | [contract parameter](#contracts) | `ContractParameter` | its contract, and the indices that lead to it | walking the contract's parameters from the top |
 | [waypoint](#waypoints) | `Waypoint` | the waypoint's navigation id, a `Guid` it is given when it is built | a search of the waypoint manager's list |
 | [comm link](#comm-links) | `CommLink` | the vessel whose control path it is a hop in, and the two nodes it joins | a walk of that vessel's control path as it stands |
-| [close approach](#close-approaches) | `ClosestApproach` | the two orbits and the time, all held as values | nothing to resolve; its orbits resolve |
+| [close approach](#close-approaches) | `ClosestApproach` | the two orbits and which of the successive approaches it is | nothing to resolve; its orbits resolve |
 
 **Not every kind is covered**, and nothing has to be: a class that does not implement
 `IGameObjectState` behaves as it does today, always usable and never swept, which is the right
@@ -820,7 +820,8 @@ or parent frames, and for a hybrid frame each of its components. A frame defined
 celestial body alone never dies, and neither does one defined against a constructed orbit, which
 names nothing the game can destroy. The frames on a constructed orbit are still a new producer of
 retained proxies, and are reclaimed with the orbit they belong to rather than on their own; see
-[constructed orbits](#constructed-orbits).
+[constructed orbits](#constructed-orbits). A frame a client creates is reclaimed on its own; see
+[created reference frames](#created-reference-frames).
 
 `DockingPort.ReferenceFrame` captures its `ModuleDockingNode` and so can still raise a raw
 `NullReferenceException`. Giving part-relative reference frames the same id-based re-derivation the
@@ -947,9 +948,17 @@ values a client reads a link for. The three states fall out of that:
 
 ### Close approaches
 
-A `ClosestApproach` is a snapshot of values plus the two `Orbit` objects it was computed for, and it
-already compares by value, so the store dedups it. It needs the state getter alone, `LeastAlive` of
-its two orbits, exactly as a reference frame combines what it is defined against.
+A `ClosestApproach` names which of the successive approaches between two `Orbit` objects it is, and
+solves the time and distance from the orbits on each access. It needs the state getter alone,
+`LeastAlive` of its two orbits, exactly as a reference frame combines what it is defined against.
+
+The estimated time was originally part of what the object stood for. That made it a snapshot, and
+since the estimate is solved from the current time it also made every call build an object that
+compared equal to none before it, so a script polling the approach to a target filled the store, per
+[Ways the store grows](proxy-object-conventions.md#ways-the-store-grows). Naming the approach rather
+than describing it fixes both: the same approach asked for twice is one object, and it goes on
+naming the next approach once the one it named has passed. Members read one after another can differ
+a little, which is the cost.
 
 ### What SpaceCenter leaves out
 
@@ -1075,6 +1084,27 @@ Releasing on disconnect makes the id invalid for anyone else still holding it, w
 a client passes an id to another client out of band, since ids come from one sequence and one store.
 That is already true of drawings and forces, so a constructed orbit behaving the same way is
 consistent rather than new.
+
+#### Created reference frames
+
+A frame from `ReferenceFrame.CreateRelative` or `ReferenceFrame.CreateHybrid` is the same kind of
+thing as a constructed orbit and takes the same treatment: a `Remove`, a `ClientOwnedObjects`
+collection hosted by an addon in every scene, and a `Release` on the disconnect path. Only those two
+kinds are removable; every other frame is named by something in the game, which is what says when it
+is finished with.
+
+It differs in one way, and it is the way that matters. A frame compares by value, so two clients
+asking for the same one were given the same object, which broke both halves of
+[the rules](proxy-object-conventions.md#objects-created-for-a-client-and-remove): one client's
+removal took the other's frame away, and creating a frame again after removing it handed back the
+removed one, which then raised on every use. A created frame therefore keeps the identity of the
+object itself, per I1, and `ReferenceFrame` decides which identity to use per instance. Frames named
+by something in the game keep value identity, or the store would take an entry every time a script
+read `vessel.reference_frame`.
+
+The server builds hybrid frames of its own, `Drawing.AddDirectionFromCom` being the case, and those
+go through a factory that does not register them with the collection: the frame belongs to the line
+it holds, not to the caller.
 
 ### Drawing
 
