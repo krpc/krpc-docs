@@ -14,6 +14,10 @@ the vessel under construction, which is a second kind of thing a part can belong
 controls and layout objects those add. It settles the reload half of the follow-up the editor scene
 API leaves open; see [The vessel in the editor](#the-vessel-in-the-editor).
 
+The rules this design places on a service class, distilled for writing, auditing and
+reviewing code, are in
+[proxy-object-conventions.md](proxy-object-conventions.md).
+
 ## Problem
 
 First, a note on terminology. Three different things here are called objects:
