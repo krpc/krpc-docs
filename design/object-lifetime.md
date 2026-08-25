@@ -510,9 +510,14 @@ and cannot be removed. That is why the hash rule is a rule and not a preference.
 | `ModuleRef` | SpaceCenter | KSP specific |
 | `ClientOwnedObjects.RemoveDestroyed` | server assembly | it is one more operation on the collection every addon holding client-owned state already uses, and only that assembly and the services see both it and `IGameObjectState` |
 
-`CachedObject<T>` and `ModuleRef` stay internal to SpaceCenter. No other service resolves anything
-of its own: each reaches the game through a `Part` or a `Vessel`, which is public and does its own
-resolving and caching.
+`CachedObject<T>` stays internal to SpaceCenter. No bundled service resolves anything of its own:
+each reaches the game through a `Part` or a `Vessel`, which is public and does its own resolving
+and caching.
+
+`ModuleRef` was internal on the same reasoning, and is public as of
+[#1075](https://github.com/krpc/krpc/pull/1075). Extension members let a third-party class of a
+third-party service stand for a part module, which is the first thing outside SpaceCenter that
+resolves a module of its own. See [extension members](protocol/extension-members.md).
 
 ## SpaceCenter
 
@@ -1321,7 +1326,7 @@ Each alternative below was turned down on evidence, several of them after being 
 | Record only where a module was found, not that a part has none | An object with an optional module it does not have, an engine with no gimbal, then searches the whole module list on every access, since nothing records the absence. Built that way, `engine.thrust` cost 1165 ns. A reference records a part having no such module as readily as which module it found, so both answers cost an index and a string comparison. |
 | A module reference generic on the module type | Built and measured: the shared generic it compiles to costs 21 ns against 7 ns for the indexed lookup underneath it, so the wrapper cost three times the work it wrapped. Naming the module by its class name keeps the whole resolve path non-generic; with the absence fix above it took `module.name` from 51 ns to 46 ns and `engine.thrust` from 1165 ns to 46 ns. |
 | Cache the resolved `PartModule` behind the same weak reference the part uses | It would let module getters skip part resolution entirely, and it is correct, since destroying a part destroys its modules. Measured a regression on both counts; see the second row of this table. |
-| Make `ModuleRef` public, so the module-backed objects in other services use it | It buys them nothing. `Antenna`, `Laser`, `Camera` and `Servo` each hand a `Part` to their mod's API and never touch a `PartModule` on the way, so the only place a module has to be found is the classifier, which runs after a resolve has already failed or from a sweep, and a walk of one part's modules is affordable there. `Servo` does resolve a module, but Infernal Robotics itself names a servo by its part, so a lookup by name is exact. Keeping the two SpaceCenter pieces internal keeps the fast path they exist for from being an inter-assembly contract. |
+| Make `ModuleRef` public, so the module-backed objects in other services use it | **Superseded by [#1075](https://github.com/krpc/krpc/pull/1075)**, which makes it public for third-party services that expose a part module as a class of their own. The reasoning below still holds for the bundled services, and none of them was converted. It buys them nothing. `Antenna`, `Laser`, `Camera` and `Servo` each hand a `Part` to their mod's API and never touch a `PartModule` on the way, so the only place a module has to be found is the classifier, which runs after a resolve has already failed or from a sweep, and a walk of one part's modules is affordable there. `Servo` does resolve a module, but Infernal Robotics itself names a servo by its part, so a lookup by name is exact. Keeping the two SpaceCenter pieces internal keeps the fast path they exist for from being an inter-assembly contract. |
 | Give a `Servo` a cached resolve of the module it wraps | Every member of a servo is a reflection call into the mod, hundreds of nanoseconds at best, so the tens of nanoseconds a cache saves are invisible. What made wrapping expensive was the wrapper's own per-instance reflection lookups, and those are the thing to move, since every listing call pays them today too. |
 | Leave Drawing and UI out, as objects the client owns | The client owning an object says who removes it, not whether the game can. A scene change destroys every drawing and every interface element, so the objects standing for them are as dead as any part's, and reading one raises whatever Unity raises for a torn-down object rather than saying so. |
 | Destroy a drawing whose reference frame is destroyed | The frame is a settable property, so the object is recoverable and taking it away is not. Not drawing it is enough, and it is reversible. |

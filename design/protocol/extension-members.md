@@ -3,7 +3,7 @@
 **Status:** in progress — built on a branch, not yet opened as a PR. Written 2026-07-03,
 revised 2026-08-22 against `krpc` at version 0.7.0.
 
-Everything below landed as designed, with three differences:
+Everything below landed as designed, with four differences:
 
 - **The scanner pass covers every `[KRPCMethod]`/`[KRPCProperty]` method in a public
   static class, not only extension methods.** A member that forgets `this` is then a
@@ -17,6 +17,11 @@ Everything below landed as designed, with three differences:
   is nothing there to cover separately.
 - **The Python merge covers class members only.** Service-level procedures and properties
   are not merged; service-level extension procedures are out of scope anyway.
+- **`KRPC.SpaceCenter.ModuleRef` is now public.** The #900 pattern has a third-party class
+  standing for a part module, so it has to find that module again on every access. Everything
+  else the proxy conventions ask for was already public; the resolver was not. This supersedes
+  the rejected alternative in [object-lifetime.md](../object-lifetime.md), which weighed only
+  whether the bundled services needed it.
 
 ## Context
 
