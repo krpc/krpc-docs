@@ -210,8 +210,7 @@ indistinguishable from native members downstream.
   `this`-parameter rule, GameScene semantics, collision behavior.
 - A worked #900 example: wrapping a mod `PartModule` as a `[KRPCClass]` +
   nullable extension property on `SpaceCenter.Part`, with the
-  `InternalPart` access pattern, `IGameObjectState` on the wrapper, and a pointer from
-  the `Module` class docs to this pattern for mod authors.
+  `InternalPart` access pattern and `IGameObjectState` on the wrapper.
 
 ## Tests
 
