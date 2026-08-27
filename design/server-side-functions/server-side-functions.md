@@ -121,6 +121,12 @@ A dynamic client walks `ReturnType` recursively, reconstructs the equivalent pro
 locally, and feeds its existing decode machinery (`Types.as_type` in Python). Statically typed
 clients do not need this: the user supplies the expected type as a generic parameter.
 
+**As built, Java walks `ReturnType` too.** Its `Stream<T>` is constructed from a protobuf `Type`
+rather than from a `Class<T>`, and its decoder takes the same message, so there is nothing for a
+type argument alone to drive. `Connection.runFunction` and `Connection.addStream` therefore
+introspect the type and cast the decoded value to `T`, which the compiler cannot check. C# and C++
+follow the design and decode at the type the user names.
+
 ### Constants
 
 Value constants are `ConstantDouble`, `ConstantFloat`, `ConstantInt`, `ConstantBool` and
@@ -374,6 +380,17 @@ the node at all. So a name resolves to a **set**: the kRPC type plus every type 
 obtained by inverting `Services.MappedExceptionTypes`, with one LINQ catch block emitted per type
 over a shared handler. The set is fixed when the scanner runs.
 
+**The set must not widen either, and a CLR catch block widens it.** `catch (System.ArgumentException)`
+also catches `ArgumentNullException` and `ArgumentOutOfRangeException`, which map to kRPC types of
+their own, and it catches `ObjectDisposedException`, which maps to nothing and so reaches the client
+with no name at all. `HandleException` maps by exact type, so each of those arrives under a name the
+catch did not name, and the kRPC exception classes are flat: they are all `sealed` and derive from
+`System.Exception`, so no client can express the subclass relationship the catch is assuming. Each
+handler therefore opens with `Services.ExpressionExceptionIsNamed(caught, type)` and rethrows when
+it is false. An exception filter would say the same thing more directly, and is avoided here for the
+reason `TryCatchAll` avoids it. The rule the two halves buy is one sentence: a name catches exactly
+the exceptions that reach the client under it.
+
 **An RPC failure is not nameable, and is documented as such.** Direct call emission means there is
 no `ExecuteCall` wrapper, so a procedure's own exception propagates as it is, and the two checks
 emitted around a call, the game scene mask and the null return from a non-nullable procedure, throw
@@ -482,7 +499,8 @@ decoding a value whose type the server reports rather than the stub declares.
   overloads, where the user supplies `T`; a non-generic `RunFunction` covers functions with no
   result.
 * **Java** and **C++**: equivalent typed helpers matching each client's existing stream-construction
-  idiom, plus their own run-once helpers.
+  idiom, plus their own run-once helpers. Java decodes by the introspected type, per "Types and
+  introspection".
 * **Lua**: no helper; the raw RPCs remain available, and this is documented.
 
 Each helper introspects the type once per function and keeps it. Walking `ReturnType` is a round
@@ -702,9 +720,17 @@ limited to single-expression lambdas.
 
 ### Semantics that differ from running locally
 
-Documented for both compilers, because they are the surprises: `and`/`or` do not short-circuit on
-the server; captured values are frozen at compile time, so only remote calls re-evaluate per tick;
-and a procedure that pauses execution cannot be used inside a function.
+Documented for both compilers, because they are the surprises: captured values are frozen at compile
+time, so only remote calls re-evaluate per tick; and a procedure that pauses execution cannot be
+used inside a function.
+
+**Short-circuiting is not one of them.** `And` and `Or` compile to LINQ's `And`/`Or`, which evaluate
+both operands, and mapping `and`/`or` and `&&`/`||` onto them would silently drop the guard in
+`x.Count > 0 and x[0] == 1`. `ConditionalAnd` and `ConditionalOr` compile to `AndAlso`/`OrElse`, so
+both compilers map the conditional operators onto them and the bitwise ones onto `And`/`Or`. Python
+chained comparisons need one more thing: `a < b < c` expands to two comparisons over one `b`, so a
+non-constant `b` is assigned to a temporary in an enclosing block and read from it twice, which is
+where python evaluates it once.
 
 ## Object identity and lifetime
 
