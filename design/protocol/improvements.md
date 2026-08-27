@@ -87,6 +87,10 @@ client/server pairs. Once landed, revert the #824 `LaunchVessel.crew` workaround
 whether static clients (C#, Java, C++, cnano) need presence handling for results — C++
 may want `std::optional`.
 
+**Follow-up.** #843 covers a parameter and a return value. Nullability inside a collection
+or a structure field is designed separately in
+[nested-nullable-values.md](nested-nullable-values.md), which has no issue yet.
+
 ### 3. Extension methods — [#305](https://github.com/krpc/krpc/issues/305) + [#900](https://github.com/krpc/krpc/issues/900)
 
 **Status: design agreed** — see [extension-members.md](extension-members.md). C#

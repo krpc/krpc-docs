@@ -359,7 +359,8 @@ First-adoption candidates (separate follow-up work, per the issue): a
 `Control.pitch_roll_yaw` alongside the existing per-axis properties.
 `SpaceCenter.LaunchSite` is still the `KRPCClass` the issue describes, with `Name`,
 `Body` and `EditorFacility` properties and no mutable state, so the 1 + 3n cost and the
-worked example both still hold.
+worked example both still hold. The full survey of what else should be converted is
+[struct-adoption-audit.md](../services/struct-adoption-audit.md).
 
 ## What was built
 
@@ -392,3 +393,12 @@ whose field types are not all known is skipped as a whole.
    or mutable variants may be friendlier. Defer until adoption shows the need.
 2. **`coerce_to` behavior** (Python/Lua): settled as proposed. A tuple or list with one
    element per field coerces to the structure, in both dynamic clients.
+3. **Nullable structure fields**: two adoption candidates are blocked on them,
+   `SpaceCenter.ActionGroupAction` (a nullable `Module`) and `SpaceCenter.CommNode` (a
+   `Vessel` that only a ground station lacks), and the second gates `CommLink` and
+   `Comms` behind it. Both are class-typed fields, which need no wire change:
+   `ObjectStore.AddInstance (null)` returns 0, still the reserved null id. Per-field
+   presence for value-typed fields remains the tagged-encoding work rejected above. See
+   [struct-adoption-audit.md](../services/struct-adoption-audit.md), and
+   [nested-nullable-values.md](nested-nullable-values.md), which designs a nullable field
+   for every field type without the tagged encoding.

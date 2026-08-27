@@ -258,7 +258,8 @@ fold the parameter/return nullability split into one field. Kept slot-level inst
   model (`ProcedureParameter.Nullable`, handler `ReturnIsNullable`) is unaffected either way.
 
 `Type.nullable` becomes the right schema only if kRPC later wants genuine nullable
-collection elements, which needs a new source-level annotation and is out of #843's scope.
+collection elements, which needs a new source-level annotation and is out of #843's scope. That work is designed in
+[nested-nullable-values.md](nested-nullable-values.md).
 
 ## Server changes (`core/`)
 
