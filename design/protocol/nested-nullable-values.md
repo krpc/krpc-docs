@@ -95,17 +95,17 @@ through that same recursion, which is what to weigh before Phase 3 starts.
   true. This is in band, which the top-level design deliberately avoided. The reasons it gave do
   not apply here: the cost falls only on a position declared nullable, and a presence bool
   collides with nothing because it prefixes the value rather than standing in for it.
-- **Nullable positions are the structure field, the list element, the tuple element and the
+- **Nullable positions are the structure field, the list element, the tuple item and the
   dictionary value**, alongside the three top-level slots. A dictionary **key** and a **set**
   element may not be nullable. A null key carries no meaning and key types are already
   restricted to the six that hash cleanly. A set of nullable values admits at most one null,
   which is well defined and rarely wanted, and it costs `std::optional` hashing in C++ and a
-  parallel flag array in cnano. Both exclusions are a scanner error, so no service produces one
-  and no client decodes one.
+  parallel flag array in cnano. Neither exclusion needs a rule of its own: a position is named
+  rather than counted, and neither has a name.
 - **Value types declare nullability structurally, reference types declare it by attribute.**
   `Nullable<T>` is a real runtime type, so `double? Temperature` and `IList<int?>` need no
   annotation. A reference type carries no nullability at runtime, so it is marked:
-  `[KRPCProperty (Nullable = true)]` on a structure field, and an index path on
+  `[KRPCProperty (Nullable = true)]` on a structure field, and a path of named positions on
   `[KRPCNullable]` for a collection element.
 - **A structure knows its own fields; a collection does not know its elements.** This is what
   splits the phases. `WriteStruct` and `DecodeStruct` already hold the `PropertyInfo` for each
@@ -245,32 +245,94 @@ IDictionary<string, double?>
 Tuple<int?, string>
 ```
 
-A reference type takes an index path on `[KRPCNullable]`, extending the existing attribute
-rather than adding a sibling:
+A reference type takes a path of named positions on `[KRPCNullable]`, extending the existing
+attribute rather than adding a sibling:
 
 ```csharp
+public enum Position
+{
+    Element,                                          // the element of a list
+    Value,                                            // the value of a dictionary
+    Item1, Item2, Item3, Item4, Item5, Item6, Item7   // the items of a tuple
+}
+
 [AttributeUsage (AttributeTargets.Parameter | AttributeTargets.Method |
                  AttributeTargets.Property, AllowMultiple = true)]
 public sealed class KRPCNullableAttribute : Attribute
 {
-    public KRPCNullableAttribute (params int[] path) { Path = path; }
-    public int[] Path { get; }
+    public KRPCNullableAttribute (params Position[] path) { Path = path; }
+    public Position[] Path { get; }
 }
 ```
 
-An empty path is the meaning the attribute has today, so every existing use stands. A path
-indexes `Type.types` at each step, which is the order the wire already uses:
+An empty path is the meaning the attribute has today, so every existing use stands. Each step
+of the path names a position of the type it is applied to, and the next step applies to the
+type at that position:
 
 ```csharp
-[KRPCNullable (0)] IList<Vessel> vessels
-[KRPCNullable (1, 0)] IDictionary<string, IList<Vessel>> byName
-[KRPCNullable] [KRPCNullable (0)] IList<Vessel> maybeVessels
+[KRPCNullable] IList<Vessel> vessels
+[KRPCNullable (Element)] IList<Vessel> crew
+[KRPCNullable (Value)] IDictionary<string, Vessel> byName
+[KRPCNullable (Item2)] Tuple<string, Vessel> named
+[KRPCNullable (Element, Element)] IList<IList<Vessel>> byStage
+[KRPCNullable (Value, Item1)] IDictionary<string, Tuple<Vessel, double>> targets
+```
+
+The examples read with `using static KRPC.Service.Attributes.Position;`. Without it each
+position is written `Position.Element`, as `GameScene` already is on `[KRPCProcedure]`.
+
+Nesting repeats a position name once per level, outermost first. On `IList<IList<Vessel>>`,
+`[KRPCNullable (Element)]` makes the inner **lists** nullable and
+`[KRPCNullable (Element, Element)]` makes the **vessels** nullable. A type with both nullable
+carries both attributes.
+
+`AllowMultiple` covers a type with several nullable positions:
+
+```csharp
+[KRPCNullable]
+[KRPCNullable (Element)]
+IList<Vessel> maybeVessels                                    // the list, and its elements
+
+[KRPCNullable (Value, Item1)]
+[KRPCNullable (Value, Item2)]
+IDictionary<string, Tuple<Vessel, Vessel>> pairs              // both items of every value
 ```
 
 On a method the path applies to the return type, matching how `Nullable = true` already does.
-An out of range index, a path into a type that has no element at that position, and a path onto
-a dictionary key or a set element are all scanner errors. The readability of the path is
-[open question 2](#open-questions).
+
+### One validation rule
+
+A path step is an error when the type at that step has no position by that name. That single
+rule covers every case, with no exclusion written as a special case:
+
+| Path | Applied to | Outcome |
+| --- | --- | --- |
+| `Value` | `IDictionary<string, Vessel>` | the values are nullable |
+| `Value` | `IList<Vessel>` | error, a list has no value |
+| `Item3` | `Tuple<string, Vessel>` | error, the tuple has two items |
+| `Element` | `HashSet<Vessel>` | error, a set has no nameable position |
+| `Key` | anything | does not compile, `Position` has no `Key` |
+
+A dictionary key and a set element are excluded by having no name rather than by a rule that
+rejects them. `Element` is defined as the element of a list, so a set has no position a path
+can reach, and `Position` has no `Key` at all.
+
+### Rejected alternative: integer index paths
+
+`[KRPCNullable (1, 0)]` on `IDictionary<string, IList<Vessel>>`, indexing `Type.types` at each
+step. It is the smallest attribute and it maps directly onto the wire. Rejected because the
+reader has to know that a dictionary key is index 0 and its value is index 1, and because a
+wrong index is usually another valid position rather than an error: `1` on a two-item tuple is
+silently the second item, and on a dictionary silently the value. A named position is checked
+against the container kind, and a dictionary key becomes unspellable rather than a scanner
+error.
+
+### Rejected alternative: marking by element type
+
+`[KRPCNullable (typeof (Vessel))]`, meaning every `Vessel` in the declared type is nullable. It
+needs no position vocabulary and no counting. Rejected because it cannot distinguish two
+occurrences of one type: `Tuple<Vessel, Vessel>` with only the second item nullable is exactly
+the structure-like tuple the phase is for.
 
 ### Rejected alternative: C# nullable reference type annotations
 
@@ -394,7 +456,8 @@ types already use, so a list of nullable ints and a list of ints stay distinct d
   `is_null`, and rewrites the Structures section, which states that a field is never null.
 - `doc/src/extending.rst`: Phase 2 covers the serializable types list, the *Null Values* and
   *Nullable Value Types* sections, and the `KRPCStruct` criteria, which forbid a nullable
-  field. Phase 3 documents the index path on `KRPCNullable` beside the existing form.
+  field. Phase 3 documents `Position` and the path form of `KRPCNullable` beside the existing
+  form.
 
 ## Tests
 
@@ -407,8 +470,7 @@ types already use, so a list of nullable ints and a list of ints stay distinct d
   `Nullable<T>` field and one with a class-typed nullable field, plus the rejection case, a
   null in a non-nullable field. Phase 3 adds a nullable element in each of a list, a dictionary
   value and a tuple, declared once by `Nullable<T>` and once by attribute, a nested case such as
-  `IDictionary<string, IList<Vessel>>`, and the rejection cases, a nullable dictionary key and a
-  nullable set element.
+  `IDictionary<string, IList<Vessel>>`, and a doubly nested case, `IList<IList<Vessel>>`.
 - **Core**: scanner tests for each declaration form and each error, encoder round trips for
   every nullable position, and a check that a non-nullable value still encodes byte for byte as
   it did.
@@ -454,8 +516,8 @@ unreleased, and it gets more expensive with every release that ships the two slo
 
 Follows the same order, on top of a merged Phase 2.
 
-1. Core: `TypeSpec`, the four `Encoder.Encode` call sites, the `[KRPCNullable]` index path, and
-   the scanner validation. Core tests.
+1. Core: `TypeSpec`, the four `Encoder.Encode` call sites, `Position` and the path form of
+   `[KRPCNullable]`, and the scanner validation. Core tests.
 2. TestService fixtures.
 3. Python plus the shared krpctools path.
 4. One step per remaining client: C#, C++, Java, Lua, cnano.
@@ -463,15 +525,15 @@ Follows the same order, on top of a merged Phase 2.
 
 ## Open questions
 
-1. **Whether Phase 3 has a caller.** No service wants a nullable collection element today. The
-   same objection sank `Type.nullable` in [nullable-values.md](nullable-values.md), and sank the
-   2017 version before it, and it now applies to Phase 3 alone. Phase 3 may sit as a design
-   until a service needs it.
-2. **The readability of the `[KRPCNullable]` index path.** `[KRPCNullable (1, 0)]` on
-   `IDictionary<string, IList<Vessel>>` asks the reader to know that a dictionary key is index 0
-   and its value is index 1. Restricting Phase 3 to depth one covers every service anyone has
-   proposed and makes the attribute read plainly. Revisit when Phase 3 starts.
-3. **The C# client's `TypeInfo` shape.** Emitting a static descriptor per nullable position is
+1. **The C# client's `TypeInfo` shape.** Emitting a static descriptor per nullable position is
    the cheapest change, and it splits the client's type handling between reflection and
    generated data. Building every `TypeInfo` from the service definition instead is tidier and
    is a larger change to a client that currently reflects.
+
+## Settled
+
+- **Whether Phase 3 covers more than the dictionary value.** It does. A tuple and a dictionary
+  value are both used the way a structure is, which is where the demand for a nullable field
+  comes from, and a list falls out of the same mechanism with no corner case. A tuple standing
+  in for a structure is still better declared as a `[KRPCStruct]`, which Phase 2 covers.
+- **How a nullable position is named.** By name rather than by index, resolved above.
