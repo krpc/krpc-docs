@@ -393,12 +393,16 @@ whose field types are not all known is skipped as a whole.
    or mutable variants may be friendlier. Defer until adoption shows the need.
 2. **`coerce_to` behavior** (Python/Lua): settled as proposed. A tuple or list with one
    element per field coerces to the structure, in both dynamic clients.
-3. **Nullable structure fields**: two adoption candidates are blocked on them,
+3. **Nullable structure fields**: settled by
+   [nested-nullable-values.md](nested-nullable-values.md), which designs a nullable field for
+   every field type without the tagged encoding. Two adoption candidates are blocked on it,
    `SpaceCenter.ActionGroupAction` (a nullable `Module`) and `SpaceCenter.CommNode` (a
-   `Vessel` that only a ground station lacks), and the second gates `CommLink` and
-   `Comms` behind it. Both are class-typed fields, which need no wire change:
-   `ObjectStore.AddInstance (null)` returns 0, still the reserved null id. Per-field
-   presence for value-typed fields remains the tagged-encoding work rejected above. See
-   [struct-adoption-audit.md](../services/struct-adoption-audit.md), and
-   [nested-nullable-values.md](nested-nullable-values.md), which designs a nullable field
-   for every field type without the tagged encoding.
+   `Vessel` that only a ground station lacks), and the second gates `CommLink` and `Comms`
+   behind it. See [struct-adoption-audit.md](../services/struct-adoption-audit.md).
+
+   Both are class-typed fields, which an earlier draft of this question read as needing no
+   wire change, on the grounds that `ObjectStore.AddInstance (null)` returns the reserved id
+   0. [PR #1017](https://github.com/krpc/krpc/pull/1017) retired that sentinel on the client
+   side: a class value decodes into an object handle built from whatever id arrives, so id 0
+   now yields a live handle rather than a null. A class-typed field needs the mechanism like
+   every other field.
