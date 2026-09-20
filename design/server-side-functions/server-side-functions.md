@@ -1,8 +1,8 @@
 # Server-side functions
 
 **Status:** in progress. Implemented in [PR #1069](https://github.com/krpc/krpc/pull/1069), which
-closes umbrella issue [#679](https://github.com/krpc/krpc/issues/679). Deferred calls and resumable
-functions (under "Yielding procedures inside a function") are designed here and not built.
+closes umbrella issue [#679](https://github.com/krpc/krpc/issues/679). Resumable functions are not
+built; their design moved to [`resumable-functions.md`](resumable-functions.md).
 
 Linked issues: [#517](https://github.com/krpc/krpc/issues/517) (per-element calls in predicates),
 [#503](https://github.com/krpc/krpc/issues/503) (object constants),
@@ -42,12 +42,21 @@ So the algebra keeps the name `Expression` and everything a user invokes is name
 `Expression` for a factory class that contains `Block`, `Loop`, `Goto` and `TryCatch` too. A user
 builds a function out of expressions, which is how every language describes itself.
 
+The split is a naming rule, not a type distinction. A function is the root expression of a tree, so
+`KRPC.RunFunction`, `KRPC.AddFunctionStream` and `KRPC.AddEvent` all take an `Expression`. Each
+names its parameter `function`, which is what tells a reader that the whole tree is wanted rather
+than a node of one. `KRPC.AddEvent` was renamed from `expression` for this, which is the one
+user-visible break the rule costs.
+
 The lambda node is `Expression.Lambda(parameters, body)`, after the LINQ node it maps to. It is
 `Invoke`d or handed to `Select`/`Where`; it is not the whole function, and a block can be handed
 straight to `RunFunction` with no lambda around it.
 
 Prose, error messages and XML doc summaries follow the same split: a node is an expression, the
-whole is a function.
+whole is a function. The tutorial's two properties are properties of a function, the yield message
+reports that a function is evaluated within a single tick, and the client guides introduce the
+feature as a server side function. The API reference page keeps the title `Expressions`, which
+names what it documents, and links the tutorial for the rest.
 
 Whether a client should reach the factories through a builder object (`conn.Expression.Not(...)`)
 rather than through the class is an open question, unaffected by this split.
@@ -76,17 +85,6 @@ helpers, so it stays within the current protocol and composes with the planned #
 improvements (see "Interaction with planned protocol work").
 
 ## Design
-
-### Numeric promotion in binary operators
-
-LINQ expression trees require exact operand type matches, so `int * double` is not directly
-constructible. `Add`, `Subtract`, `Multiply`, `Divide`, `Modulo` and the numeric comparisons
-(`Equal`, `NotEqual`, `GreaterThan(OrEqual)`, `LessThan(OrEqual)`) therefore apply C#'s standard
-binary numeric promotion before building the LINQ node: if either operand is `double` then both go
-to `double`; else `float` to `float`; else `ulong` to `ulong` (an error if the other side is a
-signed type that cannot be implicitly converted); else `long` to `long`; else `uint` plus `int` to
-`long`; else `uint` to `uint`; else `int`. Promotion applies only when both operand types are
-numeric and differ. `Power` converts to double. Explicit `Cast` remains available.
 
 ### Types and introspection
 
@@ -126,6 +124,18 @@ rather than from a `Class<T>`, and its decoder takes the same message, so there 
 type argument alone to drive. `Connection.runFunction` and `Connection.addStream` therefore
 introspect the type and cast the decoded value to `T`, which the compiler cannot check. C# and C++
 follow the design and decode at the type the user names.
+
+### Numeric promotion in binary operators
+
+LINQ expression trees require exact operand type matches, so `int * double` is not directly
+constructible. `Add`, `Subtract`, `Multiply`, `Divide`, `Modulo`, `Power` and the numeric
+comparisons (`Equal`, `NotEqual`, `GreaterThan(OrEqual)`, `LessThan(OrEqual)`) therefore apply C#'s
+standard binary numeric promotion before building the LINQ node: if either operand is `double` then
+both go to `double`; else `float` to `float`; else `ulong` to `ulong` (an error if the other side
+is a signed type that cannot be implicitly converted); else `long` to `long`; else `uint` plus
+`int` to `long`; else `uint` to `uint`; else `int`. Promotion applies only when both operand types
+are numeric and differ. `Power` converts its promoted operands to double for the underlying
+`Math.Pow`, and takes its result at the promoted type. Explicit `Cast` remains available.
 
 ### Constants
 
@@ -242,6 +252,8 @@ Tuples are built by `CreateTuple` and read by `Get`, which special-cases tuple t
 index onto the corresponding `ItemN` property. The index must be a constant, and this is inherent
 rather than a limitation to lift: tuple elements are differently typed, so an index computed at
 evaluation time would leave the resulting node with no static type. It is documented as such.
+A tuple has at most seven elements, matching the flat CLR tuple types; the eighth position holds
+a nested tuple, which is not a shape kRPC can name or carry.
 
 Structures ([#866](https://github.com/krpc/krpc/issues/866)) are built by
 `CreateStruct(type, fieldValues)` and read by `GetField(value, name)`. A field is named to the
@@ -249,11 +261,17 @@ server by the name it is declared with, since the wire type carries only the str
 and name; the Python compiler maps a pythonic attribute name back to the declared one through the
 structure's position in the definitions.
 
-Collections are created empty (`CreateEmptyList`, `CreateEmptySet`, `CreateEmptyDictionary`) and
-mutated by `ListAdd`, `ListSet`, `SetAdd` and `DictionarySet`, with `ListRemove`, `ListRemoveAt`,
-`SetRemove` and `DictionaryRemove` (each reporting whether the value was there) and `ListClear`,
-`SetClear` and `DictionaryClear`. The query surface covers counting, membership, `Select`, `Where`,
-`Any`, `All`, `Skip`, `Take`, `ToList`/`ToSet`, and:
+Collections are built from their elements by `CreateList`, `CreateSet` and `CreateDictionary`, or
+created empty by `CreateEmptyList`, `CreateEmptySet` and `CreateEmptyDictionary`. An empty one
+names its element types, since there is no element to infer them from. Either is then mutated by
+`Append`, `Set`, `Remove`, `RemoveAt` and `Clear`. Each mutation is named for the operation rather
+than the collection, and the type of the collection decides what it does, as `Get` already did for
+a tuple, a list and a dictionary: `Set` writes an element of a list or an entry of a dictionary,
+and `Remove` (reporting whether the value was there) takes a value out of a list or a set and an
+entry out of a dictionary by its key. Appending is `Append` because `Add` is numerical addition.
+The query surface covers counting, membership, `Select`, `Where`,
+`Any`, `All`, `Skip`, `Take`, `ToList`/`ToSet`, the aggregations `Sum`, `Average` and `Min`/`Max`,
+`Aggregate`/`AggregateWithSeed`, and:
 
 * **Dictionary enumeration**: `DictionaryKeys` and `DictionaryValues`, each producing a list rather
   than the `KeyCollection`/`ValueCollection` the CLR returns, because those are nested generic types
@@ -261,7 +279,9 @@ mutated by `ListAdd`, `ListSet`, `SetAdd` and `DictionarySet`, with `ListRemove`
   report the wrong element type to everything downstream.
 * **Element selection**: `First`, `Last`, `ElementAt`, and `MinBy`/`MaxBy`, which give back the
   value producing the smallest or largest key rather than the key.
-* **Reshaping**: `Distinct`, `Reverse`, `Zip`, `Union`/`Intersect`/`Except`, and `GroupBy`.
+* **Reshaping**: `SelectMany`, `Distinct`, `Reverse`, `Zip`, `Union`/`Intersect`/`Except`, `Concat`,
+  `OrderBy`, `GroupBy`, and `BuildDictionary`, which builds a dictionary from a collection by
+  running a key function and a value function on every element.
 
 `GroupBy` produces `IDictionary<K, IList<T>>` rather than LINQ's `IEnumerable<IGrouping<K,T>>`,
 since `IGrouping` is not a type kRPC can carry and a dictionary is what the result is wanted for.
@@ -271,7 +291,8 @@ and `GroupBy` are single-pass helpers rather than LINQ calls.
 **Strings are deliberately not collections.** Every collection operation rejects a string with a
 message saying so, through `CheckIsNotAString`, reached either directly or through
 `CheckIsEnumerable` (which `GetEnumerableValueType` calls). Strings have their own operations
-instead, one `String` prefixed family following `ListAdd`/`SetAdd`/`DictionarySet`. The prefix keeps
+instead, one `String` prefixed family. A string is immutable, so `StringConcat` produces a value
+where `Append` mutates, and the algebra has no character type. The prefix keeps
 `StringLength`, `StringGet` and `StringContains` distinct from the collection operations of the same
 concept, and makes the family sort together in the generated reference and in `doc/order.txt`.
 
@@ -408,8 +429,10 @@ does the same job with primitives the algebra already compiles. Named catches ar
 `YieldException` is not a `[KRPCException]` and so cannot be named.
 
 **Semantics per context** are documented rather than left to be discovered: an exception that
-escapes a function surfaces immediately as an RPC error from `RunFunction`, but from a stream or
-event it becomes an error result on every update for as long as the condition holds.
+escapes a function surfaces immediately as an RPC error from `RunFunction`, and from a stream or
+event it becomes an error result. The server then removes the stream, the rule
+[#269](https://github.com/krpc/krpc/issues/269) settled for every stream, so a client that wants
+to keep watching builds a new one.
 
 `ExceptionSignature` does not record the CLR type of the exception, unlike `ClassSignature`,
 `EnumerationSignature` and `StructSignature`, so resolving `(service, name)` to a type it can
@@ -419,21 +442,22 @@ classes, enumerations and structures.
 
 ### Computed streams and events
 
-`KRPC.AddFunctionStream(Expression expression, bool start = true)` returns a `Stream` message,
-symmetric with `AddStream`. It validates at creation time that the expression's type is a
+`KRPC.AddFunctionStream(Expression function, bool start = true)` returns a `Stream` message,
+symmetric with `AddStream`. It validates at creation time that the function's type is a
 serializable kRPC type (`TypeUtils.IsAValidType` on the static type), with an error message pointing
 at `ToList`/`ToSet` for lazy enumerables.
 
 `FunctionStream : Stream` compiles `Lambda<Func<object>>(Convert(expr, object))` once.
-`UpdateInternal` evaluates it, turning `YieldException` into a skipped tick and any other exception
-into a `Result.Error`, mirroring `ProcedureCallStream`, including value-change detection through
-`ValueUtils.Equal` so unchanged values are not resent. The runtime-typed `Encoder.Encode` serializes
-the boxed result correctly, so no server-side type routing is needed.
+`UpdateInternal` evaluates it and turns any exception into a `Result.Error`. A `YieldException`
+becomes an `InvalidOperationException` naming the pause, per "A yield is an error, and nothing
+retries". Value-change detection through `ValueUtils.Equal` mirrors `ProcedureCallStream`, so
+unchanged values are not resent. The `TypeSpec` built at creation time tells `Encoder.Encode` how to
+serialize the boxed result, so no per-update type routing is needed.
 
 `EventStream.UpdateInternal` has the same handling, so a predicate error becomes a stream error
 result (surfaced by existing client stream machinery as a raised exception) instead of propagating
-out of the per-frame update loop and starving every stream. `AddEvent` reports "expression must be
-of type bool" when given anything else.
+out of the per-frame update loop and starving every stream. `AddEvent` reports "The function must
+evaluate to a boolean value" when given anything else.
 
 **Streams are not unified with procedure-call streams on the server, and are in the clients where
 the language allows.** `AddStream` takes an encoded `ProcedureCall` and `AddFunctionStream` takes an
@@ -463,6 +487,13 @@ user-supplied type parameter (static clients). A void-typed function returns an 
 is why `HasReturnType` exists: an empty collection encodes to an empty payload too, so a client that
 decodes by payload length rather than by type would report `None` for an empty list.
 
+A null value is carried by `ProcedureResult.is_null`, which `RunFunction` gets by declaring its
+`bytes` return nullable. That is the channel every other nullable return uses, and the rule
+[nested-nullable-values.md](../protocol/nested-nullable-values.md) sets for a value at the call
+boundary. A null nested inside the result is an error naming the position, since C# and C++ decode
+at a type the caller names: carrying one would mean writing
+`run_function<std::vector<std::optional<Vessel>>>` for a `std::vector<Vessel>`.
+
 `YieldException` is turned into a plain error, since a procedure that pauses and resumes on a later
 tick cannot be honored by a call that must complete within this one.
 
@@ -472,15 +503,26 @@ Expressions can only call RPCs, so any arithmetic beyond the operator nodes woul
 `math.sqrt` on a streamed value is not otherwise expressible. `StdLib` is a core service supplying
 the missing primitives as ordinary RPCs:
 
-* scalars: `Abs`, `Sqrt`, `Exp`, `Log`, `Floor`, `Ceiling`, `Round`, `Sign`, `Clamp`, `Min`, `Max`,
-  the trigonometric functions (`Sin`/`Cos`/`Tan`/`Asin`/`Acos`/`Atan`) and
+* scalars: `Abs`, `Sqrt`, `Exp`, `Log`, `Log10`, `Floor`, `Ceiling`, `Sign`, `Clamp`, `Min`,
+  `Max`, the trigonometric functions (`Sin`/`Cos`/`Tan`/`Asin`/`Acos`/`Atan`/`Atan2`) and
   `DegreesToRadians`/`RadiansToDegrees`. Exponentiation is the `Power` operator node.
+* the constants `Pi` and `E`, as properties. A client that folds its own `math.pi` into a
+  constant node never calls them, and a tree built through the expression API has no other
+  source for them.
+* one procedure per midpoint rounding rule, matching `Floor` and `Ceiling` beside them rather
+  than taking a mode: `Round` rounds a halfway value to even, as Python and C# do, and
+  `RoundHalfAwayFromZero` and `RoundHalfUp` are the C and Java rules. A client can then round
+  the way its own language does. Each takes the number of decimal places, and `Log` takes the
+  base of the logarithm, so a quantity is a parameter where a rule is a name.
 * vectors and quaternions over the tuple types the SpaceCenter service already uses:
   `VectorAdd`/`Subtract`/`Scale`/`Dot`/`Cross`/`Magnitude`/`Normalize`/`Distance`/`Angle`/`Lerp`,
   and `QuaternionMultiply`/`Inverse`/`Angle`/`Slerp`/`FromAxisAngle`/`RotateVector`.
 
 These exist to be called from inside functions, and are what the client compilers target when they
-see `math.sqrt` (Python) or `System.Math.Sqrt` (C#). Because calls compile to direct typed
+see `math.sqrt` (Python) or `System.Math.Sqrt` (C#). Each compiler holds the number of arguments
+its target takes, so an overload with no equivalent, `Math.Round(x, MidpointRounding.ToZero)` for
+instance, is reported when the function is compiled rather than when the server runs it. A
+rounding mode selects the procedure, so it has to be a constant. Because calls compile to direct typed
 invocations of the underlying method, the JIT inlines them, so the indirection costs nothing at
 evaluation time.
 
@@ -501,7 +543,9 @@ decoding a value whose type the server reports rather than the stub declares.
 * **Java** and **C++**: equivalent typed helpers matching each client's existing stream-construction
   idiom, plus their own run-once helpers. Java decodes by the introspected type, per "Types and
   introspection".
-* **Lua**: no helper; the raw RPCs remain available, and this is documented.
+* **Lua**: no helper. A Lua client builds trees through the ordinary factories, and `RunFunction`
+  hands it back encoded bytes to decode itself. Events and function streams need streams, which
+  the Lua client does not have. The tutorial says which clients support what.
 
 Each helper introspects the type once per function and keeps it. Walking `ReturnType` is a round
 trip per property of every type it is built from, and `run_function` would otherwise pay all of them
@@ -601,9 +645,22 @@ follow-ups below take opposite sides of that trade, and compose rather than comp
 
 ### Deferred calls
 
-Not built. A call form that starts a yielding procedure and returns within the same frame. If the
-call yields, its continuation is scheduled and driven to completion by the core on subsequent
-updates, detached from the function, which carries on immediately.
+Built. `Expression.DeferredCall` and `Expression.DeferredCallWithArguments` start a yielding
+procedure and return within the same frame. If the call yields, its continuation is scheduled and
+driven to completion by the core on subsequent updates, detached from the function, which carries
+on immediately.
+
+The emission wraps the ordinary direct call and its scene check in an `Action`, and passes that to
+`Services.ExecuteDeferredCall` with the procedure's signature. A failure to start the call
+propagates to the function, so an unavailable procedure is still reported to the client. A
+`YieldException` hands a `DeferredCall` to the core, which runs the ones it holds ahead of each
+update's calls and logs a failure against the procedure's name.
+
+Both compilers reach it. Python spells it `krpc.defer(call)`, a marker recognized by identity
+like the `math` module functions, allowed wherever a statement goes. C# spells it
+`Function.Defer(() => call)`, a marker taking a lambda, since a call returning nothing cannot be
+an argument; an expression tree carries a single expression, so it is the whole body of a
+`RunFunction` or `CompileFunction` lambda.
 
 This lets a function trigger an action it does not need to wait for. It is genuinely limited, and
 the limitation falls unevenly across the procedures that yield:
@@ -653,13 +710,9 @@ it is not performed twice. Its costs are a journal per in-flight function, re-ru
 computation on each resumption (quadratic in the number of yields, which is fine when yields are
 few) and cleanup of journals belonging to a disconnected client.
 
-Its semantics are worth stating plainly: replayed reads return the values seen when the function
-started, so a function that spans frames sees a consistent but increasingly stale view of the game.
-That is inherent to any resumable design, not specific to this one; a captured stack would hold the
-same stale locals.
-
-Scope it to `RunFunction` initially. A stream that suspends across updates raises its own questions
-about update rate and staleness that are better answered separately.
+The implementation design is in [`resumable-functions.md`](resumable-functions.md), which covers the
+journal, the call emission, the semantics a user sees and three correctness problems to settle
+first. It is scoped to `RunFunction`, and is a follow-up PR rather than a phase of this one.
 
 ## Client-side compilation
 
@@ -690,8 +743,8 @@ the server uses the parameter's default.
   mapped onto `StdLib`.
 * Statements (`krpc/functionstatements.py`): `if`/`elif`/`else`, `while` and `for` with
   `break`/`continue`, early `return`, local variables including augmented and annotated assignment,
-  assignment to remote properties and to collection elements, `pass`, and calls evaluated purely for
-  their effects.
+  assignment to remote properties and to collection elements, `pass`, calls evaluated purely for
+  their effects, and `krpc.defer(call)` for a procedure that pauses execution.
 * Strings and collections dispatch on the statically tracked type: `len`, `[i]`, `[a:b]`, `in`,
   `.upper()` and `.split()` reach the string operations, with slicing compiling to
   `StringSubstring`. `min`/`max` with a `key` reach `MinBy`/`MaxBy`, `reversed` reaches `Reverse`,
@@ -705,6 +758,9 @@ the server uses the parameter's default.
 for free from an `Expression<Func<TResult>>` lambda, into the same server tree. `AddEvent` accepts a
 boolean lambda, `AddStream` compiles compound lambdas, and `RunFunction` accepts
 `Expression<Action>` lambdas so side-effecting functions can be written in the same style.
+
+`Function.Defer` is the one statement the compiler reaches, and `CompileFunction` has an
+`Expression<Action>` overload so a lambda with no result compiles to a reusable object.
 
 Beyond the operator set: `System.Math` methods map onto `StdLib`; string `+` and `ToString` become
 `StringConcat` and `ConvertToString`; the bitwise complement and the LINQ operators `Skip`, `Take`,
@@ -909,11 +965,10 @@ Two things to get right:
 * **Not leaking deferred handles.** `compile_function`, `run_function`, `add_event` and
   `add_function_stream` must flush and hand the real root handle onward.
 
-**Two cheaper wins to take first.** `remote_type` (`client/python/krpc/expressionutils.py`) is
-uncached, so every `self._remote_type(...)` is a fresh `Type.*` round trip and composite types
-recurse into several more; memoizing on the ptype removes a large and highly repetitive slice of the
-traffic for a few lines. Deduplicating repeated constants is the same shape. Both are worth doing
-regardless, and they change the measurement that decides whether the deferred-handle work is
+**A cheaper win to take first.** `remote_type` (`client/python/krpc/expressionutils.py`) memoizes on
+the serialized ptype, in the `client._expression_remote_types` cache every function on a connection
+shares. Deduplicating repeated constants is the same shape and is still open. It is worth doing
+regardless, and it changes the measurement that decides whether the deferred-handle work is
 justified. That measurement should be taken before building it, by counting factory calls for
 realistic inputs such as the launch-into-orbit tutorial function and the examples under
 `doc/src/scripts/client/python/`.
@@ -955,8 +1010,8 @@ explicit batch helper instead, which is only worth adding if hand-built trees th
   operations.
 * `TypeTest` for the factories and introspection, and `StdLibTest` for the scalar, vector and
   quaternion operations.
-* Stream behavior (value change detection, error capture, yield skip) alongside the existing core
-  stream tests.
+* Stream behavior (value change detection, error capture, a yield reported as an error) alongside
+  the existing core stream tests.
 * `TypeTest` and `ExpressionTest` also cover object identity: two equal factory calls yield the same
   object id, and types and constants differing only in type (`Int` versus `Long`, `ConstantInt(1)`
   versus `ConstantDouble(1.0)`) do not collide. `ObjectStoreTest` covers the equality path itself.
@@ -968,6 +1023,10 @@ explicit batch helper instead, which is only worth adding if hand-built trees th
   existing event and stream test structure.
 * Compiler tests per client covering the accepted language subset and the diagnostics raised for
   unsupported constructs.
+* `service/SpaceCenter/test/test_server_side_functions.py`, in the in-game suite, against a vessel
+  on the launchpad: reading the game state, a single tick shared by every call, comprehensions and
+  loops over the vessel's parts, side effects, `StdLib` on the game's vectors, a function stream, an
+  event, and a deferred `WarpTo` beside the error a yielding procedure produces without it.
 
 Three behaviors are decided rather than merely implemented, and each is covered explicitly: the
 collection operations reject a string with the intended message rather than an internal exception;
@@ -1016,6 +1075,6 @@ test sources include `krpc/services/krpc.hpp` before `services/test_service.hpp`
 * Batched tree construction, designed above; client-side only, and gated on measuring real tree
   sizes first.
 * Bounding the time a loop can run for, so that a runaway function cannot hang the game.
-* Deferred calls and resumable functions, designed under "Yielding procedures inside a function".
+* Resumable functions, designed under "Yielding procedures inside a function".
 * Calling arbitrary CLR members from a function, sketched in
   [server-side-arbitrary-expressions.md](server-side-arbitrary-expressions.md).
