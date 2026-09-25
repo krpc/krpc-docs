@@ -1,9 +1,14 @@
 # Nullable values inside structures and collections
 
-**Status:** proposal (2026-08-28). Follow-up to
+**Status:** in progress (as of 2026-09-02). Follow-up to
 [nullable-values.md](nullable-values.md), which made a parameter or a return value nullable but
 left every nested position non-nullable. Unblocks open question 3 of
 [struct-types.md](struct-types.md). No issue yet.
+
+All three phases landed across the schema, the server, krpctools and every client, merged as
+[PR #1091](https://github.com/krpc/krpc/pull/1091). Every client holds nullability the way
+[The shape a client takes](#the-shape-a-client-takes) sets out. Outstanding: the service
+adoptions of Phase 2 step 5.
 
 Split into three phases, each mergeable on its own. **Phase 1** moves nullability onto the
 `Type` message, a wire format change with no change in behavior. **Phase 2** makes a structure
@@ -49,6 +54,7 @@ a class-typed field needs no wire change, because `ObjectStore.AddInstance (null
 reserved id 0. #1017 retired that on the client side: Python builds an object handle from
 whatever id arrives (`client/python/krpc/decoder.py:91`), so id 0 now yields a live handle
 rather than a null. A class-typed field needs the mechanism below like every other field.
+The server keeps the mapping, and the decision below takes it out.
 
 ### Nullability was on `Type` once
 
@@ -90,6 +96,11 @@ through that same recursion, which is what to weigh before Phase 3 starts.
   `false` costs nothing. A value nested inside another value has no such field, so it carries a
   leading presence bool instead. Declaration is uniform; carriage follows what the position can
   afford.
+- **The object id 0 is not a null.** `ObjectStore` maps a null to the id 0 and back, which
+  is how a null reached a class-typed slot before #1017. Nullability is declared on the type
+  and carried beside the value, so the mapping goes: adding a null is an error, and the id 0
+  names no object. A client that sends 0 for a class value gets an error rather than a null
+  at a position that never declared one.
 - **A nullable value carries a leading presence bool.** At a nested position, `Type.nullable`
   means the encoded value is a bool, followed by the value's ordinary encoding when the bool is
   true. This is in band, which the top-level design deliberately avoided. The reasons it gave do
@@ -393,11 +404,15 @@ Build a descriptor once, in the scanner:
 
 ```csharp
 sealed class TypeSpec {
-    public System.Type Type;   // the unwrapped type
+    public System.Type Type;          // the unwrapped type
+    public System.Type DeclaredType;  // the type as declared, which keeps Nullable<T>
     public bool Nullable;
     public TypeSpec[] Types;   // element specs, mirroring Type.types
 }
 ```
+
+The declared type is what the decoder builds a collection from, so a position that can hold a
+null is able to hold one: an `IList<int?>` rather than an `IList<int>`.
 
 `ParameterSignature` and `ProcedureSignature` hold it. It subsumes three walks of the C# type
 that are separate today: `MessageExtensions.ToProtobufMessage (this Type)`,
@@ -417,6 +432,15 @@ rest is the scanner reading the paths off `[KRPCNullable]`, validating them agai
 and folding them together with the `Nullable<T>` positions into the spec. `ValueUtils.Equal`
 needs no change, since it compares a null operand before it dispatches on type.
 
+The spec replaces the runtime-type dispatch rather than sitting beside it. The encoder reads
+the type from the spec at every position, so a value is encoded as the type that declares it.
+A procedure declaring `IList<T>` and returning an array encodes, where the runtime type gave
+no serializable type at all.
+
+A null at a position that does not allow one is an error at encode, naming the position and
+the type holding it. There is none to catch at decode: no encoding decodes to a null once the
+object store rejects the id 0.
+
 ## Client changes
 
 Every client follows one rule: at a position whose type is nullable, read or write the presence
@@ -425,11 +449,11 @@ declared type and how the language spells a null.
 
 | Client | Where the declared type comes from | Null value |
 | --- | --- | --- |
-| Python | `TypeBase` gains `nullable`, resolved through the non-nullable type so the generated class is shared | `None`, with `Optional[...]` in the generated stubs |
+| Python | `TypeBase` gains `nullable`, and the nullable form of a type is a copy sharing its python type | `None`, with `Optional[...]` in the generated stubs |
 | Lua | the same type model as Python | `Types.none`, the sentinel that already keeps a null out of a table without leaving a hole |
 | Java | `Encoder.encode` already threads the wire `Type` through its recursion, so the flag arrives with no plumbing | a boxed `Integer`, held as null |
-| C++ | template overloads | `std::optional<T>`, except a class type, where an `Object<T>` with id 0 is already the null representation (`client/cpp/include/krpc/object.hpp:35`) |
-| C# | reflects the generated type, so a nullable reference position is invisible; clientgen emits an explicit `TypeInfo` | `int?`, and a plain reference type |
+| C++ | template overloads | `std::optional<T>`, a class type included, so one rule covers every type |
+| C# | reflects the generated type, so a nullable reference position is invisible; clientgen emits an explicit `TypeSpec` | `int?`, and a plain reference type |
 | cnano | generated per type | a companion `bool` |
 
 Phase 1 is a read-site change in every client, from `Parameter.nullable` and
@@ -440,14 +464,123 @@ above. The reflection-based clients carry most of the remaining cost, and only i
 nullable structure field is visible there, because clientgen generates the structure class and
 can give the field a nullable type. A nullable collection element is not: `IList<int?>` is self
 describing and `IList<Vessel>` declared nullable by attribute is not. Clientgen emits a static
-`TypeInfo` describing the nullable positions, which the generated stub passes to the encoder in
-place of `typeof (...)`.
+`TypeSpec` naming the nullable positions, which the generated stub passes to the encoder in
+place of `typeof (...)`. Specs are interned per service, so a shape is built once.
+
+A stream and a call built from an expression read no stub body: the C# type in the expression
+is all they have. So the generated service also holds the spec of every procedure whose values
+that type cannot describe, keyed by procedure name and reached through the `RPCAttribute` on
+the stub. Java resolves its wire `Type` through `@RPCInfo` the same way.
 
 **cnano** stores collection items by value, `krpc_list_int32_t { size_t size; int32_t * items; }`,
 so there is no free null anywhere. A nullable position takes a companion `bool`: a member beside
 a nullable structure field, and, in Phase 3, a parallel array beside nullable items. A nullable
 element type is named as its own generated type, following the naming scheme the collection
 types already use, so a list of nullable ints and a list of ints stay distinct declarations.
+
+## The shape a client takes
+
+Three rules, which fall out of the wire format. Hold a client against them when its step lands,
+and rework it to them where it does not fit.
+
+1. **The type at a position carries whether that position can hold null.** Nullability belongs
+   to the position, and the type there is the one thing every part of a client already has. So a
+   client holds no flag beside a type.
+2. **A slot and a position are different operations.** A slot carries its null out of band and
+   encodes as the value alone; a value inside another value carries a leading presence bool. The
+   codec has an entry point for each, and the slot one ignores the nullability of the type it is
+   given. This mirrors the server's `EncodeObject` against its `EncodeItem`.
+3. **The nullable form of a type shares the language type of the non-nullable one.** A class has
+   one generated class and a structure one generated structure, however the position holding it
+   is declared, so identity and equality still hold across a nullable position.
+
+What each part of a client looks like:
+
+| Part | Shape |
+| --- | --- |
+| Type model | one type object per type and nullability; the nullable form is built from the non-nullable one and shares its language type |
+| Slot codec | `encode (value, type)` and `decode (data, type)`, ignoring the type's nullability |
+| Position codec | `encode_item (value, type)` and `decode_item (data, type)`, reading it |
+| Collections | a collection holds the types of the positions inside it, and nullability arrives with them |
+| Structure fields | fields are set as a name and a type; the field's type carries whether it can be null |
+| Coercion | a null passes at a position whose type is nullable, and is rejected at one whose type is not |
+| Generated stubs | name a nullable position by its type, `list_type (nullable (class_type ("S", "C")))` |
+| Documentation | a nullable position is described from its type alone |
+
+A language that spells nullability in the type itself satisfies rules 1 and 3 for free:
+`std::optional<T>` in C++, a generated `krpc_nullable_object_t` in cnano. A language whose type
+model is the wire `Type` satisfies them by setting `nullable` on it, as Java does.
+
+### Where each client stands
+
+| Client | Carries nullability in | Conforms |
+| --- | --- | --- |
+| Python | the type object, `TypeBase.nullable` | yes |
+| C++ | the C++ type, `std::optional<T>` | yes |
+| cnano | the generated C type, `krpc_nullable_object_t` | yes |
+| Java | the wire `Type`, through `Types.nullable` | yes |
+| Lua | the type object, `TypeBase.nullable` | yes |
+| C# | the type object, `TypeSpec` | yes |
+
+**C#** carried the same fact three ways at first: the CLR type, a `TypeSpec` and
+`TypeInfo.ArgumentIsNullable`, with `EncodeItem (value, type, nullable, spec)` taking two of
+them beside the type. `TypeSpec` is the one that can describe every position, since a
+reference-typed one is invisible in the CLR type, so it became the client's type object. A stub
+names a spec everywhere it once named a `typeof (T)`, and `TypeSpec.For` builds the one a CLR
+type gives on its own. The stream and expression paths have only that, so they take the spec
+the service declares for the procedure instead, as [Client changes](#client-changes) sets out.
+The client's `TypeSpec` mirrors the server's.
+
+### What it rules out
+
+Each of these is a second place the same fact lives, and each was in the first Python
+implementation:
+
+- a parallel `value_nullable` or `field_nullable` list beside a collection's or a structure's
+  types
+- a `nullable` argument passed beside a type through a codec, a coercion or a generator
+- a `has_nullable_fields` memo, or any flag derived once and stored beside what it came from
+- a structure field registered as a name, a type and a nullability triple
+- a second read of the service definition for a flag the type already carries
+- a nullable type resolving to the non-nullable type object, which throws the flag away and
+  forces all of the above
+
+### Reworking one client
+
+1. Give the type model the nullable form: one type per type and nullability, built from the
+   non-nullable one, sharing its language type and whatever the type store binds after
+   construction. Key the type cache on nullability too, so a list of nullable values and a list
+   of values are distinct types.
+2. Split the codec into the slot and position entry points, and delete the nullability argument
+   from the position one.
+3. Take the flag out of the collection and structure types, and out of coercion and structure
+   field registration.
+4. Point the client's krpctools backend at the type: the generated stubs name the nullable form,
+   and the docs are rendered from the type alone.
+5. Regenerate the golden fixtures. Only that client's should change.
+
+The rework is one commit, amended into that client's step rather than added after it. The steps
+of a phase are not green in turn, so judge the branch by its tip: `bazel test //:test`,
+`bazel build //...`, then that client's own target and `//tools/krpctools:test`. A fixture that
+moves for another language means a backend changed behavior rather than where it reads
+nullability.
+
+### Tests a client needs
+
+Beyond the round trips already listed under [Tests](#tests), the cases that catch the failures
+this shape is for:
+
+- a nullable type of every kind resolves to a type sharing the language type of its
+  non-nullable form
+- a value at a nullable position holding a collection, and one holding a structure, at the byte
+  level: the presence bool sits ahead of the whole encoding
+- a structure field that is a collection with a nullable element
+- a stream of a collection with a nullable element, which is the only path that reaches the
+  presence bool through the stream decoder
+- a null at a position that cannot hold one is rejected by coercion
+- a nullable set element and a nullable dictionary key, which no service declares: a client that
+  reads the type at every position handles them, and one that names the positions instead reads
+  the presence byte as part of the value
 
 ## Documentation
 
@@ -507,9 +640,10 @@ unreleased, and it gets more expensive with every release that ships the two slo
 3. Python plus the shared krpctools path, which unblocks every generator.
 4. One step per remaining client, each carrying that client's generator backend, its runtime
    codec, its golden fixtures and its tests: C#, C++, Java, Lua, cnano.
-5. The service adoptions Phase 2 is for: `SpaceCenter.CommNode`, `ActionGroupAction`, and
-   `CommLink` and `Comms` behind them. See
-   [struct-adoption-audit.md](../services/struct-adoption-audit.md).
+5. The service adoptions Phase 2 is for: `SpaceCenter.CommNode` and `ActionGroupAction`.
+   `CommLink` stays a class, since its `SignalStrength` is a live reading a client streams. See
+   [struct-adoption-audit.md](../services/struct-adoption-audit.md). In progress, separately
+   from steps 1 to 4.
 6. Changelogs, as the final commit before merging.
 
 ### Phase 3: nullable collection elements
@@ -523,12 +657,11 @@ Follows the same order, on top of a merged Phase 2.
 4. One step per remaining client: C#, C++, Java, Lua, cnano.
 5. Changelogs.
 
+Steps 1 to 5 are implemented.
+
 ## Open questions
 
-1. **The C# client's `TypeInfo` shape.** Emitting a static descriptor per nullable position is
-   the cheapest change, and it splits the client's type handling between reflection and
-   generated data. Building every `TypeInfo` from the service definition instead is tidier and
-   is a larger change to a client that currently reflects.
+None.
 
 ## Settled
 
@@ -537,3 +670,14 @@ Follows the same order, on top of a merged Phase 2.
   comes from, and a list falls out of the same mechanism with no corner case. A tuple standing
   in for a structure is still better declared as a `[KRPCStruct]`, which Phase 2 covers.
 - **How a nullable position is named.** By name rather than by index, resolved above.
+- **The C# client's descriptor shape.** A static `TypeSpec` per nullable shape, interned per
+  service, rather than a `TypeInfo` built from the service definition. The reflection the client
+  already does covers every position a CLR type can describe, and the spec covers the rest.
+  Reading nullability from the spec alone is the rework above, not a change of shape.
+- **How a client holds nullability.** On the type at the position, per
+  [The shape a client takes](#the-shape-a-client-takes). Python, Lua and C# landed with the
+  flag beside their types first, and were reworked. C++ landed with a nullable class at a
+  slot spelled as the id-0 object, and was reworked to `std::optional` everywhere. The cnano
+  client landed with nullability passed beside the type, and only some positions taking the
+  nullable form. It was reworked to a slot and a position entry point, reading the type at
+  each.

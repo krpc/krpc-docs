@@ -1,11 +1,15 @@
 # Nullable values and default-value presence (issue #843)
 
-**Status:** in progress (as of 2026-07-24). Phases 1–6 implemented — protocol schema, core server
-+ enforcement, TestService fixtures, the Python client and shared krpctools path, the SpaceCenter
-services audit + workaround revert, and every client (C#, C++, Java, Lua, cnano). Only the final
-changelog commit remains pending. Tracked by
-[issue #843](https://github.com/krpc/krpc/issues/843); each phase's implementation notes are
-inline under [Implementation phases](#implementation-phases).
+**Status:** done, merged as [PR #1017](https://github.com/krpc/krpc/pull/1017), closing
+[issue #843](https://github.com/krpc/krpc/issues/843). All six phases landed — protocol schema,
+core server + enforcement, TestService fixtures, the Python client and shared krpctools path, the
+SpaceCenter services audit + workaround revert, and every client (C#, C++, Java, Lua, cnano).
+Each phase's implementation notes are inline under
+[Implementation phases](#implementation-phases).
+
+This is a record of the design as it was decided.
+[nested-nullable-values.md](nested-nullable-values.md) later moved nullability onto the `Type`
+message and extended it to structure fields and collection elements.
 
 ## Context
 

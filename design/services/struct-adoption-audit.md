@@ -1,12 +1,13 @@
 # Audit: RPCs that should return a structure
 
-**Status:** proposal. No issue yet. Follows
+**Status:** in progress. No issue yet. Follows
 [structure types](../protocol/struct-types.md) (issue
 [#866](https://github.com/krpc/krpc/issues/866)), which landed in the unreleased 0.7.0 cycle and
 named two first-adoption candidates without surveying the rest. This audit does that survey.
 
-Nothing under `service/` uses `[KRPCStruct]` today. The only structures in the tree are the test
-fixtures in `tools/TestServer/src/TestService.cs` and `core/test/Service/TestService.cs`.
+The three conversions that nullable fields blocked are done, as step 5 of Phase 2 of
+[nested nullable values](../protocol/nested-nullable-values.md). Everything else here is
+outstanding.
 
 Each conversion below is its own issue and its own PR. All of them are breaking, except the
 `RCS.Override` merge in the last section.
@@ -33,13 +34,13 @@ already in `doc/src/extending.rst`.
 
 1. Every `[KRPCProperty]` is read-only. A setter mutates game state, which a value cannot do.
 2. There are no `[KRPCMethod]` members. `ServiceSignature.AddStruct` collects fields only.
-3. No field is nullable, sets a `GameScene`, or makes the structure recursive.
+3. No field sets a `GameScene` or makes the structure recursive. A field may be null.
 4. Clients read the fields together, and a snapshot taken at the call is what they want. A class
    whose value a client holds and re-reads is a live view, and stays a class.
 5. Every field is cheap. A structure computes all of them on every read.
 
 A nullable *return* composes fine. `[KRPCProcedure (Nullable = true)]` on a structure generates
-`TestStruct?` in the C# client. Only fields may not be null.
+`TestStruct?` in the C# client.
 
 A structure carries no `GameScene`, but the four classes recommended below are all reached through
 a Flight-scoped member, so the restriction survives on the producing RPC.
@@ -61,27 +62,20 @@ behavior at all. It is the worked example in `doc/src/extending.rst`, under the 
 so a structure pays that on every read of the record. It is still worth converting, because
 `Experiment.Data` returns a list and a client reading one field of one record is rare.
 
-## Blocked on nullable structure fields
+## Converted, once a structure field could be null
 
-| Class | Fields | Blocker |
+| Class | Fields | Nullable field |
 | --- | --- | --- |
-| `ActionGroupAction` | 4 | `Module` is `Nullable = true`, null only under Extended Action Groups |
-| `CommNode` | 5 | `Vessel` throws for a ground station rather than returning null |
+| `ActionGroupAction` | 4 | `Module`, null only under Extended Action Groups |
+| `CommNode` | 5 | `Vessel`, null for a ground station |
 
-Both are otherwise textbook records. `ActionGroupAction` stores all four values at construction
-and has no methods, and `Control.GetActionGroupActions` returns a list of them.
+[nested nullable values](../protocol/nested-nullable-values.md) made a structure field nullable,
+which is what these two waited on. `CommNode.Vessel` reads as null for a node that is not a
+vessel, in place of the exception it threw.
 
-`CommNode` gates `CommLink` as well. `CommLink` has four read-only fields, no methods, and builds
-its two `CommNode` values eagerly in its constructor, so it is already a snapshot in all but name.
-`Comms.ControlPath` returns a list of them.
-
-[structure types](../protocol/struct-types.md) made fields non-nullable in v1 and put per-field
-presence behind the tagged encoding it rejected. That is the right call for value-typed fields. It
-is more than this shape needs: both blockers are class-typed fields, and
-`ObjectStore.AddInstance (null)` already returns 0, which is still the reserved null id. A
-class-typed field can therefore carry null with no wire change. What stands in the way is the null
-guard in `Encoder.WriteStruct` and `Encoder.DecodeStruct`, the `ValidateStructFields` rejection of
-`Nullable`, and decoding id 0 as absent in each client.
+`Control.GetActionGroupActions` returns a list of `ActionGroupAction` values, and `CommLink.Start`
+and `CommLink.End` are `CommNode` values. A two-hop control path read in full is 9 calls rather
+than 29.
 
 ## Blocked on other rules
 
@@ -102,6 +96,11 @@ is a straight conversion even once the methods move, for the reason under *Leave
 read of `SignalStrength`, so it fails rule 5. `Stage` has the same shape: its `Parts` field would
 build a part list per stage on every read of `Vessel.Stages`. A structure for either one has to
 drop the collection field, which is an API redesign rather than a migration.
+
+`CommLink` fails rule 4, which the count of read-only fields hides. `Type` and `SignalStrength`
+are live readings, rewritten by the game as it rebuilds the network, and a client watching one hop
+wants to stream that one double rather than the whole control path. The two `CommNode` values a
+link holds are snapshots, so `Start` and `End` cost one call each.
 
 Outside SpaceCenter there are no candidates at all. All 26 classes in Drawing, UI,
 InfernalRobotics, KerbalAlarmClock, RemoteTech, LiDAR and DockingCamera wrap a Unity `GameObject`
