@@ -1,6 +1,6 @@
 # Server-side functions
 
-**Status:** in progress. Implemented in [PR #1069](https://github.com/krpc/krpc/pull/1069), which
+**Status:** done in [PR #1069](https://github.com/krpc/krpc/pull/1069), open for review, which
 closes umbrella issue [#679](https://github.com/krpc/krpc/issues/679). Resumable functions are not
 built; their design moved to [`resumable-functions.md`](resumable-functions.md).
 
@@ -140,6 +140,10 @@ are numeric and differ. `Power` converts its promoted operands to double for the
 `Math.Pow`, and takes its result at the promoted type. `Conditional` promotes its two branches the
 same way. Explicit `Cast` remains available.
 
+`Negate` follows the unary form of the same rules: a `uint` is negated as a `long`, and a `ulong`
+is an error, as in C#. The compilers used to multiply by `-1`, which gave a `uint` operand the
+wrong type and a `ulong` one no type at all.
+
 A value used in a position of a fixed type follows one rule: a numeric conversion that widens is
 implicit, and one that narrows needs `Cast`. The positions are:
 
@@ -157,7 +161,8 @@ passes through.
 ### Constants
 
 Value constants are `ConstantDouble`, `ConstantFloat`, `ConstantInt`, `ConstantLong`,
-`ConstantUInt`, `ConstantULong`, `ConstantBool` and `ConstantString`. The Python compiler gives
+`ConstantUInt`, `ConstantULong`, `ConstantBool`, `ConstantString` and `ConstantBytes`. Both
+compilers use the wide integer constants, so a constant outside `int` keeps its value. The Python compiler gives
 an integer literal the narrowest of `int`, `long` and `ulong` that holds it, and the exact type of a
 parameter it is passed to.
 
@@ -254,7 +259,9 @@ exposing it as factories with kRPC-shaped semantics.
   innermost-first.
 * Early exit: `Return(value)` and `ReturnNothing()` are likewise markers, bound to a label that
   `Expression.Lambda` wraps around the function body, so a return anywhere in a nested block leaves
-  the whole function.
+  the whole function. A body that ends with a statement, such as an `IfThenElse` returning on both
+  branches, takes its result type from its first `Return(value)`. Reaching the end of such a body
+  raises `KRPC.InvalidOperationException`.
 * Side effects: calls to procedures with no return value (including property setters) are ordinary
   statement expressions, and collections can be built imperatively.
 
@@ -299,11 +306,11 @@ structure's position in the definitions.
 Collections are built from their elements by `CreateList`, `CreateSet` and `CreateDictionary`, or
 created empty by `CreateEmptyList`, `CreateEmptySet` and `CreateEmptyDictionary`. An empty one
 names its element types, since there is no element to infer them from. Either is then mutated by
-`Append`, `Set`, `Remove`, `RemoveAt` and `Clear`. Each mutation is named for the operation rather
-than the collection, and the type of the collection decides what it does, as `Get` already did for
-a tuple, a list and a dictionary: `Set` writes an element of a list or an entry of a dictionary,
-and `Remove` (reporting whether the value was there) takes a value out of a list or a set and an
-entry out of a dictionary by its key. Appending is `Append` because `Add` is numerical addition.
+`Append`, `Set`, `Remove`, `RemoveAt` and `Clear`, which "Collection operations named by what they
+do" below covers. `Get` of a missing dictionary key raises `KRPC.ArgumentException`, where the CLR
+indexer's `KeyNotFoundException` has no kRPC type. `ContainsKey` tests for a key, and `Contains`
+rejects a dictionary with a message pointing at it, since the CLR would compare key and value pairs.
+`StringSplit` gives a `List<string>`, so the parts can be appended to.
 The query surface covers counting, membership, `Select`, `Where`,
 `Any`, `All`, `Skip`, `Take`, `ToList`/`ToSet`, the aggregations `Sum`, `Average` and `Min`/`Max`,
 `Aggregate`/`AggregateWithSeed`, and:
@@ -322,6 +329,27 @@ The query surface covers counting, membership, `Select`, `Where`,
 since `IGrouping` is not a type kRPC can carry and a dictionary is what the result is wanted for.
 Its key type is checked against the dictionary key rules when the node is built. `MinBy`, `MaxBy`
 and `GroupBy` are single-pass helpers rather than LINQ calls.
+
+#### Collection operations named by what they do
+
+The mutations were first one node per collection and operation. Eleven nodes collapse into five,
+each named for the operation, with the type of the collection deciding what it does:
+
+| Node | List | Set | Dictionary | Replaces |
+| --- | --- | --- | --- | --- |
+| `Append(c, value)` | adds at the end | adds | - | `ListAdd`, `SetAdd` |
+| `Set(c, index, value)` | writes an element | - | writes an entry | `ListSet`, `DictionarySet` |
+| `Remove(c, value)` | removes a value | removes a value | removes by key | `ListRemove`, `SetRemove`, `DictionaryRemove` |
+| `RemoveAt(list, index)` | removes by position | - | - | `ListRemoveAt` |
+| `Clear(c)` | empties | empties | empties | `ListClear`, `SetClear`, `DictionaryClear` |
+
+* **The shape follows `Get`**, which already read a tuple, a list and a dictionary through one
+  node. A client learns one verb per operation, and the compilers dispatch on the tracked type
+  rather than choosing a node per collection.
+* **`Append` is not `Add`**, because `Add` is numerical addition.
+* **Each node checks the kind of collection it was given.** The old `ListAdd`, `ListRemove`,
+  `ListClear` and `SetClear` went through `ICollection`, so `ListAdd(set, value)` added to a set.
+  The checks make a wrong collection an error when the tree is built.
 
 **Strings are deliberately not collections.** Every collection operation rejects a string with a
 message saying so, through `CheckIsNotAString`, reached either directly or through
@@ -480,7 +508,8 @@ classes, enumerations and structures.
 `KRPC.AddFunctionStream(Expression function, bool start = true)` returns a `Stream` message,
 symmetric with `AddStream`. It validates at creation time that the function's type is a
 serializable kRPC type (`TypeUtils.IsAValidType` on the static type), with an error message pointing
-at `ToList`/`ToSet` for lazy enumerables.
+at `ToList`/`ToSet` for lazy enumerables. A void function and a protocol buffer message type, which
+`Type.Code` cannot describe, each get their own message, and `ReturnType` applies the same check.
 
 `FunctionStream : Stream` compiles `Lambda<Func<object>>(Convert(expr, object))` once.
 `UpdateInternal` evaluates it and turns any exception into a `Result.Error`. A `YieldException`
@@ -586,10 +615,15 @@ decoding a value whose type the server reports rather than the stub declares.
   returning `None` for a void function.
 * **C#**: `Connection.AddStream<T>(Services.KRPC.Expression)` and `Connection.RunFunction<T>(...)`
   overloads, where the user supplies `T`; a non-generic `RunFunction` covers functions with no
-  result.
-* **Java** and **C++**: equivalent typed helpers matching each client's existing stream-construction
-  idiom, plus their own run-once helpers. Java decodes by the introspected type, per "Types and
-  introspection".
+  result. `T` is checked against the introspected type, so a void function or a mismatch throws
+  rather than decoding bytes as the wrong type. A compiled `Func<T>` lambda skips the check, as its
+  type comes from the lambda.
+* **C++**: `run_function<T>` and `add_function_stream<T>` check `T` the same way, through a trait
+  mapping C++ types onto type codes. Generated class, enumeration and structure types carry no
+  names, so only their kind is compared.
+* **Java**: typed helpers matching the client's stream-construction idiom, plus a run-once
+  helper. Java decodes by the introspected type, per "Types and introspection", so there is no
+  `T` to check.
 * **Lua**: no helper. A Lua client builds trees through the ordinary factories, and `RunFunction`
   hands it back encoded bytes to decode itself. Events and function streams need streams, which
   the Lua client does not have. The tutorial says which clients support what.
