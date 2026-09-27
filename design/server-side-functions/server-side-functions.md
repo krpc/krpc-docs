@@ -156,8 +156,10 @@ passes through.
 
 ### Constants
 
-Value constants are `ConstantDouble`, `ConstantFloat`, `ConstantInt`, `ConstantBool` and
-`ConstantString`.
+Value constants are `ConstantDouble`, `ConstantFloat`, `ConstantInt`, `ConstantLong`,
+`ConstantUInt`, `ConstantULong`, `ConstantBool` and `ConstantString`. The Python compiler gives
+an integer literal the narrowest of `int`, `long` and `ulong` that holds it, and the exact type of a
+parameter it is passed to.
 
 `ConstantObject(ulong value)` is a constant object reference, passed as its object identifier (the
 same `uint64` the protocol already uses to encode class instances; `0` is null, which is rejected
@@ -844,6 +846,17 @@ instance as a fixed argument, and embedded with `Call`. The instance is a consta
 
   `ContainsKey` and a `Range` node would replace two of these. A client side call written as a
   statement is an error, since it would run once, at compile time.
+* Integer results keep their server type. `//` is an exact integer floor division built from
+  `Divide` and `Modulo`, and integer `abs`, `min` and `max` are `Conditional` on temporaries.
+  `int()` and `round()` of an integer are the integer itself, and of a float give an `int`. A
+  negative constant index counts from the end through `Count` or `StringLength`, and a string
+  slice clamps its bounds to the length, as Python does.
+* A final `if`/`else` whose branches both return compiles to a `Conditional` of two blocks, so
+  the function's value is its last expression.
+* `except ValueError` catches the three argument exceptions, and a tuple in `except` gives one
+  catch per exception, all recording the same clause.
+* Left as documented differences: integer overflow wraps, a server computed negative index or
+  exponent, negative slice bounds, and `str()` of a float using the server's formatting.
 * An enumeration value captured from the client compiles to a `Cast` of an integer constant rather
   than `ConstantEnum`. The value comes from the client's own enumeration, so it is a member.
 * `raise` and `try`/`except` map onto the exception nodes. A `try` with one `except` is one
@@ -939,8 +952,7 @@ The mechanism differs. `Expression` wraps an arbitrary LINQ tree, and those have
 equality, so a blanket `Equals` override is not available: value equality is well defined for
 constant nodes and for nothing else. The factories intern instead, through a
 `Dictionary<Tuple<System.Type, object>, Expression>` keyed on the constant's type and value,
-consulted by `ConstantDouble`, `ConstantFloat`, `ConstantInt`, `ConstantBool`, `ConstantString` and
-`ConstantEnum`.
+consulted by every value constant factory and `ConstantEnum`.
 Reference equality then does the deduplication in the object store with no equality override at all,
 and the allocation is avoided as well. Sharing is safe because LINQ trees are immutable and sharing
 a subexpression between trees is supported. The key includes the type so that `ConstantInt(1)`,
