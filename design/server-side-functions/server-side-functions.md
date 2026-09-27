@@ -50,7 +50,9 @@ user-visible break the rule costs.
 
 The lambda node is `Expression.Lambda(parameters, body)`, after the LINQ node it maps to. It is
 `Invoke`d or handed to `Select`/`Where`; it is not the whole function, and a block can be handed
-straight to `RunFunction` with no lambda around it.
+straight to `RunFunction` with no lambda around it. A function that uses `Return` is the exception:
+it is a parameterless lambda, invoked, since `Return` binds to a lambda (see "Statements, control
+flow and side effects").
 
 Prose, error messages and XML doc summaries follow the same split: a node is an expression, the
 whole is a function. The tutorial's two properties are properties of a function, the yield message
@@ -135,7 +137,17 @@ both go to `double`; else `float` to `float`; else `ulong` to `ulong` (an error 
 is a signed type that cannot be implicitly converted); else `long` to `long`; else `uint` plus
 `int` to `long`; else `uint` to `uint`; else `int`. Promotion applies only when both operand types
 are numeric and differ. `Power` converts its promoted operands to double for the underlying
-`Math.Pow`, and takes its result at the promoted type. Explicit `Cast` remains available.
+`Math.Pow`, and takes its result at the promoted type. `Conditional` promotes its two branches the
+same way. Explicit `Cast` remains available.
+
+A value used in a position of a fixed type follows one rule: a numeric conversion that widens is
+implicit, and one that narrows needs `Cast`. The positions are:
+
+* a procedure argument (`CallWithArguments`, `DeferredCallWithArguments`);
+* a collection element, a dictionary key or value, the value given to `Append`, `Set`, `Remove`
+  and `Contains`, and the key given to `Get` on a dictionary;
+* a structure field (`CreateStruct`);
+* a variable assignment (`Assign`), and an argument to `Invoke`.
 
 ### Constants
 
@@ -158,13 +170,13 @@ it when the node is built.
 ### Calls
 
 `Expression.Call(ProcedureCall call)` embeds an RPC whose arguments are fixed when the node is
-built. `Expression.CallWithArguments(ProcedureCall call, IDictionary<int, Expression> arguments)`
+built. `Expression.CallWithArguments(ProcedureCall call, IDictionary<int, Expression> args)`
 supplies the call's arguments as sub-expressions instead, keyed by the position of the parameter
 each one supplies (position 0 is the instance for class members). A position with no entry falls
 back to the argument encoded in `call`, then to the parameter's default value; a position outside
 the procedure's parameter list is an error. Each expression's static type must be assignable to the
-parameter's CLR type, checked when the node is built. This is what makes per-element calls work
-(#517):
+parameter's CLR type, or be a numeric type that widens to it (see "Numeric promotion"), checked when
+the node is built. This is what makes per-element calls work (#517):
 
 ```
 param     = Expression.Parameter("e", Type.ClassType("SpaceCenter", "Engine"))
@@ -233,7 +245,15 @@ exposing it as factories with kRPC-shaped semantics.
 
 `ForEach` desugars to an enumerator loop wrapped in a `try`/`finally` that disposes the enumerator,
 matching what a C# `foreach` statement compiles to. It matters for a loop over a lazy sequence,
-whose enumerator holds the enumerator of its source.
+whose enumerator holds the enumerator of its source. The loop variable is a `Variable` that an
+enclosing `BlockWithVariables` declares, as LINQ requires. `ForEach` does not check this, so a
+missing declaration surfaces as LINQ's own error when the function is compiled.
+
+`Return` is bound when `Lambda` is built, and a function that returns early is therefore
+`Invoke(Lambda([], body), {})`, which is what the Python compiler emits for a function with
+statements. A block containing `Return` handed straight to `RunFunction` is reported as an unbound
+marker. A bare `Lambda` is rejected too, since its type is a delegate, which cannot be sent to a
+client.
 
 Void-typed nodes are the reason several things elsewhere are special-cased: an expression whose type
 is `void` has no return type to report, cannot be streamed, and is only meaningful under
@@ -459,6 +479,16 @@ result (surfaced by existing client stream machinery as a raised exception) inst
 out of the per-frame update loop and starving every stream. `AddEvent` reports "The function must
 evaluate to a boolean value" when given anything else.
 
+Both reject a function containing a deferred call, since it would start the call again on every
+update (see "Deferred calls").
+
+**Function streams deduplicate like procedure call streams.** Two `FunctionStream`s are equal when
+they share the compiled delegate, which the `Expression` caches, so a second `AddFunctionStream` of
+the same function by the same client returns the existing stream's id, as `AddStream` does for an
+equal call. The consequence is the one [#902](https://github.com/krpc/krpc/issues/902) describes:
+one `RemoveStream` removes it for both. An event is not deduplicated, because `AddEvent` compiles a
+fresh delegate on every call rather than reusing the cached one.
+
 **Streams are not unified with procedure-call streams on the server, and are in the clients where
 the language allows.** `AddStream` takes an encoded `ProcedureCall` and `AddFunctionStream` takes an
 `Expression` object; kRPC procedures are not overloaded, so one procedure would have to take both
@@ -477,8 +507,9 @@ the calling tick, and returns its result.
 The compiled delegate is cached on the `Expression` object, so a function is compiled the first time
 it is run and reused on every later call. It is not compiled when the object is created: most
 expression objects are interior nodes of a larger tree and are never run on their own, so compiling
-every one of them would pay the cost hundreds of times over for a single function. Checking the tree
-for unbound `Break`/`Continue`/`Return` markers is cached the same way.
+every one of them would pay the cost hundreds of times over for a single function. `RunFunction`
+and `FunctionStream` share the cached delegate; `AddEvent` compiles its own `Func<bool>` on every
+call. Checking the tree for unbound `Break`/`Continue`/`Return` markers is cached the same way.
 
 The return value is a `bytes` payload rather than a typed value, since the procedure's declared
 return type cannot depend on the expression: the server encodes the value with the runtime-typed
@@ -519,12 +550,13 @@ the missing primitives as ordinary RPCs:
   and `QuaternionMultiply`/`Inverse`/`Angle`/`Slerp`/`FromAxisAngle`/`RotateVector`.
 
 These exist to be called from inside functions, and are what the client compilers target when they
-see `math.sqrt` (Python) or `System.Math.Sqrt` (C#). Each compiler holds the number of arguments
-its target takes, so an overload with no equivalent, `Math.Round(x, MidpointRounding.ToZero)` for
-instance, is reported when the function is compiled rather than when the server runs it. A
-rounding mode selects the procedure, so it has to be a constant. Because calls compile to direct typed
-invocations of the underlying method, the JIT inlines them, so the indirection costs nothing at
-evaluation time.
+see `math.sqrt` (Python) or `System.Math.Sqrt` (C#). Each compiler holds the number of arguments its
+target takes, so an overload with no equivalent, `Math.Round(x, MidpointRounding.ToZero)` for
+instance, is reported when the function is compiled rather than when the server runs it. Only
+`ToEven` and `AwayFromZero` map: `ToZero`, `ToNegativeInfinity` and `ToPositiveInfinity` are
+directed rounding rather than midpoint rules, and no procedure performs them. A rounding mode
+selects the procedure, so it has to be a constant. Because calls compile to direct typed invocations
+of the underlying method, the JIT inlines them, so the indirection costs nothing at evaluation time.
 
 ### Client libraries
 
@@ -551,6 +583,13 @@ Each helper introspects the type once per function and keeps it. Walking `Return
 trip per property of every type it is built from, and `run_function` would otherwise pay all of them
 on every call, which is the opposite of what the procedure is for. The type a function returns
 cannot change, so it is cached against the expression's object identifier.
+
+**A Python function given to a helper is compiled on every call.** Caching the compiled function
+against the Python function would freeze its captured values across calls, when they may have
+changed. The compiler tracks the result type as it builds the tree, so the helper takes the type
+from it instead of introspecting, and caches nothing for a function compiled for a single use. A
+program that runs the same function repeatedly compiles it once with `compile_function` and passes
+the result, as the docstrings say.
 
 ### Documentation ([#608](https://github.com/krpc/krpc/issues/608))
 
@@ -584,13 +623,17 @@ mistake travels before it is reported:
    `GetValidReturnType()`. Anything the node algebra did not check falls through to LINQ's own
    validation in `Compile()`, whose messages are not written for kRPC users.
 
-**Unbound `Break`/`Continue` are reported when the function is compiled.** The marker methods are
-only rewritten when a loop node is built, so a `Break` with no enclosing loop is left as an ordinary
-call to a method that throws: it compiles, and fails only when the function is evaluated, which for
-a stream means on every update. The tree is therefore checked for residual marker calls at each
-point it is compiled, rather than only in `Expression.Lambda`, since a block can be handed straight
-to `RunFunction` with no lambda wrapper. `Return` does not have this problem, since it is bound and
-type-checked when the lambda is built.
+**Unbound `Break`, `Continue` and `Return` are reported when the function is compiled.** The marker
+methods are only rewritten when a loop or lambda node is built, so a `Break` with no enclosing loop,
+or a `Return` with no enclosing lambda, is left as an ordinary call to a method that throws: it
+compiles, and fails only when the function is evaluated, which for a stream means on every update.
+The tree is therefore checked for residual marker calls at each point it is compiled, rather than
+only in `Expression.Lambda`, since a block can be handed straight to `RunFunction` with no lambda
+wrapper. A `Return` inside a lambda is also type-checked against the lambda's result type when the
+lambda is built.
+
+**A deferred call is reported when a stream or event is created.** `AddFunctionStream` and
+`AddEvent` reject a function containing one, per "Deferred calls".
 
 ## Yielding procedures inside a function
 
@@ -654,7 +697,20 @@ The emission wraps the ordinary direct call and its scene check in an `Action`, 
 `Services.ExecuteDeferredCall` with the procedure's signature. A failure to start the call
 propagates to the function, so an unavailable procedure is still reported to the client. A
 `YieldException` hands a `DeferredCall` to the core, which runs the ones it holds ahead of each
-update's calls and logs a failure against the procedure's name.
+update's calls, outside `MaxTimePerUpdate`, and logs a failure against the procedure's name.
+
+**Only `RunFunction` may contain one.** A stream or event evaluates its function on every update,
+so a deferred call in one would start the procedure again each time, and the pending calls would
+accumulate without bound. `AddFunctionStream` and `AddEvent` reject such a function when they are
+called, through `Expression.CheckNoDeferredCalls`.
+
+**A deferred call is owned by the client that started it.** `ExecuteDeferredCall` records
+`CallContext.Client`, and each resumption runs with that client set in `CallContext`, as an ordinary
+resumed call does. The call is canceled when its client disconnects, and every call is canceled
+once no server is running, alongside the object store being cleared. Canceling drops the
+continuation and logs it; the procedures have no undo, so a canceled `WarpTo` leaves the game
+warping. The precedent is `RPCServerUpdate`, which already drops a yielded continuation whose client
+has disconnected.
 
 Both compilers reach it. Python spells it `krpc.defer(call)`, a marker recognized by identity
 like the `math` module functions, allowed wherever a statement goes. C# spells it
@@ -730,6 +786,10 @@ position, with per-parameter numeric conversion (a Python float is a double, so 
 parameters get `constant_float` or casts). A position a keyword argument skips is simply absent, so
 the server uses the parameter's default.
 
+The Python compiler has one exception. A property read on an object captured from the client, such
+as `vessel.met` with `vessel` captured, is built with the ordinary `Client.get_call`, with the
+instance as a fixed argument, and embedded with `Call`. The instance is a constant either way.
+
 ### Python
 
 `Client.compile_function` compiles a lambda or a function from its source; `add_event`,
@@ -744,13 +804,24 @@ the server uses the parameter's default.
 * Statements (`krpc/functionstatements.py`): `if`/`elif`/`else`, `while` and `for` with
   `break`/`continue`, early `return`, local variables including augmented and annotated assignment,
   assignment to remote properties and to collection elements, `pass`, calls evaluated purely for
-  their effects, and `krpc.defer(call)` for a procedure that pauses execution.
+  their effects, and `krpc.defer(call)` for a procedure that pauses execution. A block holding
+  only `pass` is an error, since the algebra has no empty block, except as the body of an
+  `except`.
 * Strings and collections dispatch on the statically tracked type: `len`, `[i]`, `[a:b]`, `in`,
   `.upper()` and `.split()` reach the string operations, with slicing compiling to
   `StringSubstring`. `min`/`max` with a `key` reach `MinBy`/`MaxBy`, `reversed` reaches `Reverse`,
-  and the list, set and dictionary methods reach removal and clearing. The reshaping operations are
-  factory-only, and meet a user as an unsupported-construct error naming the syntax.
-* `raise` and `try`/`except` map onto the exception nodes.
+  and the list, set and dictionary methods reach removal and clearing.
+* Some reshaping operations have syntax: `sorted` reaches `OrderBy`, `reversed` reaches `Reverse`,
+  a slice of a collection reaches `Skip` and `Take`, a nested comprehension reaches `SelectMany`,
+  and a dict comprehension reaches `BuildDictionary`. The rest are factory-only. Their natural
+  syntax does not name them in its error: `zip(a, b)` and `set(xs)` report a client side function
+  called with an argument computed on the server, and `list + list` fails on the server.
+* An enumeration value captured from the client compiles to a `Cast` of an integer constant rather
+  than `ConstantEnum`. The value comes from the client's own enumeration, so it is a member.
+* `raise` and `try`/`except` map onto the exception nodes. A `try` with one `except` is one
+  `TryCatch`. With several, the catches nest in the order written, and each catch only records
+  which clause matched in a variable; the clauses then run after the catches, dispatched on that
+  variable. So an exception raised by one clause is not caught by a later one, as in Python.
 
 ### C#
 
@@ -796,8 +867,8 @@ an id, using the default comparer, so any class overriding `Equals`/`GetHashCode
 automatically. That is what `Equatable<T>` (`core/src/Utils/Equatable.cs`) exists for.
 
 Nothing in the store is released except by the sweep described below: `RemoveInstance` has no
-callers in `core/`, `server/` or `service/`, and `ObjectStore.Clear()` runs only from
-`Server.Stop()`. A function that asks for `Type.Double()` five hundred times must therefore not
+callers in `core/`, `server/` or `service/`, and `ObjectStore.Clear()` runs only once the last
+server stops. A function that asks for `Type.Double()` five hundred times must therefore not
 leave five hundred entries describing a single type.
 
 Types and value constants are shared. Interior nodes are not, and the last two subsections say why
@@ -817,7 +888,10 @@ and the code that builds trees compares with `ReferenceEquals` throughout in any
 
 The client half matters as much as the server half, because each factory call is also a round trip.
 The Python compiler shares one cache of the objects naming each type across every function compiled
-for a connection, so a type is named to the server once rather than once per mention.
+for a connection, so a type is named to the server once rather than once per mention. The casts
+the compiler inserts for `//`, `/`, `abs`, `round` and `int()` are the exception: they call
+`Type.Int()` and `Type.Double()` directly, which costs a round trip per use but no new object store
+entry, since types compare by value.
 
 ### Constants
 
@@ -829,7 +903,8 @@ The mechanism differs. `Expression` wraps an arbitrary LINQ tree, and those have
 equality, so a blanket `Equals` override is not available: value equality is well defined for
 constant nodes and for nothing else. The factories intern instead, through a
 `Dictionary<Tuple<System.Type, object>, Expression>` keyed on the constant's type and value,
-consulted by `ConstantDouble`, `ConstantFloat`, `ConstantInt`, `ConstantBool` and `ConstantString`.
+consulted by `ConstantDouble`, `ConstantFloat`, `ConstantInt`, `ConstantBool`, `ConstantString` and
+`ConstantEnum`.
 Reference equality then does the deduplication in the object store with no equality override at all,
 and the allocation is avoided as well. Sharing is safe because LINQ trees are immutable and sharing
 a subexpression between trees is supported. The key includes the type so that `ConstantInt(1)`,
@@ -894,12 +969,15 @@ server guessing from liveness. Not designed here.
 Deliberate, and it is the reason deduplication is enough on its own. Distinct types are bounded by
 the service surface, distinct constants by the literals a program actually writes. Reaching a
 troubling number would take thousands of distinct literals, which is not a realistic shape for
-hand-written or compiled code. So nothing sweeps them and they live for the server session.
+hand-written or compiled code. So nothing sweeps them. The interned constants are dropped once the
+last server stops, alongside the object store whose identifiers name them; types need no such step,
+since the object store holds the only references to them.
 
 **This is not [#902](https://github.com/krpc/krpc/issues/902).** That issue is reference-counted
 *streams*: two equal `AddStream` requests deduplicate to one id, and a single `RemoveStream` then
 destroys it for both consumers. It concerns stream lifetime rather than the object store, and it is
-a correctness bug rather than a growth concern. Nothing here affects it.
+a correctness bug rather than a growth concern. Deduplicating types and constants does not affect
+it, but function streams are subject to it, per "Computed streams and events".
 
 **What deduplication does not bound.** Interior nodes, every operator, call, block and lambda, are
 not deduplicated, and they are the population that actually grows: one compile of a moderate
@@ -911,8 +989,8 @@ encoded is pinned the same way, which is what #771 and #1051 are about, and it i
 
 ## Batched tree construction
 
-Not built. Building a tree costs one blocking round trip per node. The Python compiler has 72
-distinct factory call sites, and every one is an ordinary generated stub call going through
+Not built. Building a tree costs one blocking round trip per node. The Python compiler calls some
+seventy distinct factories, and every one is an ordinary generated stub call going through
 `Client._invoke`, which hard-codes a single call per `Request`. A compiled function of any real size
 is therefore hundreds of sequential round trips.
 
@@ -995,8 +1073,9 @@ explicit batch helper instead, which is only worth adding if hand-built trees th
   per "Batched tree construction". The overlap is elsewhere: the expression registry, storing
   server-side state and evaluating it per tick, is the same machinery reverse streams cite as prior
   art.
-* **#902 stream refcounting** is unrelated, despite the surface similarity. See "No refcounting for
-  these".
+* **#902 stream refcounting** applies to function streams as it does to procedure call streams,
+  since both deduplicate; see "Computed streams and events". It is unrelated to deduplicating types
+  and constants, despite the surface similarity; see "No refcounting for these".
 * **#904 deprecation**: individual expression operators can be evolved or deprecated through the
   standard mechanism, since they are ordinary service members.
 
