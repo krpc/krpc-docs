@@ -827,9 +827,23 @@ instance as a fixed argument, and embedded with `Call`. The instance is a consta
   and the list, set and dictionary methods reach removal and clearing.
 * Some reshaping operations have syntax: `sorted` reaches `OrderBy`, `reversed` reaches `Reverse`,
   a slice of a collection reaches `Skip` and `Take`, a nested comprehension reaches `SelectMany`,
-  and a dict comprehension reaches `BuildDictionary`. The rest are factory-only. Their natural
-  syntax does not name them in its error: `zip(a, b)` and `set(xs)` report a client side function
-  called with an argument computed on the server, and `list + list` fails on the server.
+  and a dict comprehension reaches `BuildDictionary`. `zip(a, b)` and `d.items()` reach `Zip`.
+  The rest are factory-only. Their natural syntax does not name them in its error: `set(xs)`
+  reports a client side function called with an argument computed on the server, and
+  `list + list` fails on the server.
+* Constructs with no node of their own lower onto existing ones, with no server change:
+
+  | Construct | Lowering |
+  |---|---|
+  | `range`, `enumerate` | a value block building a list in a `While` or `ForEach` loop; `range` needs a constant step, whose sign picks the comparison |
+  | `d.items()` | `Zip` of `DictionaryKeys` and `DictionaryValues`, with the dictionary in a temporary |
+  | iterating `d`, `k in d` | over `DictionaryKeys(d)` |
+  | tuple targets | `Get` by constant index, from a hidden variable in statements |
+  | truth of a condition | `!= 0`, a length or count `!= 0`, or `IsNull` |
+  | `a or b` on non-booleans | `Conditional` on the truth of a temporary holding `a` |
+
+  `ContainsKey` and a `Range` node would replace two of these. A client side call written as a
+  statement is an error, since it would run once, at compile time.
 * An enumeration value captured from the client compiles to a `Cast` of an integer constant rather
   than `ConstantEnum`. The value comes from the client's own enumeration, so it is a member.
 * `raise` and `try`/`except` map onto the exception nodes. A `try` with one `except` is one
