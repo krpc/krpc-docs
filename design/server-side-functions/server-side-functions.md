@@ -136,9 +136,10 @@ standard binary numeric promotion before building the LINQ node: if either opera
 both go to `double`; else `float` to `float`; else `ulong` to `ulong` (an error if the other side
 is a signed type that cannot be implicitly converted); else `long` to `long`; else `uint` plus
 `int` to `long`; else `uint` to `uint`; else `int`. Promotion applies only when both operand types
-are numeric and differ. `Power` converts its promoted operands to double for the underlying
-`Math.Pow`, and takes its result at the promoted type. `Conditional` promotes its two branches the
-same way. Explicit `Cast` remains available.
+are numeric and differ. `Power` of integers is exact, by repeated squaring, and wraps on overflow
+as the other integer operators do; a negative integer exponent goes through `Math.Pow` and
+truncates. `Power` of floating point operands uses `Math.Pow`. `Conditional` promotes its two
+branches the same way. Explicit `Cast` remains available.
 
 `Negate` follows the unary form of the same rules: a `uint` is negated as a `long`, and a `ulong`
 is an error, as in C#. The compilers used to multiply by `-1`, which gave a `uint` operand the
@@ -172,7 +173,10 @@ here). The server recovers the instance through `ObjectStore.GetInstance(id)` an
 most-derived `KRPCClass` type as the node's static type, so no protocol change and no
 self-describing wire value is needed, which is what blocked
 [#503](https://github.com/krpc/krpc/issues/503). Clients already expose the identifier
-(`RemoteObject.id` in C#, `_object_id` in Python, `Object::_id` in C++, `RemoteObject.id` in Java).
+(`RemoteObject.id` in C#, `_object_id` in Python, `Object::_id` in C++, and in Java
+`RemoteObject.id`, which PR #1069 makes public). An object of a KRPC service class, such as an
+`Expression`, is rejected: a function holding one could run or stream it, past the checks
+`RunFunction`, `AddEvent` and `AddFunctionStream` make.
 
 `ConstantEnum(service, name, value)` names a member of a service's enumeration. Casting an int to an
 enumeration type works too, but it makes the caller spell out a conversion that carries no
@@ -207,6 +211,10 @@ anyOut    = Expression.Any(Expression.Call(get_call(parts.engines)), predicate)
 
 The client builds the template `ProcedureCall` from any convenient instance, since only the
 procedure identity is used for overridden positions.
+
+Any service's procedures can be called except the KRPC service's. That service builds, runs and
+streams functions, so a function calling it could create a function at run time, past the checks
+made on the function it runs in, and could add a stream or an event on every update.
 
 `CallWithArguments` subsumes `Call`, and the two share one implementation, so the second factory
 costs a signature and nothing else. `Call` exists because it is the common case and the one a client
@@ -304,8 +312,10 @@ and name; the Python compiler maps a pythonic attribute name back to the declare
 structure's position in the definitions.
 
 Collections are built from their elements by `CreateList`, `CreateSet` and `CreateDictionary`, or
-created empty by `CreateEmptyList`, `CreateEmptySet` and `CreateEmptyDictionary`. An empty one
-names its element types, since there is no element to infer them from. Either is then mutated by
+created empty by `CreateEmptyList`, `CreateEmptySet` and `CreateEmptyDictionary`. Numeric elements
+widen to their common type, as the operands of a binary operator do, and any other elements must
+share one type. An empty one names its element types, since there is no element to infer them
+from. Either is then mutated by
 `Append`, `Set`, `Remove`, `RemoveAt` and `Clear`, which "Collection operations named by what they
 do" below covers. `Get` of a missing dictionary key raises `KRPC.ArgumentException`, where the CLR
 indexer's `KeyNotFoundException` has no kRPC type. `ContainsKey` tests for a key, and `Contains`
@@ -466,8 +476,8 @@ over a shared handler. The set is fixed when the scanner runs.
 
 **The set must not widen either, and a CLR catch block widens it.** `catch (System.ArgumentException)`
 also catches `ArgumentNullException` and `ArgumentOutOfRangeException`, which map to kRPC types of
-their own, and it catches `ObjectDisposedException`, which maps to nothing and so reaches the client
-with no name at all. `HandleException` maps by exact type, so each of those arrives under a name the
+their own, and `catch (System.InvalidOperationException)` catches `ObjectDisposedException`, which
+maps to nothing and so reaches the client with no name at all. `HandleException` maps by exact type, so each of those arrives under a name the
 catch did not name, and the kRPC exception classes are flat: they are all `sealed` and derive from
 `System.Exception`, so no client can express the subclass relationship the catch is assuming. Each
 handler therefore opens with `Services.ExpressionExceptionIsNamed(caught, type)` and rethrows when
@@ -567,7 +577,9 @@ A null value is carried by `ProcedureResult.is_null`, which `RunFunction` gets b
 [nested-nullable-values.md](../protocol/nested-nullable-values.md) sets for a value at the call
 boundary. A null nested inside the result is an error naming the position, since C# and C++ decode
 at a type the caller names: carrying one would mean writing
-`run_function<std::vector<std::optional<Vessel>>>` for a `std::vector<Vessel>`.
+`run_function<std::vector<std::optional<Vessel>>>` for a `std::vector<Vessel>`. A null result at
+a type that cannot hold one is an error: a C# value type that is not nullable, or a C++ type that is
+not a `std::optional`.
 
 `YieldException` is turned into a plain error, since a procedure that pauses and resumes on a later
 tick cannot be honored by a call that must complete within this one.
@@ -748,6 +760,9 @@ propagates to the function, so an unavailable procedure is still reported to the
 `YieldException` hands a `DeferredCall` to the core, which runs the ones it holds ahead of each
 update's calls, outside `MaxTimePerUpdate`, and logs a failure against the procedure's name.
 
+The arguments are evaluated into temporaries before the `Action`, so a pause in an argument belongs
+to the function, and is reported as any other pause is.
+
 **Only `RunFunction` may contain one.** A stream or event evaluates its function on every update,
 so a deferred call in one would start the procedure again each time, and the pending calls would
 accumulate without bound. `AddFunctionStream` and `AddEvent` reject such a function when they are
@@ -871,15 +886,16 @@ instance as a fixed argument, and embedded with `Call`. The instance is a consta
 
   | Construct | Lowering |
   |---|---|
-  | `range`, `enumerate` | a value block building a list in a `While` or `ForEach` loop; `range` needs a constant step, whose sign picks the comparison |
+  | `range`, `enumerate` | a value block building a list in a `While` or `ForEach` loop; `range` needs a constant step, whose sign picks the comparison. A constant `range` is lowered the same way, so its size does not set the size of the tree |
   | `d.items()` | `Zip` of `DictionaryKeys` and `DictionaryValues`, with the dictionary in a temporary |
-  | iterating `d`, `k in d` | over `DictionaryKeys(d)` |
+  | iterating `d` | over `DictionaryKeys(d)` |
+  | `k in d` | `ContainsKey(d, k)` |
   | tuple targets | `Get` by constant index, from a hidden variable in statements |
   | truth of a condition | `!= 0`, a length or count `!= 0`, or `IsNull` |
   | `a or b` on non-booleans | `Conditional` on the truth of a temporary holding `a` |
 
-  `ContainsKey` and a `Range` node would replace two of these. A client side call written as a
-  statement is an error, since it would run once, at compile time.
+  A `Range` node would replace the `range` lowering. A client side call written as a statement is
+  an error, since it would run once, at compile time.
 * Integer results keep their server type. `//` is an exact integer floor division built from
   `Divide` and `Modulo`, and integer `abs`, `min` and `max` are `Conditional` on temporaries.
   `int()` and `round()` of an integer are the integer itself, and of a float give an `int`. A
@@ -926,7 +942,8 @@ limited to single-expression lambdas.
 
 Documented for both compilers, because they are the surprises: captured values are frozen at compile
 time, so only remote calls re-evaluate per tick; and a procedure that pauses execution cannot be
-used inside a function.
+called for its value inside a function, though a run-once function can start one as a deferred
+call.
 
 **Short-circuiting is not one of them.** `And` and `Or` compile to LINQ's `And`/`Or`, which evaluate
 both operands, and mapping `and`/`or` and `&&`/`||` onto them would silently drop the guard in
