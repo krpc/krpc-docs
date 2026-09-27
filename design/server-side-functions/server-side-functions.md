@@ -149,6 +149,11 @@ implicit, and one that narrows needs `Cast`. The positions are:
 * a structure field (`CreateStruct`);
 * a variable assignment (`Assign`), and an argument to `Invoke`.
 
+A nullable number, which a procedure returning a nullable value type produces as `Nullable<T>`,
+takes part in both rules as its underlying `T`: promotion and each position convert it to `T`
+first, which throws when the value is null. A nullable parameter takes it as it is, so a null
+passes through.
+
 ### Constants
 
 Value constants are `ConstantDouble`, `ConstantFloat`, `ConstantInt`, `ConstantBool` and
@@ -166,6 +171,14 @@ self-describing wire value is needed, which is what blocked
 enumeration type works too, but it makes the caller spell out a conversion that carries no
 information and cannot check the value against the enumeration's members; `ConstantEnum` does check
 it when the node is built.
+
+### Null values
+
+There is no null constant. A value can be null only where a procedure returns one, so the algebra
+tests for it rather than producing it: `IsNull(value)` is a boolean, `ReferenceEqual` against null
+for a class and `Equal` against a null `Nullable<T>` for a nullable number. A value whose type
+cannot hold null is an error when the node is built. The compilers map `x is None` and `x == null`
+onto it.
 
 ### Calls
 
@@ -796,7 +809,8 @@ instance as a fixed argument, and embedded with `Call`. The instance is a consta
 `add_function_stream` and `run_function` accept functions directly.
 
 * Expressions (`krpc/functioncompiler.py`): operators including floor division, true-division
-  semantics and the bitwise operators; comprehensions (list, set and dict, nested) and generator
+  semantics, a remainder taking the sign of the divisor, the bitwise operators, and `is None`
+  and `is not None` through `IsNull`; comprehensions (list, set and dict, nested) and generator
   expressions; `any`/`all`/`sum`/`min`/`max`/`len`/`sorted`/`abs`/`round`/`int`/`float`/`str`;
   subscripts and slices; f-strings; conditional expressions through `Expression.Conditional`;
   assignment expressions; parameterless lambdas and local function calls; and `math` module calls
@@ -833,11 +847,13 @@ boolean lambda, `AddStream` compiles compound lambdas, and `RunFunction` accepts
 `Function.Defer` is the one statement the compiler reaches, and `CompileFunction` has an
 `Expression<Action>` overload so a lambda with no result compiles to a reusable object.
 
-Beyond the operator set: `System.Math` methods map onto `StdLib`; string `+` and `ToString` become
-`StringConcat` and `ConvertToString`; the bitwise complement and the LINQ operators `Skip`, `Take`,
-`SelectMany`, `ToDictionary`, `Distinct`, `Reverse`, `Zip`, `Union`, `Intersect`, `Except`, `First`,
-`Last` and `ElementAt` are supported; captured collections are folded into constants; and `.Length`,
-`.Substring`, `.ToUpper` and `.Contains` dispatch onto the string operations by static type.
+Beyond the operator set: a comparison with `null` maps onto `IsNull`, and a conversion between a
+value type and its nullable form is left to the server; `System.Math` methods map onto `StdLib`;
+string `+` and `ToString` become `StringConcat` and `ConvertToString`; the bitwise complement and
+the LINQ operators `Skip`, `Take`, `SelectMany`, `ToDictionary`, `Distinct`, `Reverse`, `Zip`,
+`Union`, `Intersect`, `Except`, `First`, `Last` and `ElementAt` are supported; captured collections
+are folded into constants; and `.Length`, `.Substring`, `.ToUpper` and `.Contains` dispatch onto the
+string operations by static type.
 
 Three things are deliberately out of reach. `GroupBy` is not mapped, since the node's result type
 differs from LINQ's. `MinBy`/`MaxBy` have no syntax at net472, where `Enumerable.MinBy` does not
@@ -858,6 +874,12 @@ both compilers map the conditional operators onto them and the bitwise ones onto
 chained comparisons need one more thing: `a < b < c` expands to two comparisons over one `b`, so a
 non-constant `b` is assigned to a temporary in an enclosing block and read from it twice, which is
 where python evaluates it once.
+
+**Nor is the sign of a remainder.** `Modulo` is the CLR remainder, whose sign follows the dividend,
+and python's follows the divisor. The Python compiler emits `(a % b + b) % b`, assigning a
+non-constant `b` to a temporary as it does for a chained comparison, so `-30 % 360` is 330 on the
+server as it is locally. The C# compiler maps `%` straight onto `Modulo`, which is C#'s own
+semantics.
 
 ## Object identity and lifetime
 
