@@ -87,6 +87,9 @@ sealed class FunctionJournal
 }
 ```
 
+`Current` is safe as an ambient value because a function cannot call a `KRPC` procedure, so
+`RunFunction` never runs inside another `RunFunction`.
+
 The cursor is a runtime counter rather than a per-node identifier, because a call inside a loop
 executes many times. Replay reproduces the counter because everything in the algebra apart from
 calls is deterministic.
@@ -135,8 +138,9 @@ Block(vars: [a0, a1, idx, tmp],
 
 ## Two compiled delegates
 
-`Expression` caches its compiled delegate, and the same tree is shared by `AddFunctionStream` and
-`AddEvent`. Emitting journaling unconditionally makes every stream pay it on every update.
+`Expression` caches its compiled delegate, which `RunFunction` and `AddFunctionStream` share;
+`AddEvent` compiles its own. Emitting journaling unconditionally makes every function stream pay it
+on every update.
 
 So `Expression` gains a `JournalingEvaluator` beside `Evaluator`, compiled lazily from a rewritten
 tree and used by `RunFunction` alone. Laziness applies to the tree, not to the attempt: the first
@@ -198,7 +202,7 @@ the compiled tree, so every enclosing finalizer runs on the way out and again on
 
 ## Testing
 
-`TestService.BlockingProcedure (n, sum)` pauses `n` times and returns a sum, so the whole thing
+`TestService.BlockingProcedureReturns (n, sum)` pauses `n` times and returns a sum, so the whole thing
 is testable in `core/test/Service/KRPC/ExpressionTest.cs` with no game running. Assert the value,
 the number of invocations, and that a side-effecting call placed before the pause happens exactly
 once. `core/test/CoreTest.cs` covers the parked continuation against the `TestServer` harness.

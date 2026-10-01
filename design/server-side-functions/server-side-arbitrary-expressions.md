@@ -84,7 +84,8 @@ and error messages only; it has no protocol type code and can never be encoded, 
 
 * `Expression.CallMethod(Type type, string name, IList<Type> parameterTypes, IList<Expression> arguments)`
 * `Expression.CallStaticMethod(...)` — same, without an instance argument
-* `Expression.GetField` / `SetField`, `GetProperty` / `SetProperty`
+* `Expression.GetClrField` / `SetClrField`, `GetProperty` / `SetProperty`. The shipped `GetField`
+  reads a field of a kRPC structure, so a CLR field needs its own name.
 
 Parameter types are given **explicitly** rather than inferred from the arguments. Overload
 resolution over reflected members is otherwise ambiguous, and an implicit rule would let a mod
@@ -97,7 +98,7 @@ promotion, collection operations, statements — composes over foreign values un
 ### 4. Getting values out
 
 Nothing new. A foreign type is not a valid kRPC type, so `ReturnType` throws and both
-`AddExpressionStream` and `RunFunction` reject it. To get data out, the function reduces to
+`AddFunctionStream` and `RunFunction` reject it. To get data out, the function reduces to
 something serializable inside the tree — read a `double` field, call a method returning a string,
 build a list of primitives.
 
@@ -172,7 +173,7 @@ still lower than shipping a service.
 * Core tests against a fixture type standing in for a mod assembly: field/property read and write,
   method calls including overload selection by parameter type, and each error case.
 * Boundary tests: a function whose result is a foreign type is rejected by both
-  `AddExpressionStream` and `RunFunction`; one that reduces to a serializable value is accepted.
+  `AddFunctionStream` and `RunFunction`; one that reduces to a serializable value is accepted.
 * Enablement tests: every factory throws while the setting is off.
 * Golden expression-tree tests for the emitted nodes, following the existing
   `ExpressionTreePrinter` suites.
