@@ -141,6 +141,10 @@ as the other integer operators do; a negative integer exponent goes through `Mat
 truncates. `Power` of floating point operands uses `Math.Pow`. `Conditional` promotes its two
 branches the same way. Explicit `Cast` remains available.
 
+`Equal` and `NotEqual` compare objects, tuples and bytes by value, since a getter such as
+`SpaceCenter.ActiveVessel` returns a new object on each call. They and `Conditional` keep a null:
+when either operand is a nullable number, both widen to the nullable common type.
+
 `Negate` follows the unary form of the same rules: a `uint` is negated as a `long`, and a `ulong`
 is an error, as in C#. The compilers used to multiply by `-1`, which gave a `uint` operand the
 wrong type and a `ulong` one no type at all.
@@ -214,7 +218,9 @@ procedure identity is used for overridden positions.
 
 Any service's procedures can be called except the KRPC service's. That service builds, runs and
 streams functions, so a function calling it could create a function at run time, past the checks
-made on the function it runs in, and could add a stream or an event on every update.
+made on the function it runs in, and could add a stream or an event on every update. For the same
+reason a plain `AddStream` of `RunFunction`, `AddFunctionStream` or `AddEvent` is rejected;
+`AddFunctionStream` is how a function is streamed.
 
 `CallWithArguments` subsumes `Call`, and the two share one implementation, so the second factory
 costs a signature and nothing else. `Call` exists because it is the common case and the one a client
@@ -273,7 +279,9 @@ exposing it as factories with kRPC-shaped semantics.
 * Side effects: calls to procedures with no return value (including property setters) are ordinary
   statement expressions, and collections can be built imperatively.
 
-`ForEach` desugars to an enumerator loop wrapped in a `try`/`finally` that disposes the enumerator,
+`ForEach` over a list iterates by position, as Python does, so the body can append to the list it
+loops over. Over any other collection it desugars to an enumerator loop wrapped in a `try`/`finally`
+that disposes the enumerator,
 matching what a C# `foreach` statement compiles to. It matters for a loop over a lazy sequence,
 whose enumerator holds the enumerator of its source. The loop variable is a `Variable` that an
 enclosing `BlockWithVariables` declares, as LINQ requires. `ForEach` does not check this, so a
@@ -302,7 +310,7 @@ Tuples are built by `CreateTuple` and read by `Get`, which special-cases tuple t
 index onto the corresponding `ItemN` property. The index must be a constant, and this is inherent
 rather than a limitation to lift: tuple elements are differently typed, so an index computed at
 evaluation time would leave the resulting node with no static type. It is documented as such.
-A tuple has at most seven elements, matching the flat CLR tuple types; the eighth position holds
+A tuple has one to seven elements, matching the flat CLR tuple types; the eighth position holds
 a nested tuple, which is not a shape kRPC can name or carry.
 
 Structures ([#866](https://github.com/krpc/krpc/issues/866)) are built by
@@ -317,10 +325,11 @@ widen to their common type, as the operands of a binary operator do, and any oth
 share one type. An empty one names its element types, since there is no element to infer them
 from. Either is then mutated by
 `Append`, `Set`, `Remove`, `RemoveAt` and `Clear`, which "Collection operations named by what they
-do" below covers. `Get` of a missing dictionary key raises `KRPC.ArgumentException`, where the CLR
-indexer's `KeyNotFoundException` has no kRPC type. `ContainsKey` tests for a key, and `Contains`
+do" below covers. `Get` of a missing dictionary key raises `KRPC.KeyNotFoundException`, added for
+it, which Python maps to `KeyError`. `ContainsKey` tests for a key, and `Contains`
 rejects a dictionary with a message pointing at it, since the CLR would compare key and value pairs.
-`StringSplit` gives a `List<string>`, so the parts can be appended to.
+`StringSplit` gives a `List<string>`, so the parts can be appended to. An integer `Sum` wraps on
+overflow, and the aggregations accept unsigned integers.
 The query surface covers counting, membership, `Select`, `Where`,
 `Any`, `All`, `Skip`, `Take`, `ToList`/`ToSet`, the aggregations `Sum`, `Average` and `Min`/`Max`,
 `Aggregate`/`AggregateWithSeed`, and:
@@ -439,11 +448,13 @@ one as `(service, name)` follows `ClassType`, and the exception types already pr
 A throw is a statement rather than a value, so an early exit is written as an `IfThen` containing a
 throw. The typed form LINQ offers, for a throw in a value position such as one branch of an
 `IfThenElse`, is not proposed: trees are built innermost-first, so there is no surrounding context
-to infer the type from and it would have to be supplied explicitly at every use.
+to infer the type from and it would have to be supplied explicitly at every use. `Conditional` does
+give a `Throw` in one branch the type of the other, which the C# compiler uses for a client side
+branch that fails to evaluate.
 
-There are five exceptions to choose from and no service defines its own: `ArgumentException`,
-`ArgumentNullException`, `ArgumentOutOfRangeException`, `InvalidOperationException` and
-`ObjectDestroyedException`, all in the KRPC service. Signaling a condition therefore means throwing
+There are six exceptions to choose from and no service defines its own: `ArgumentException`,
+`ArgumentNullException`, `ArgumentOutOfRangeException`, `InvalidOperationException`,
+`KeyNotFoundException` and `ObjectDestroyedException`, all in the KRPC service. Signaling a condition therefore means throwing
 a generic type and putting the meaning in the message, which is worth documenting rather than
 leaving users to work out that there is no custom exception type to define.
 
@@ -874,11 +885,13 @@ instance as a fixed argument, and embedded with `Call`. The instance is a consta
   `except`.
 * Strings and collections dispatch on the statically tracked type: `len`, `[i]`, `[a:b]`, `in`,
   `.upper()` and `.split()` reach the string operations, with slicing compiling to
-  `StringSubstring`. `min`/`max` with a `key` reach `MinBy`/`MaxBy`, `reversed` reaches `Reverse`,
+  `StringSubstring`. `min`/`max` with a `key` reach `MinBy`/`MaxBy`, taking several arguments as a
+list of them, `reversed` reaches `Reverse`,
   and the list, set and dictionary methods reach removal and clearing.
 * Some reshaping operations have syntax: `sorted` reaches `OrderBy`, `reversed` reaches `Reverse`,
-  a slice of a collection reaches `Skip` and `Take`, a nested comprehension reaches `SelectMany`,
-  and a dict comprehension reaches `BuildDictionary`. `zip(a, b)` and `d.items()` reach `Zip`.
+  a slice of a collection reaches `Skip` and `Take`, and a nested comprehension reaches
+  `SelectMany`. A dict comprehension is a `ForEach` that sets each key, so a repeated key takes the
+  last value as in Python; `BuildDictionary` throws on one, as C#'s `ToDictionary` does. `zip(a, b)` and `d.items()` reach `Zip`.
   The rest are factory-only. Their natural syntax does not name them in its error: `set(xs)`
   reports a client side function called with an argument computed on the server, and
   `list + list` fails on the server.
@@ -903,13 +916,27 @@ instance as a fixed argument, and embedded with `Call`. The instance is a consta
   slice clamps its bounds to the length, as Python does.
 * A final `if`/`else` whose branches both return compiles to a `Conditional` of two blocks, so
   the function's value is its last expression.
-* `except ValueError` catches the three argument exceptions, and a tuple in `except` gives one
-  catch per exception, all recording the same clause.
+* `except ValueError` catches the three argument exceptions, `except KeyError` a missing key and
+  `except RuntimeError` an `InvalidOperationException`. A tuple in `except` gives one catch per
+  exception, all recording the same clause.
 * Left as documented differences: integer overflow wraps, a server computed negative index or
   exponent, negative slice bounds, and `str()` of a float using the server's formatting.
-* An enumeration value captured from the client compiles to a `Cast` of an integer constant rather
-  than `ConstantEnum`. The value comes from the client's own enumeration, so it is a member.
-* `raise` and `try`/`except` map onto the exception nodes. A `try` with one `except` is one
+* Both compilers compile an enumeration value captured from the client to a `Cast` of an integer
+  constant, so no compiler emits `ConstantEnum`. The value comes from the client's own
+  enumeration, so it is a member.
+* A name assigned anywhere in the function is local throughout it, as in Python, and reading it
+  before its first assignment is an error. Declaring it up front would need its type, which only
+  the assignment gives. A local function defined in a nested block is callable only inside it,
+  since which branch's definition ran is known only at run time.
+* Writing to or deleting an element of a captured collection is an error, as the server holds a
+  copy. A valued function that can reach its end without a `return` is an error.
+* An argument, element or field narrowing to an integer type is an error, as assignment is.
+  A double narrows to a float with a `Cast`, since Python has one float type.
+* `and`/`or` fold left to right and stop at a constant that decides the result, so a guard such as
+  `d != 0 and x / d > 1` with `d` captured as 0 never folds the division. `set.discard` has no
+  value.
+* `del` removes a list element or a dictionary key. `raise` and `try`/`except`/`finally` map onto
+  the exception nodes. A `try` with one `except` is one
   `TryCatch`. With several, the catches nest in the order written, and each catch only records
   which clause matched in a variable; the clauses then run after the catches, dispatched on that
   variable. So an exception raised by one clause is not caught by a later one, as in Python.
@@ -931,6 +958,24 @@ the LINQ operators `Skip`, `Take`, `SelectMany`, `ToDictionary`, `Distinct`, `Re
 `Union`, `Intersect`, `Except`, `First`, `Last` and `ElementAt` are supported; captured collections
 are folded into constants; and `.Length`, `.Substring`, `.ToUpper` and `.Contains` dispatch onto the
 string operations by static type.
+
+A lazy `IEnumerable<T>` result is wrapped in `ToList` and decoded as `IList<T>`. Only an
+`IOrderedEnumerable<T>` result type is rejected, with a hint to call `ToList`.
+
+Where C# semantics and the server differ, the compiler does the following:
+
+* An explicit `null` argument is left out where the parameter's default is null, so the server
+  takes its default, and is otherwise sent as a null argument. An expression tree cannot omit an
+  optional argument.
+* A comparison with a nullable number is a null test and the comparison, false on null as in C#.
+  Arithmetic on a null still throws.
+* `checked` arithmetic is rejected, since server integer arithmetic wraps. Integer `Math.Abs`,
+  `Min`, `Max` and `Clamp` are `Conditional` on temporaries, exact at their own type.
+* `List<T>.Contains`, `HashSet<T>.Contains` and an interpolated string with plain placeholders
+  compile to `Contains` and `StringConcat`. A client side subtree with no case of its own is
+  folded, and `&&`/`||` with a client side left operand short-circuit at compile time.
+* A client side branch of a server side `?:` that fails to evaluate becomes a `Throw` in that
+  branch, so the error is raised only when the branch is chosen.
 
 Three things are deliberately out of reach. `GroupBy` is not mapped, since the node's result type
 differs from LINQ's. `MinBy`/`MaxBy` have no syntax at net472, where `Enumerable.MinBy` does not
@@ -954,9 +999,10 @@ non-constant `b` is assigned to a temporary in an enclosing block and read from 
 where python evaluates it once.
 
 **Nor is the sign of a remainder.** `Modulo` is the CLR remainder, whose sign follows the dividend,
-and python's follows the divisor. The Python compiler emits `(a % b + b) % b`, assigning a
-non-constant `b` to a temporary as it does for a chained comparison, so `-30 % 360` is 330 on the
-server as it is locally. The C# compiler maps `%` straight onto `Modulo`, which is C#'s own
+and python's follows the divisor. The Python compiler takes `r = a % b` and adds `b` when `r` is
+nonzero and its sign differs from `b`'s, holding `r` and `b` in temporaries, so `-30 % 360` is 330
+on the server as it is locally. Adding `b` only when needed keeps `0.1 % 360` exact and an `int`
+remainder in range. The C# compiler maps `%` straight onto `Modulo`, which is C#'s own
 semantics.
 
 ## Object identity and lifetime
@@ -989,7 +1035,8 @@ and the code that builds trees compares with `ReferenceEquals` throughout in any
 The client half matters as much as the server half, because each factory call is also a round trip.
 The Python compiler shares one cache of the objects naming each type across every function compiled
 for a connection, so a type is named to the server once rather than once per mention. The casts
-the compiler inserts for `//`, `/`, `abs`, `round` and `int()` are the exception: they call
+the compiler inserts for `/`, a float `//`, a negative constant exponent, `round`, `int()` and
+`float()` are the exception: they call
 `Type.Int()` and `Type.Double()` directly, which costs a round trip per use but no new object store
 entry, since types compare by value.
 
