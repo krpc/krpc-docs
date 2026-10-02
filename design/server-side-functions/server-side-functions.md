@@ -45,8 +45,9 @@ builds a function out of expressions, which is how every language describes itse
 The split is a naming rule, not a type distinction. A function is the root expression of a tree, so
 `KRPC.RunFunction`, `KRPC.AddFunctionStream` and `KRPC.AddEvent` all take an `Expression`. Each
 names its parameter `function`, which is what tells a reader that the whole tree is wanted rather
-than a node of one. `KRPC.AddEvent` was renamed from `expression` for this, which is the one
-user-visible break the rule costs.
+than a node of one. `KRPC.AddEvent` was renamed from `expression` for this. With the rename of
+`Expression.Function` to `Lambda` below, these are the two user-visible breaks the rule costs.
+Whether `Function` stays as a deprecated alias of `Lambda` is open.
 
 The lambda node is `Expression.Lambda(parameters, body)`, after the LINQ node it maps to. It is
 `Invoke`d or handed to `Select`/`Where`; it is not the whole function, and a block can be handed
@@ -149,6 +150,10 @@ when either operand is a nullable number, both widen to the nullable common type
 is an error, as in C#. The compilers used to multiply by `-1`, which gave a `uint` operand the
 wrong type and a `ulong` one no type at all.
 
+`And`, `Or` and `ExclusiveOr` promote integer operands the same way. A shift takes its count as an
+`int`, converting any other integer count, and uses its low bits as C# does. `Divide` and `Modulo`
+of the smallest `int` or `long` by -1 wrap, giving that value and 0, where the CLR throws.
+
 A value used in a position of a fixed type follows one rule: a numeric conversion that widens is
 implicit, and one that narrows needs `Cast`. The positions are:
 
@@ -243,10 +248,12 @@ signature and `Nullable<T>` on the method, and only the latter types the call. T
 down to `Math.Sqrt`, measured 38.4 to 7.8 ns/call with gen-0 collections eliminated, which matters
 under Unity's Boehm GC.
 
-Semantics match an ordinary RPC exactly, via two lean static helpers emitted around the call:
+Semantics match an ordinary RPC exactly, via three lean static helpers emitted around the call:
 
 * `Services.CheckExpressionGameScene(procedure)` before every invocation, the same scene-mask check
   and `RPCException` as the ordinary dispatch path;
+* `Services.CheckExpressionArgument(procedure, position, value)` around each computed argument of
+  reference type at a parameter that is not nullable, the null check the dispatch path makes;
 * `Services.CheckExpressionReturnValue(procedure, value)` after invocation, emitted only for
   reference-typed returns where null is not permitted. A direct typed call can only violate the
   declared return type by returning null, so the per-evaluation `IsInstanceOfType` reflection check
@@ -329,7 +336,15 @@ do" below covers. `Get` of a missing dictionary key raises `KRPC.KeyNotFoundExce
 it, which Python maps to `KeyError`. `ContainsKey` tests for a key, and `Contains`
 rejects a dictionary with a message pointing at it, since the CLR would compare key and value pairs.
 `StringSplit` gives a `List<string>`, so the parts can be appended to. An integer `Sum` wraps on
-overflow, and the aggregations accept unsigned integers.
+overflow, and the aggregations accept unsigned integers. `Average` of longs is taken over doubles,
+since `Enumerable` sums longs checked.
+
+A collection built inside a function is typed by the interface a `Type` names: a list element, a
+dictionary value, a tuple element, a `Conditional` branch and a returned value that is a `List<T>`
+or a `Dictionary<K,V>` is used as an `IList<T>` or `IDictionary<K,V>`. A variable of a nested type,
+such as `IList<IList<int>>`, can then hold a list of lists the function builds. A tuple widens
+element by element to a tuple type it is used at, as an argument, a variable or a structure field,
+so `(x, 0, 0)` with a double `x` is a `Tuple<double,double,double>` argument.
 The query surface covers counting, membership, `Select`, `Where`,
 `Any`, `All`, `Skip`, `Take`, `ToList`/`ToSet`, the aggregations `Sum`, `Average` and `Min`/`Max`,
 `Aggregate`/`AggregateWithSeed`, and:
@@ -473,7 +488,7 @@ assigns `.Message` from it as the first statement of the handler.
 **A name must resolve to every CLR type that reaches the client under it.** This is the one thing
 that has to be right, and the obvious implementation gets it wrong.
 `[KRPCException(MappedException = ...)]` maps a CLR exception type onto a kRPC one, and
-`HandleException` applies that mapping on the way out; four of the five kRPC exceptions have one.
+`HandleException` applies that mapping on the way out; five of the six kRPC exceptions have one.
 Services throw the CLR types, not the kRPC ones: `service/SpaceCenter/src` has 145
 `throw new InvalidOperationException`, 73 `ArgumentException`, 46 `ArgumentNullException` and 22
 `ArgumentOutOfRangeException`, and no service file imports the kRPC exception namespace, so every
@@ -538,6 +553,10 @@ becomes an `InvalidOperationException` naming the pause, per "A yield is an erro
 retries". Value-change detection through `ValueUtils.Equal` mirrors `ProcedureCallStream`, so
 unchanged values are not resent. The `TypeSpec` built at creation time tells `Encoder.Encode` how to
 serialize the boxed result, so no per-update type routing is needed.
+
+A value that cannot be encoded, such as a null element in a list of objects, is turned into an
+error result by encoding it in `UpdateInternal` whenever it changes. The encode that sends an update
+covers every stream of a client, so an error there would fail all of them, every update.
 
 `EventStream.UpdateInternal` has the same handling, so a predicate error becomes a stream error
 result (surfaced by existing client stream machinery as a raised exception) instead of propagating
@@ -892,9 +911,9 @@ list of them, `reversed` reaches `Reverse`,
   a slice of a collection reaches `Skip` and `Take`, and a nested comprehension reaches
   `SelectMany`. A dict comprehension is a `ForEach` that sets each key, so a repeated key takes the
   last value as in Python; `BuildDictionary` throws on one, as C#'s `ToDictionary` does. `zip(a, b)` and `d.items()` reach `Zip`.
-  The rest are factory-only. Their natural syntax does not name them in its error: `set(xs)`
-  reports a client side function called with an argument computed on the server, and
-  `list + list` fails on the server.
+  `list + list` reaches `Concat` and `ToList`. The rest are factory-only. Their natural syntax does
+  not name them in its error: `set(xs)` reports a client side function called with an argument
+  computed on the server.
 * Constructs with no node of their own lower onto existing ones, with no server change:
 
   | Construct | Lowering |
@@ -915,7 +934,16 @@ list of them, `reversed` reaches `Reverse`,
   negative constant index counts from the end through `Count` or `StringLength`, and a string
   slice clamps its bounds to the length, as Python does.
 * A final `if`/`else` whose branches both return compiles to a `Conditional` of two blocks, so
-  the function's value is its last expression.
+  the function's value is its last expression. A final `try` whose body or `else`, and every
+  handler, return is accepted too, with its returns bound by the function's `Lambda`.
+* An operator whose operand type is known and is not a number is a compile error: arithmetic
+  other than string and list `+`, ordering comparisons, `sum`, and `min`/`max` without a key. A
+  bool takes part in `&`, `|` and `^` only. `str()` and an f-string take a string, a number or a
+  bool, as the server names the CLR type of any other value.
+* A shift follows Python where the server follows C#: a count of at least the width gives 0, or -1
+  for a negative value shifted right, and a negative count raises `ValueError`.
+* `None` passed to a nullable parameter is a null constant argument of the call. Anywhere else it
+  is a compile error, since the algebra has no typed null constant.
 * `except ValueError` catches the three argument exceptions, `except KeyError` a missing key and
   `except RuntimeError` an `InvalidOperationException`. A tuple in `except` gives one catch per
   exception, all recording the same clause.
@@ -961,6 +989,13 @@ string operations by static type.
 
 A lazy `IEnumerable<T>` result is wrapped in `ToList` and decoded as `IList<T>`. Only an
 `IOrderedEnumerable<T>` result type is rejected, with a hint to call `ToList`.
+
+A client side subtree is evaluated once, as a whole, at the outermost node that does not interact
+with the server, so a side effect in it happens once. A read of a `Stream<T>` is rejected, since it
+would be evaluated once, and so are `AddStream` and `AddEvent` of a lambda that makes no remote
+call. A tuple's `ItemN` maps onto `Get`, `Tuple.Create` onto `CreateTuple`, and a dictionary
+initializer onto `CreateDictionary`. An error from the server while building the tree is raised as
+a `FunctionCompilationException`, with the server's exception inside it.
 
 Where C# semantics and the server differ, the compiler does the following:
 
@@ -1012,13 +1047,18 @@ duplicates: `AddInstance` looks the instance up in a `Dictionary<object, ulong>`
 an id, using the default comparer, so any class overriding `Equals`/`GetHashCode` is deduplicated
 automatically. That is what `Equatable<T>` (`core/src/Utils/Equatable.cs`) exists for.
 
-Nothing in the store is released except by the sweep described below: `RemoveInstance` has no
-callers in `core/`, `server/` or `service/`, and `ObjectStore.Clear()` runs only once the last
-server stops. A function that asks for `Type.Double()` five hundred times must therefore not
+Nothing in the store is released except by the sweep described below: `RemoveInstance` is called
+only by that sweep, and `ObjectStore.Clear()` runs only once the last server stops. A function that asks for `Type.Double()` five hundred times must therefore not
 leave five hundred entries describing a single type.
 
 Types and value constants are shared. Interior nodes are not, and the last two subsections say why
 that is enough.
+
+A client can still share a node by passing it to several factories, and the Python compiler reuses
+one `Lambda` for each call of a local function. LINQ compiles a shared node once per use, so a
+chain of steps that each use the step before twice doubles the compiled size at every step. The
+visitors that check, bind and rewrite a function throw past `MaxNodes`, 1,000,000 nodes counted
+per use, which compiled in 1.4 s in the core tests under .NET. Thirty such steps would otherwise hang the game for hours.
 
 ### Types
 

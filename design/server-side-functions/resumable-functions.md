@@ -143,7 +143,8 @@ Block(vars: [a0, a1, idx, tmp],
 on every update.
 
 So `Expression` gains a `JournalingEvaluator` beside `Evaluator`, compiled lazily from a rewritten
-tree and used by `RunFunction` alone. Laziness applies to the tree, not to the attempt: the first
+tree and used by `RunFunction` alone. A function with no value runs through `Runner`, the `Action`
+form of the same delegate, so it needs a `JournalingRunner` as well. Laziness applies to the tree, not to the attempt: the first
 run must journal, or a pause leaves side effects performed and nothing recorded.
 
 The rewrite has to find the call sites, and `BuildCall` has already flattened them into a `Block`
@@ -196,7 +197,7 @@ the compiled tree, so every enclosing finalizer runs on the way out and again on
 
 | Phase | Content |
 | --- | --- |
-| 1 | `FunctionJournal`, the emission change, and `JournalingEvaluator` |
+| 1 | `FunctionJournal`, the emission change, `JournalingEvaluator` and `JournalingRunner` |
 | 2 | `RunFunction` throwing the wrapped yield, and the three problems above |
 | 3 | Documentation, tutorial and changelog |
 
