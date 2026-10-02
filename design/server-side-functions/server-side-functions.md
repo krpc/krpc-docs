@@ -47,7 +47,9 @@ The split is a naming rule, not a type distinction. A function is the root expre
 names its parameter `function`, which is what tells a reader that the whole tree is wanted rather
 than a node of one. `KRPC.AddEvent` was renamed from `expression` for this. With the rename of
 `Expression.Function` to `Lambda` below, these are the two user-visible breaks the rule costs.
-Whether `Function` stays as a deprecated alias of `Lambda` is open.
+`Function` is removed rather than kept as a deprecated alias, so a v0.6 client calling it fails.
+The new procedures are also declared among the released ones, which renumbers the `KRPC` service's
+procedure ids: a client that calls by id, as cnano does, needs stubs generated for this version.
 
 The lambda node is `Expression.Lambda(parameters, body)`, after the LINQ node it maps to. It is
 `Invoke`d or handed to `Select`/`Where`; it is not the whole function, and a block can be handed
@@ -61,8 +63,8 @@ reports that a function is evaluated within a single tick, and the client guides
 feature as a server side function. The API reference page keeps the title `Expressions`, which
 names what it documents, and links the tutorial for the rest.
 
-Whether a client should reach the factories through a builder object (`conn.Expression.Not(...)`)
-rather than through the class is an open question, unaffected by this split.
+Reaching the factories through a builder object (`conn.Expression.Not(...)`) was considered and not
+taken: the factories stay static members of the class in every client.
 
 ## Approach
 
@@ -112,7 +114,10 @@ not declare:
   `SInt32`, `SInt64`, `UInt32`, `UInt64`, `Bool`, `String`, `Bytes`, `Class`, `Enumeration`,
   `Struct`, `Tuple`, `List`, `Set`, `Dictionary`.
 * Instance properties on `Type`: `Code`, `Service` and `Name` (empty unless the type is defined by a
-  service), and `Types` (generic arguments, empty otherwise).
+  service), `Types` (generic arguments, empty otherwise), and `Nullable`. A function's value is
+  encoded with a presence flag at each position whose type is a nullable number or enumeration, so
+  a client builds its type message with `nullable` set there. The C# and C++ return type checks
+  require a nullable element type at exactly those positions.
 * `Expression.ReturnType` gives the `Type` an expression evaluates to, and `HasReturnType` reports
   whether it has one at all. `ReturnType` throws for types that cannot be returned to a client, such
   as the lazy `IEnumerable<T>` produced by `Select`/`Where`, and the message says to wrap it in
@@ -142,8 +147,10 @@ as the other integer operators do; a negative integer exponent goes through `Mat
 truncates. `Power` of floating point operands uses `Math.Pow`. `Conditional` promotes its two
 branches the same way. Explicit `Cast` remains available.
 
-`Equal` and `NotEqual` compare objects, tuples and bytes by value, since a getter such as
-`SpaceCenter.ActiveVessel` returns a new object on each call. They and `Conditional` keep a null:
+`Equal`, `NotEqual` and `Contains` compare objects, tuples, bytes and collections by value, since a
+getter such as `SpaceCenter.ActiveVessel` returns a new object on each call. A list compares in
+order, a set as a set and a dictionary entry by entry, as Python does. They and `Conditional` keep a
+null:
 when either operand is a nullable number, both widen to the nullable common type.
 
 `Negate` follows the unary form of the same rules: a `uint` is negated as a `long`, and a `ulong`
@@ -333,7 +340,8 @@ share one type. An empty one names its element types, since there is no element 
 from. Either is then mutated by
 `Append`, `Set`, `Remove`, `RemoveAt` and `Clear`, which "Collection operations named by what they
 do" below covers. `Get` of a missing dictionary key raises `KRPC.KeyNotFoundException`, added for
-it, which Python maps to `KeyError`. `ContainsKey` tests for a key, and `Contains`
+it, which Python maps to `KeyError`. It maps the CLR `KeyNotFoundException` for every service, so
+any service's missing key now reaches a Python client as a `KeyError`. `ContainsKey` tests for a key, and `Contains`
 rejects a dictionary with a message pointing at it, since the CLR would compare key and value pairs.
 `StringSplit` gives a `List<string>`, so the parts can be appended to. An integer `Sum` wraps on
 overflow, and the aggregations accept unsigned integers. `Average` of longs is taken over doubles,
@@ -993,7 +1001,9 @@ A lazy `IEnumerable<T>` result is wrapped in `ToList` and decoded as `IList<T>`.
 A client side subtree is evaluated once, as a whole, at the outermost node that does not interact
 with the server, so a side effect in it happens once. A read of a `Stream<T>` is rejected, since it
 would be evaluated once, and so are `AddStream` and `AddEvent` of a lambda that makes no remote
-call. A tuple's `ItemN` maps onto `Get`, `Tuple.Create` onto `CreateTuple`, and a dictionary
+call. `AddStream` streams a single call as that call only when its arguments make no remote call;
+otherwise it compiles the lambda, so the arguments are evaluated on every update rather than once.
+A tuple's `ItemN` maps onto `Get`, `Tuple.Create` onto `CreateTuple`, and a dictionary
 initializer onto `CreateDictionary`. An error from the server while building the tree is raised as
 a `FunctionCompilationException`, with the server's exception inside it.
 
@@ -1048,8 +1058,9 @@ an id, using the default comparer, so any class overriding `Equals`/`GetHashCode
 automatically. That is what `Equatable<T>` (`core/src/Utils/Equatable.cs`) exists for.
 
 Nothing in the store is released except by the sweep described below: `RemoveInstance` is called
-only by that sweep, and `ObjectStore.Clear()` runs only once the last server stops. A function that asks for `Type.Double()` five hundred times must therefore not
-leave five hundred entries describing a single type.
+only by that sweep, and `ObjectStore.Clear()` runs only once the last server stops. A function that
+asks for `Type.Double()` five hundred times must therefore not leave five hundred entries
+describing a single type.
 
 Types and value constants are shared. Interior nodes are not, and the last two subsections say why
 that is enough.
@@ -1058,7 +1069,14 @@ A client can still share a node by passing it to several factories, and the Pyth
 one `Lambda` for each call of a local function. LINQ compiles a shared node once per use, so a
 chain of steps that each use the step before twice doubles the compiled size at every step. The
 visitors that check, bind and rewrite a function throw past `MaxNodes`, 1,000,000 nodes counted
-per use, which compiled in 1.4 s in the core tests under .NET. Thirty such steps would otherwise hang the game for hours.
+per use, which compiled in 1.4 s in the core tests under .NET. Thirty such steps would otherwise
+hang the game for hours.
+
+A function itself is never released either, nor its delegate or the constants interned for it. A
+client that builds a new function per call, such as `run_function(lambda)` in a loop, grows the
+store without bound. The tutorial says to compile once and reuse the function. A release procedure
+and client-side caching of compiled lambdas are
+[#1107](https://github.com/krpc/krpc/issues/1107).
 
 ### Types
 
