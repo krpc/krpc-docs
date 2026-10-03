@@ -158,8 +158,7 @@ Equality and `Conditional` keep a null. When either operand is a nullable value 
 to the nullable common type.
 
 `Negate` follows the unary form of the same rules: a `uint` is negated as a `long`, and a `ulong`
-is an error, as in C#. The compilers used to multiply by `-1`, which gave a `uint` operand the
-wrong type and a `ulong` one no type at all.
+is an error, as in C#.
 
 `And`, `Or` and `ExclusiveOr` promote integer operands the same way. A shift takes its count as an
 `int`, converting any other integer count, and uses its low bits as C# does. `Divide` and `Modulo`
@@ -407,24 +406,23 @@ and `GroupBy` are single-pass helpers rather than LINQ calls.
 
 #### Collection operations named by what they do
 
-The mutations were first one node per collection and operation. Eleven nodes collapse into five,
-each named for the operation, with the type of the collection deciding what it does:
+Mutations are five nodes, each named for the operation, with the type of the collection deciding
+what it does:
 
-| Node | List | Set | Dictionary | Replaces |
-| --- | --- | --- | --- | --- |
-| `Append(c, value)` | adds at the end | adds | - | `ListAdd`, `SetAdd` |
-| `Set(c, index, value)` | writes an element | - | writes an entry | `ListSet`, `DictionarySet` |
-| `Remove(c, value)` | removes a value | removes a value | removes by key | `ListRemove`, `SetRemove`, `DictionaryRemove` |
-| `RemoveAt(list, index)` | removes by position | - | - | `ListRemoveAt` |
-| `Clear(c)` | empties | empties | empties | `ListClear`, `SetClear`, `DictionaryClear` |
+| Node | List | Set | Dictionary |
+| --- | --- | --- | --- |
+| `Append(c, value)` | adds at the end | adds | - |
+| `Set(c, index, value)` | writes an element | - | writes an entry |
+| `Remove(c, value)` | removes a value | removes a value | removes by key |
+| `RemoveAt(list, index)` | removes by position | - | - |
+| `Clear(c)` | empties | empties | empties |
 
 * **The shape follows `Get`**, which already read a tuple, a list and a dictionary through one
   node. A client learns one verb per operation, and the compilers dispatch on the tracked type
   rather than choosing a node per collection.
 * **`Append` is not `Add`**, because `Add` is numerical addition.
-* **Each node checks the kind of collection it was given.** The old `ListAdd`, `ListRemove`,
-  `ListClear` and `SetClear` went through `ICollection`, so `ListAdd(set, value)` added to a set.
-  The checks make a wrong collection an error when the tree is built.
+* **Each node checks the kind of collection it was given**, so a wrong collection is an error when
+  the tree is built.
 
 **Strings are deliberately not collections.** Every collection operation rejects a string with a
 message saying so, through `CheckIsNotAString`, reached either directly or through
