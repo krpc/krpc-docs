@@ -1,17 +1,16 @@
-# Resumable server side functions
+# Yielding procedures in server side functions
 
-**Status:** proposal — not started. A follow-up to server side functions, to be built once
-their stack of PRs merges. No GitHub issue filed yet.
+**Status:** proposal — not started. Two follow-ups to server side functions, deferred calls and
+resumable functions, to be built once the server side functions stack merges. No GitHub issue
+filed yet.
 
-Supersedes the "Resumable functions" sketch in
-[`server-side-functions.md`](server-side-functions.md), under "Yielding procedures inside a
-function". That section states the choice between the three strategies and why journal and replay
-won; this doc is the implementation design.
+[`server-side-functions.md`](server-side-functions.md) describes the problem under "Yielding
+procedures inside a function". This doc holds the design of both follow-ups.
 
-## What it buys
+## The problem
 
-`KRPC.RunFunction` currently reports an error when a procedure inside the function pauses
-execution. Deferred calls cover part of that ground, and the coverage is uneven:
+`KRPC.RunFunction` reports an error when a procedure inside the function pauses execution. The
+procedures that pause are the actions people most want a function to perform:
 
 | Procedure | Returns | Deferred call | Needs resumption |
 | --- | --- | --- | --- |
@@ -19,10 +18,74 @@ execution. Deferred calls cover part of that ground, and the coverage is uneven:
 | `AutoPilot.Wait` | nothing | meaningless | yes |
 | `ActivateNextStage`, `Undock`, `Part.Separate` | the vessel(s) produced | discards the result | yes |
 
-A deferred call is restricted to statement position and throws the result away. So a function can
-start a warp, and it cannot stage and then act on the vessels staging produced. Resumption is what
-lets a client push a whole sequence to the server: point at a target, wait for the autopilot,
-stage, read what came off.
+The two follow-ups take opposite sides of one trade. A deferred call keeps the function within a
+single tick, and detaches the paused call from it. A resumable function waits for the call, and
+spans several ticks. They compose: a resumable function can still start a warp it does not wait
+for.
+
+## Deferred calls
+
+A deferred call starts a procedure that pauses, and the function carries on without waiting for
+it. The core drives the paused call to completion on later updates, detached from the function.
+
+It was built as three phases of the server side functions stack, and removed before review. The
+design below is what was built. "Open questions" lists what needs more design.
+
+### API
+
+* `Expression.DeferredCall (call)` and `Expression.DeferredCallWithArguments (call, args)`, beside
+  `Call` and `CallWithArguments`. The node is a statement, and the procedure's value is discarded.
+* Python spells it `krpc.defer(call)`, a marker recognized by identity like the `math` module
+  functions, allowed wherever a statement goes.
+* C# spells it `Function.Defer(() => call)`, a marker taking a lambda, since a call returning
+  nothing cannot be an argument. An expression tree carries a single expression, so it is the whole
+  body of a `RunFunction` or `CompileFunction` lambda.
+
+### Emission
+
+The emission wraps the ordinary direct call and its scene check in an `Action`, and passes that to
+`Services.ExecuteDeferredCall` with the procedure's signature. A failure to start the call
+propagates to the function, so an unavailable procedure is still reported to the client.
+
+A `YieldException` hands a `DeferredCall` to the core. The core runs the ones it holds ahead of
+each update's calls, outside `MaxTimePerUpdate`, and logs a failure against the procedure's name.
+
+The arguments are evaluated into temporaries before the `Action`, so a pause in an argument belongs
+to the function, and is reported as any other pause is.
+
+### Rules
+
+**Only `RunFunction` may contain one.** A stream or event evaluates its function on every update,
+so a deferred call in one would start the procedure again each time, and the pending calls would
+accumulate without bound. `AddFunctionStream` and `AddEvent` reject such a function when they are
+called, through `Expression.CheckNoDeferredCalls`.
+
+**A deferred call is owned by the client that started it.** `ExecuteDeferredCall` records
+`CallContext.Client`, and each resumption runs with that client set, as an ordinary resumed call
+does. The call is canceled when its client disconnects, and every call is canceled once no server
+is running. Canceling drops the continuation and logs it. The procedures have no undo, so a
+canceled `WarpTo` leaves the game warping. The precedent is `RPCServerUpdate`, which drops a
+yielded continuation whose client has disconnected.
+
+### Open questions
+
+* **The result is discarded.** The form is restricted to statement position. `Undock`,
+  `Part.Separate` and `ActivateNextStage` return the vessels they produce, which is usually the
+  reason for calling them, so a deferred call suits only `WarpTo` and `LaunchVessel`.
+* **A failure after the pause is only logged.** A detached continuation has no request to report
+  to, so the client never learns of it.
+* **The function sees stale state.** Everything after the deferred call reads the game from before
+  the action completes.
+* **Cancellation is partial.** A canceled call leaves its effect part way through.
+* **Interaction with resumable functions.** A deferred call inside a resumable function needs a
+  journal index, or each replay starts it again (problem 3 below).
+
+## Resumable functions
+
+A yield from an inner call is rethrown wrapped in a yield carrying a continuation for the
+*function*. The core's existing machinery resumes `RunFunction` on the next update, as it resumes
+any other yielding RPC. Resumption lets a client push a whole sequence to the server: point at a
+target, wait for the autopilot, stage, read what came off.
 
 **No new API.** `RunFunction` keeps its signature in every client, and both compilers keep the
 syntax they have. The client-visible change is that the call may take several ticks, which is
@@ -31,7 +94,32 @@ already how a yielding RPC behaves.
 **Scope is `RunFunction` alone.** A function stream and an event keep the error. A stream that
 suspends across updates raises its own questions about update rate and staleness.
 
-## It needs no new machinery
+### Strategies
+
+The only hard part is what the continuation contains:
+
+* **State machine.** Compile the tree into a machine that lifts locals into a heap frame so
+  evaluation can suspend and resume. A substantial compiler pass, essentially re-implementing what
+  `async`/`await` does, over an algebra that keeps growing.
+* **Thread per function.** Park the function's thread at the yield and release it on the next
+  update. Far less code, but KSP and Unity APIs are main-thread affine and some assert on the
+  calling thread, so the function's thread would have to hold the main thread's window while the
+  main thread blocks. Workable in principle, fragile in practice, and one thread per in-flight
+  function.
+* **Journal and replay** (chosen). Do not capture the stack at all. Record each completed call's
+  result in a journal held by the continuation, and on resumption re-run the function from the
+  start, serving each call from the journal instead of invoking it, until execution passes the point
+  it reached before. Everything in the algebra apart from calls is deterministic, so replay
+  reproduces exactly the same control flow, locals and collections, and the call counter that keys
+  the journal is deterministic for the same reason.
+
+Journal and replay is much the cheapest, and it is the only one that makes side effects safe rather
+than merely tolerated: a side-effecting call that already completed is replayed from the journal, so
+it is not performed twice. Its costs are a journal per in-flight function, re-running pure
+computation on each resumption (quadratic in the number of yields, which is fine when yields are
+few) and cleanup of journals belonging to a disconnected client.
+
+### It needs no new machinery
 
 `RunFunction` is an ordinary RPC, so the existing continuation machinery already carries it:
 
@@ -72,7 +160,7 @@ be sent reports without performing its effects.
 already skips a continuation whose client has disconnected, and the list is cleared on the swap, so
 a journal dies with the request that owns it.
 
-## The journal
+### The journal
 
 ```csharp
 sealed class FunctionJournal
@@ -104,7 +192,7 @@ Each index is in one of three states:
 The pending slot is what makes side effects safe. A pause inside `ActivateNextStage` at index 7
 resumes that call on the next update; nothing stages a second time.
 
-## Call emission
+### Call emission
 
 This is the work, and it costs some of what
 [`server-side-functions.md`](server-side-functions.md) bought under "Calls". A call compiles to a
@@ -135,7 +223,7 @@ Block(vars: [a0, a1, idx, tmp],
 * `Journal.Suspend` reads the cursor the emitted code already set, so the index of the suspended
   call needs no separate plumbing.
 
-## Two compiled delegates
+### Two compiled delegates
 
 `Expression` caches its compiled delegate, which `RunFunction` and `AddFunctionStream` share;
 `AddEvent` compiles its own. Emitting journaling unconditionally makes every function stream pay it
@@ -163,7 +251,7 @@ depend on the runtime underneath.
 the extension node causes trouble. It matches on identity, which holds because nodes are immutable
 and shared by reference.
 
-## Three correctness problems to settle first
+### Three correctness problems to settle first
 
 These are why the work wants its own PR rather than another phase of the server side functions stack.
 
@@ -177,10 +265,11 @@ mutable collection result, or bring the collection mutation nodes into the journ
 the compiled tree, so every enclosing finalizer runs on the way out and again on replay.
 `TryCatchAll` is already correct: it rethrows `YieldException` ahead of the catch-all.
 
-**3. Deferred calls need a journal index.** `Expression.DeferredCall` is emitted through the same
-`BuildCall`. Without an index, a resumed function starts the warp again on every replay.
+**3. Deferred calls need a journal index**, if they are built first. A deferred call is emitted
+through the same `BuildCall`. Without an index, a resumed function starts the warp again on every
+replay.
 
-## Semantics to document
+### Semantics to document
 
 * **A function is no longer evaluated within a single physics tick.** The tutorial states this twice
   as a headline property. A resumed function spans ticks, and replayed reads return the values seen
@@ -189,10 +278,10 @@ the compiled tree, so every enclosing finalizer runs on the way out and again on
 * **A completed side effect is not performed twice.**
 * **Pure computation is re-run on each resumption**, which is quadratic in the number of pauses.
   That is fine while pauses are few.
-* `Expression.YieldedMessage` currently tells the user to reach for a deferred call. After this it
+* `Expression.YieldedMessage` says a function cannot call a procedure that pauses. After this it
   applies to streams and events alone, and needs rewording.
 
-## Phases
+### Phases
 
 | Phase | Content |
 | --- | --- |
@@ -200,7 +289,7 @@ the compiled tree, so every enclosing finalizer runs on the way out and again on
 | 2 | `RunFunction` throwing the wrapped yield, and the three problems above |
 | 3 | Documentation, tutorial and changelog |
 
-## Testing
+### Testing
 
 `TestService.BlockingProcedureReturns (n, sum)` pauses `n` times and returns a sum, so the whole
 thing is testable in the `ExpressionTest` partial files in `core/test/Service/KRPC/` with no game

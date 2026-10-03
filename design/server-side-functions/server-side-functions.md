@@ -1,9 +1,9 @@
 # Server-side functions
 
-**Status:** done, in review. The work ships as a stack of 22 PRs, one per phase (see "Phases").
+**Status:** done, in review. The work ships as a stack of 19 PRs, one per phase (see "Phases").
 None of the stack is opened yet. It closes umbrella issue
-[#679](https://github.com/krpc/krpc/issues/679). Resumable functions are not built; their design
-moved to [`resumable-functions.md`](resumable-functions.md).
+[#679](https://github.com/krpc/krpc/issues/679). Deferred calls and resumable functions are
+not built; their design is in [`yielding-procedures.md`](yielding-procedures.md).
 
 Linked issues: [#517](https://github.com/krpc/krpc/issues/517) (per-element calls in predicates),
 [#503](https://github.com/krpc/krpc/issues/503) (object constants),
@@ -167,7 +167,7 @@ of the smallest `int` or `long` by -1 wrap, giving that value and 0, where the C
 A value used in a position of a fixed type follows one rule: a numeric conversion that widens is
 implicit, and one that narrows needs `Cast`. The positions are:
 
-* a procedure argument (`CallWithArguments`, `DeferredCallWithArguments`);
+* a procedure argument (`CallWithArguments`);
 * a collection element, a dictionary key or value, the value given to `Append`, `Set`, `Remove`
   and `Contains`, and the key given to `Get` on a dictionary;
 * a structure field (`CreateStruct`);
@@ -620,9 +620,6 @@ out of the per-frame update loop and starving every stream. `AddEvent` reports "
 evaluate to a boolean value" when given anything else. It takes a `bool?` as its value, so a null
 becomes an error on the event's stream.
 
-Both reject a function containing a deferred call, since it would start the call again on every
-update (see "Deferred calls").
-
 **Function streams deduplicate like procedure call streams.** Two `FunctionStream`s are equal when
 they share the compiled delegate, which the `Expression` caches, so a second `AddFunctionStream` of
 the same function by the same client returns the existing stream's id, as `AddStream` does for an
@@ -781,9 +778,6 @@ only in `Expression.Lambda`, since a block can be handed straight to `RunFunctio
 wrapper. A `Return` inside a lambda is also type-checked against the lambda's result type when the
 lambda is built.
 
-**A deferred call is reported when a stream or event is created.** `AddFunctionStream` and
-`AddEvent` reject a function containing one, per "Deferred calls".
-
 ## Yielding procedures inside a function
 
 ### Background
@@ -837,92 +831,16 @@ RPC that yields is a single operation, so it has nothing to be stale; a function
 and combines them, so partial staleness would be the normal case rather than an edge one. The two
 follow-ups below take opposite sides of that trade, and compose rather than compete.
 
-### Deferred calls
+### Follow-ups
 
-Built. `Expression.DeferredCall` and `Expression.DeferredCallWithArguments` start a yielding
-procedure and return within the same frame. If the call yields, its continuation is scheduled and
-driven to completion by the core on subsequent updates, detached from the function, which carries
-on immediately.
+Neither is built. Both are designed in [`yielding-procedures.md`](yielding-procedures.md), as
+follow-ups to this stack rather than phases of it.
 
-The emission wraps the ordinary direct call and its scene check in an `Action`, and passes that to
-`Services.ExecuteDeferredCall` with the procedure's signature. A failure to start the call
-propagates to the function, so an unavailable procedure is still reported to the client. A
-`YieldException` hands a `DeferredCall` to the core, which runs the ones it holds ahead of each
-update's calls, outside `MaxTimePerUpdate`, and logs a failure against the procedure's name.
-
-The arguments are evaluated into temporaries before the `Action`, so a pause in an argument belongs
-to the function, and is reported as any other pause is.
-
-**Only `RunFunction` may contain one.** A stream or event evaluates its function on every update,
-so a deferred call in one would start the procedure again each time, and the pending calls would
-accumulate without bound. `AddFunctionStream` and `AddEvent` reject such a function when they are
-called, through `Expression.CheckNoDeferredCalls`.
-
-**A deferred call is owned by the client that started it.** `ExecuteDeferredCall` records
-`CallContext.Client`, and each resumption runs with that client set in `CallContext`, as an ordinary
-resumed call does. The call is canceled when its client disconnects, and every call is canceled
-once no server is running, alongside the object store being cleared. Canceling drops the
-continuation and logs it; the procedures have no undo, so a canceled `WarpTo` leaves the game
-warping. The precedent is `RPCServerUpdate`, which already drops a yielded continuation whose client
-has disconnected.
-
-Both compilers reach it. Python spells it `krpc.defer(call)`, a marker recognized by identity
-like the `math` module functions, allowed wherever a statement goes. C# spells it
-`Function.Defer(() => call)`, a marker taking a lambda, since a call returning nothing cannot be
-an argument; an expression tree carries a single expression, so it is the whole body of a
-`RunFunction` or `CompileFunction` lambda.
-
-This lets a function trigger an action it does not need to wait for. It is genuinely limited, and
-the limitation falls unevenly across the procedures that yield:
-
-* `WarpTo` and `LaunchVessel` return nothing and read naturally as "start this", so deferring suits
-  them.
-* `AutoPilot.Wait` does nothing *but* wait, so deferring it is meaningless.
-* `Undock`, `Part.Separate` and `ActivateNextStage` return the vessel or vessels they produce, which
-  is usually the reason for calling them. A deferred call discards that, so the function cannot act
-  on what it just created.
-
-So the form is restricted to statement position, discarding any result, and documented as doing so
-rather than returning a null the function might use. Two further consequences need stating: a
-detached continuation has no request to report to, so a failure can only be logged and the client
-never learns of it; and the function keeps running, so anything it does after the deferred call
-observes game state from before the action completes.
-
-For the calls it covers this removes the repeated-side-effect problem outright, because the function
-no longer aborts part way through. A yielding procedure called through the ordinary form still
-aborts the function.
-
-### Resumable functions
-
-Not built. A yield from an inner call is rethrown wrapped in a yield carrying a continuation for the
-*function*, and the core's existing machinery resumes `RunFunction` on the next update exactly as it
-resumes any other yielding RPC. The only hard part is what that continuation contains. Three
-strategies:
-
-* **State machine.** Compile the tree into a machine that lifts locals into a heap frame so
-  evaluation can suspend and resume. A substantial compiler pass, essentially re-implementing what
-  `async`/`await` does, over an algebra that keeps growing.
-* **Thread per function.** Park the function's thread at the yield and release it on the next
-  update. Far less code, but KSP and Unity APIs are main-thread affine and some assert on the
-  calling thread, so the function's thread would have to hold the main thread's window while the
-  main thread blocks. Workable in principle, fragile in practice, and one thread per in-flight
-  function.
-* **Journal and replay** (chosen). Do not capture the stack at all. Record each completed call's
-  result in a journal held by the continuation, and on resumption re-run the function from the
-  start, serving each call from the journal instead of invoking it, until execution passes the point
-  it reached before. Everything in the algebra apart from calls is deterministic, so replay
-  reproduces exactly the same control flow, locals and collections, and the call counter that keys
-  the journal is deterministic for the same reason.
-
-Journal and replay is much the cheapest, and it is the only one that makes side effects safe rather
-than merely tolerated: a side-effecting call that already completed is replayed from the journal, so
-it is not performed twice. Its costs are a journal per in-flight function, re-running pure
-computation on each resumption (quadratic in the number of yields, which is fine when yields are
-few) and cleanup of journals belonging to a disconnected client.
-
-The implementation design is in [`resumable-functions.md`](resumable-functions.md), which covers the
-journal, the call emission, the semantics a user sees and three correctness problems to settle
-first. It is scoped to `RunFunction`, and is a follow-up PR rather than a phase of this one.
+* **Deferred calls.** A function starts a procedure that pauses, and carries on without waiting
+  for it. The core drives the call to completion on later updates. The function stays within one
+  tick, and the procedure's result is discarded.
+* **Resumable functions.** A pause suspends the whole function, and `RunFunction` resumes it on a
+  later update. The function can use what the procedure returns, and spans several ticks.
 
 ## Client-side compilation
 
@@ -962,7 +880,7 @@ no remote call, and a stream read inside a function, as it would be evaluated on
 * Statements (`krpc/functionstatements.py`): `if`/`elif`/`else`, `while` and `for` with
   `break`/`continue`, early `return`, local variables including augmented and annotated assignment,
   assignment to remote properties and to collection elements, `pass`, calls evaluated purely for
-  their effects, and `krpc.defer(call)` for a procedure that pauses execution. A block holding
+  their effects. A block holding
   only `pass` is an error, since the algebra has no empty block, except as the body of an
   `except`. List `+=` extends the list in place, as `list.extend` does.
 * Strings and collections dispatch on the statically tracked type: `len`, `[i]`, `[a:b]`, `in`,
@@ -1055,8 +973,7 @@ for free from an `Expression<Func<TResult>>` lambda, into the same server tree. 
 boolean lambda, `AddStream` compiles compound lambdas, and `RunFunction` accepts
 `Expression<Action>` lambdas so side-effecting functions can be written in the same style.
 
-`Function.Defer` is the one statement the compiler reaches, and `CompileFunction` has an
-`Expression<Action>` overload so a lambda with no result compiles to a reusable object.
+`CompileFunction` has an `Expression<Action>` overload so a lambda with no result compiles to a reusable object.
 
 Beyond the operator set: a comparison with `null` maps onto `IsNull`, or folds to a constant when
 the operand's `ReturnType` is not nullable, and a conversion between a value type and its nullable
@@ -1111,8 +1028,7 @@ limited to single-expression lambdas.
 
 Documented for both compilers, because they are the surprises: captured values are frozen at compile
 time, so only remote calls re-evaluate per tick; and a procedure that pauses execution cannot be
-called for its value inside a function, though a run-once function can start one as a deferred
-call.
+called inside a function.
 
 **Short-circuiting is not one of them.** `And` and `Or` compile to LINQ's `And`/`Or`, which evaluate
 both operands, and mapping `and`/`or` and `&&`/`||` onto them would silently drop the guard in
@@ -1391,7 +1307,7 @@ explicit batch helper instead, which is only worth adding if hand-built trees th
 * `service/SpaceCenter/test/test_server_side_functions.py`, in the in-game suite, against a vessel
   on the launchpad: reading the game state, a single tick shared by every call, comprehensions and
   loops over the vessel's parts, side effects, `StdLib` on the game's vectors, a function stream, an
-  event, and a deferred `WarpTo` beside the error a yielding procedure produces without it.
+  event, and the error a yielding procedure produces.
 
 Three behaviors are decided rather than merely implemented, and each is covered explicitly: the
 collection operations reject a string with the intended message rather than an internal exception;
@@ -1452,17 +1368,14 @@ what a user sees, its changelog commit. Each builds and passes `//:test` on its 
 | 8 | String operations |
 | 9 | Exceptions: `Throw`, `TryCatch`, `TryCatchAll`, `TryFinally`, and `KRPC.DivideByZeroException`, `NotSupportedException`, `TimeoutException` and `Error` |
 | 10 | The `StdLib` service |
-| 11 | Deferred calls |
-| 12 | `ExpressionTreePrinter` and the TestServer `DumpExpressionTree` RPC |
-| 13 | Python `run_function`, `add_function_stream`, `function_stream` and `add_event` over hand-built trees |
-| 14 | Python compiler, lambdas, and `None` typed from its context |
-| 15 | Python compiler, functions with statements |
-| 16 | Python `krpc.defer` |
-| 17 | C# compiler, `RunFunction`, `AddEvent` and the `AddStream` overloads |
-| 18 | C# `Function.Defer` |
-| 19 | Java `runFunction` and `addStream` helpers, and a public `RemoteObject.id` |
-| 20 | C++ `run_function` and `add_function_stream` helpers |
-| 21 | The tutorial and the in-game tests |
+| 11 | `ExpressionTreePrinter` and the TestServer `DumpExpressionTree` RPC |
+| 12 | Python `run_function`, `add_function_stream`, `function_stream` and `add_event` over hand-built trees |
+| 13 | Python compiler, lambdas, and `None` typed from its context |
+| 14 | Python compiler, functions with statements |
+| 15 | C# compiler, `RunFunction`, `AddEvent` and the `AddStream` overloads |
+| 16 | Java `runFunction` and `addStream` helpers, and a public `RemoteObject.id` |
+| 17 | C++ `run_function` and `add_function_stream` helpers |
+| 18 | The tutorial and the in-game tests |
 
 The golden tree tests for each compiler land with that compiler. Two C++ stream fixes found in
 review went out separately as [#1108](https://github.com/krpc/krpc/pull/1108) and
@@ -1477,6 +1390,7 @@ review went out separately as [#1108](https://github.com/krpc/krpc/pull/1108) an
   sizes first.
 * Declaring exception types. A function throws one from the KRPC service's fixed set.
 * Bounding the time a loop can run for, so that a runaway function cannot hang the game.
-* Resumable functions, designed under "Yielding procedures inside a function".
+* Deferred calls and resumable functions, designed in
+  [`yielding-procedures.md`](yielding-procedures.md).
 * Calling arbitrary CLR members from a function, sketched in
   [server-side-arbitrary-expressions.md](server-side-arbitrary-expressions.md).
