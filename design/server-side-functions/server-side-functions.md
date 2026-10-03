@@ -1,8 +1,10 @@
 # Server-side functions
 
-**Status:** done in [PR #1069](https://github.com/krpc/krpc/pull/1069), open for review, which
-closes umbrella issue [#679](https://github.com/krpc/krpc/issues/679). Resumable functions are not
-built; their design moved to [`resumable-functions.md`](resumable-functions.md).
+**Status:** done, in review. The work was opened as one change in
+[PR #1069](https://github.com/krpc/krpc/pull/1069), and is being split into a stack of 22 smaller
+PRs, one per phase (see "Phases"). None of the stack is opened yet. It closes umbrella issue
+[#679](https://github.com/krpc/krpc/issues/679). Resumable functions are not built; their design
+moved to [`resumable-functions.md`](resumable-functions.md).
 
 Linked issues: [#517](https://github.com/krpc/krpc/issues/517) (per-element calls in predicates),
 [#503](https://github.com/krpc/krpc/issues/503) (object constants),
@@ -48,8 +50,9 @@ names its parameter `function`, which is what tells a reader that the whole tree
 than a node of one. `KRPC.AddEvent` was renamed from `expression` for this. With the rename of
 `Expression.Function` to `Lambda` below, these are the two user-visible breaks the rule costs.
 `Function` is removed rather than kept as a deprecated alias, so a v0.6 client calling it fails.
-The new procedures are also declared among the released ones, which renumbers the `KRPC` service's
-procedure ids: a client that calls by id, as cnano does, needs stubs generated for this version.
+The new procedures are also declared among the released ones, and `Expression` is split into one
+partial class file per feature. Both renumber the `KRPC` service's procedure ids: a client that
+calls by id, as cnano does, needs stubs generated for this version.
 
 The lambda node is `Expression.Lambda(parameters, body)`, after the LINQ node it maps to. It is
 `Invoke`d or handed to `Select`/`Where`; it is not the whole function, and a block can be handed
@@ -190,7 +193,7 @@ most-derived `KRPCClass` type as the node's static type, so no protocol change a
 self-describing wire value is needed, which is what blocked
 [#503](https://github.com/krpc/krpc/issues/503). Clients already expose the identifier
 (`RemoteObject.id` in C#, `_object_id` in Python, `Object::_id` in C++, and in Java
-`RemoteObject.id`, which PR #1069 makes public). An object of a KRPC service class, such as an
+`RemoteObject.id`, which the Java phase makes public). An object of a KRPC service class, such as an
 `Expression`, is rejected: a function holding one could run or stream it, past the checks
 `RunFunction`, `AddEvent` and `AddFunctionStream` make.
 
@@ -1349,6 +1352,42 @@ Sets are deliberately excluded from the goldens, since client-side set iteration
 nondeterministic. Generated C++ service headers do not include cross-service headers, so the C++
 test sources include `krpc/services/krpc.hpp` before `services/test_service.hpp` for the new RPC's
 `KRPC::Expression` parameter.
+
+## Phases
+
+The first phase removes the v0.6.0 `Expression`, `Type` and `AddEvent`, so each later phase is an
+addition reviewed on its own. The stack's net change against v0.6.0 is the design above, and the
+breaking changes it lists are relative to v0.6.0. Each phase is a code commit and its changelog
+commit, and each builds and passes `//:test` on its own.
+
+| Phase | Content |
+| --- | --- |
+| 0 | Remove the v0.6.0 server side expression API. The sub-orbital tutorial polls until phase 2 restores events |
+| 1 | `KRPC.Type`: class, enumeration, structure and collection types, and the `Code`, `Service`, `Name`, `Types` and `Nullable` properties |
+| 2 | `KRPC.Expression` core: constants, numeric promotion, comparisons, logic, casts, calls compiled to direct method calls, and `AddEvent` |
+| 3 | `KRPC.RunFunction` and `KRPC.AddFunctionStream` |
+| 4 | Building tuples, structures and collections, and `GetField` |
+| 5 | Collection and dictionary operations, content equality, and `KRPC.KeyNotFoundException` |
+| 6 | Statements and control flow: variables, blocks, loops, `Break`, `Continue`, `Return` |
+| 7 | Collection mutation: `Append`, `Set`, `Remove`, `RemoveAt`, `Clear` |
+| 8 | String operations |
+| 9 | Exceptions: `Throw`, `TryCatch`, `TryCatchAll`, `TryFinally` |
+| 10 | The `StdLib` service |
+| 11 | Deferred calls |
+| 12 | `ExpressionTreePrinter` and the TestServer `DumpExpressionTree` RPC |
+| 13 | Python `run_function`, `add_function_stream`, `function_stream` and `add_event` over hand-built trees |
+| 14 | Python compiler, lambdas |
+| 15 | Python compiler, functions with statements |
+| 16 | Python `krpc.defer` |
+| 17 | C# compiler, `RunFunction`, `AddEvent` and the `AddStream` overloads |
+| 18 | C# `Function.Defer` |
+| 19 | Java `runFunction` and `addStream` helpers, and a public `RemoteObject.id` |
+| 20 | C++ `run_function` and `add_function_stream` helpers |
+| 21 | The tutorial and the in-game tests |
+
+The golden tree tests for each compiler land with that compiler. Two C++ stream fixes found in
+review went out separately as [#1108](https://github.com/krpc/krpc/pull/1108) and
+[#1109](https://github.com/krpc/krpc/pull/1109).
 
 ## Out of scope
 

@@ -1,8 +1,8 @@
 # Resumable server side functions
 
-**Status:** proposal — not started. A follow-up to
-[PR #1069](https://github.com/krpc/krpc/pull/1069), to be built on its own branch after that
-merges. No GitHub issue filed yet.
+**Status:** proposal — not started. A follow-up to server side functions
+([PR #1069](https://github.com/krpc/krpc/pull/1069), now being split into a stack of PRs), to be
+built once that stack merges. No GitHub issue filed yet.
 
 Supersedes the "Resumable functions" sketch in
 [`server-side-functions.md`](server-side-functions.md), under "Yielding procedures inside a
@@ -166,7 +166,7 @@ and shared by reference.
 
 ## Three correctness problems to settle first
 
-These are why the work wants its own PR rather than another phase on the branch.
+These are why the work wants its own PR rather than another phase of the server side functions stack.
 
 **1. Replay repeats local mutation of a journaled object.** "Everything but calls is deterministic"
 is not quite true. `vessel.parts.all` returns a fresh list per call. The journal records that
