@@ -37,7 +37,7 @@ Non-goal: making this safe to expose to an untrusted network. See "Security mode
 
 Most of the machinery already exists:
 
-* **The boundary check.** `ExpressionStream` validates at creation and `RunFunction` calls
+* **The boundary check.** `FunctionStream` validates at creation and `RunFunction` calls
   `GetValidReturnType()`, both via `TypeUtils.IsAValidType`. Values of types kRPC cannot serialize
   are already rejected at the wire boundary, which is exactly the restriction this feature needs —
   arbitrary CLR values may exist *inside* a function as intermediate values and simply cannot

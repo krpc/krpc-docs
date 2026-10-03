@@ -905,7 +905,7 @@ instance as a fixed argument, and embedded with `Call`. The instance is a consta
   and `is not None` through `IsNull`; comprehensions (list, set and dict, nested) and generator
   expressions; `any`/`all`/`sum`/`min`/`max`/`len`/`sorted`/`abs`/`round`/`int`/`float`/`str`;
   subscripts and slices; f-strings; conditional expressions through `Expression.Conditional`;
-  assignment expressions; parameterless lambdas and local function calls; and `math` module calls
+  assignment expressions in a function body; parameterless lambdas and local function calls; and `math` module calls
   mapped onto `StdLib`.
 * Statements (`krpc/functionstatements.py`): `if`/`elif`/`else`, `while` and `for` with
   `break`/`continue`, early `return`, local variables including augmented and annotated assignment,
@@ -1288,12 +1288,12 @@ explicit batch helper instead, which is only worth adding if hand-built trees th
 
 ## Testing
 
-* `core/test/Service/KRPC/ExpressionTest.cs`: promotion cases for every binary operator; `Call` and
-  `CallWithArguments` against the scanned core `TestService`, with `ConstantObject`, class-typed
-  `Parameter`, per-element `Any`/`Select` over real RPC calls, error propagation and `ReturnType` on
-  every node kind; the statement nodes, covering block scoping, loops with `Break`/`Continue`, early
-  `Return` and imperative collection construction; and the tuple, collection, string and exception
-  operations.
+* The `ExpressionTest` partial files in `core/test/Service/KRPC/`: promotion cases for every
+  binary operator; `Call` and `CallWithArguments` against the scanned core `TestService`, with
+  `ConstantObject`, class-typed `Parameter`, per-element `Any`/`Select` over real RPC calls, error
+  propagation and `ReturnType` on every node kind; the statement nodes, covering block scoping,
+  loops with `Break`/`Continue`, early `Return` and imperative collection construction; and the
+  tuple, collection, string and exception operations.
 * `TypeTest` for the factories and introspection, and `StdLibTest` for the scalar, vector and
   quaternion operations.
 * Stream behavior (value change detection, error capture, a yield reported as an error) alongside
@@ -1333,7 +1333,7 @@ A deterministic tree printer (`core/src/Service/KRPC/ExpressionTreePrinter.cs`: 
 `NodeType<Type> detail` lines, sequential ids for parameters, variables and labels, invariant
 round-trip numeric formatting, and object constants printed as type name only so no run-to-run
 identity leaks) is exposed through a test-only `DumpExpressionTree(Expression)` RPC on TestServer's
-`TestService` and mirrored on the in-game `TestingTools` service. Three golden suites compare dumps
+`TestService`. Three golden suites compare dumps
 against expected strings, verifying the exact trees the API generates without depending on the
 brittle compiled IL:
 
@@ -1357,17 +1357,17 @@ test sources include `krpc/services/krpc.hpp` before `services/test_service.hpp`
 
 The first phase removes the v0.6.0 `Expression`, `Type` and `AddEvent`, so each later phase is an
 addition reviewed on its own. The stack's net change against v0.6.0 is the design above, and the
-breaking changes it lists are relative to v0.6.0. Each phase is a code commit and its changelog
-commit, and each builds and passes `//:test` on its own.
+breaking changes it lists are relative to v0.6.0. Each phase is a code commit and, when it changes
+what a user sees, its changelog commit. Each builds and passes `//:test` on its own.
 
 | Phase | Content |
 | --- | --- |
 | 0 | Remove the v0.6.0 server side expression API. The sub-orbital tutorial polls until phase 2 restores events |
 | 1 | `KRPC.Type`: class, enumeration, structure and collection types, and the `Code`, `Service`, `Name`, `Types` and `Nullable` properties |
-| 2 | `KRPC.Expression` core: constants, numeric promotion, comparisons, logic, casts, calls compiled to direct method calls, and `AddEvent` |
+| 2 | `KRPC.Expression` core: constants, numeric promotion, comparisons, content equality, logic, casts, conditionals, `IsNull`, lambdas and `Invoke`, calls compiled to direct method calls, `ReturnType`, the node limit, and `AddEvent` |
 | 3 | `KRPC.RunFunction` and `KRPC.AddFunctionStream` |
 | 4 | Building tuples, structures and collections, and `GetField` |
-| 5 | Collection and dictionary operations, content equality, and `KRPC.KeyNotFoundException` |
+| 5 | Collection and dictionary operations, and `KRPC.KeyNotFoundException` |
 | 6 | Statements and control flow: variables, blocks, loops, `Break`, `Continue`, `Return` |
 | 7 | Collection mutation: `Append`, `Set`, `Remove`, `RemoveAt`, `Clear` |
 | 8 | String operations |

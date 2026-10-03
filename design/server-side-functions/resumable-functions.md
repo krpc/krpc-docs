@@ -203,10 +203,11 @@ the compiled tree, so every enclosing finalizer runs on the way out and again on
 
 ## Testing
 
-`TestService.BlockingProcedureReturns (n, sum)` pauses `n` times and returns a sum, so the whole thing
-is testable in `core/test/Service/KRPC/ExpressionTest.cs` with no game running. Assert the value,
-the number of invocations, and that a side-effecting call placed before the pause happens exactly
-once. `core/test/CoreTest.cs` covers the parked continuation against the `TestServer` harness.
+`TestService.BlockingProcedureReturns (n, sum)` pauses `n` times and returns a sum, so the whole
+thing is testable in the `ExpressionTest` partial files in `core/test/Service/KRPC/` with no game
+running. Assert the value, the number of invocations, and that a side-effecting call placed before
+the pause happens exactly once. `core/test/CoreTest.cs` covers the parked continuation against the
+`TestServer` harness.
 
 In game, stage and then read the vessels staging produced is the case worth covering, beside an
 `AutoPilot.Wait` that spans several ticks.
