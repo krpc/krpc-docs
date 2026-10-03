@@ -4,7 +4,8 @@
 None of the stack is opened yet. It closes umbrella issue
 [#679](https://github.com/krpc/krpc/issues/679). Deferred calls and resumable functions are
 not built; their design is in [`yielding-procedures.md`](yielding-procedures.md). Compiling
-shared nodes once is not built either; its design is in [`shared-nodes.md`](shared-nodes.md).
+shared nodes once and releasing functions are not built either; their designs are in
+[`shared-nodes.md`](shared-nodes.md) and [`function-release.md`](function-release.md).
 
 Linked issues: [#517](https://github.com/krpc/krpc/issues/517) (per-element calls in predicates),
 [#503](https://github.com/krpc/krpc/issues/503) (object constants),
@@ -1079,8 +1080,8 @@ the bound. It is a follow-up, designed in [`shared-nodes.md`](shared-nodes.md).
 A function itself is never released either, nor its delegate or the constants interned for it. A
 client that builds a new function per call, such as `run_function(lambda)` in a loop, grows the
 store without bound. The tutorial says to compile once and reuse the function. A release procedure
-and client-side caching of compiled lambdas are
-[#1107](https://github.com/krpc/krpc/issues/1107).
+and client-side caching of compiled lambdas are a follow-up, designed in
+[`function-release.md`](function-release.md).
 
 ### Types
 
@@ -1172,7 +1173,8 @@ described below, and it is wrong for three reasons:
 
 If interior-node growth is ever worth addressing, it therefore needs a client-driven answer, an
 explicit release or a lifetime tied to the stream or event that consumes the tree, rather than the
-server guessing from liveness. Not designed here.
+server guessing from liveness. The explicit release is designed in
+[`function-release.md`](function-release.md).
 
 ### No refcounting for these
 
@@ -1402,5 +1404,7 @@ review went out separately as [#1108](https://github.com/krpc/krpc/pull/1108) an
   [`yielding-procedures.md`](yielding-procedures.md).
 * Compiling a shared node once, which would remove `MaxNodes`, designed in
   [`shared-nodes.md`](shared-nodes.md).
+* Releasing functions and caching compiled lambdas, designed in
+  [`function-release.md`](function-release.md).
 * Calling arbitrary CLR members from a function, sketched in
   [server-side-arbitrary-expressions.md](server-side-arbitrary-expressions.md).
