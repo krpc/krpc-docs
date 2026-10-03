@@ -317,7 +317,8 @@ exposing it as factories with kRPC-shaped semantics.
 * Early exit: `Return(value)` and `ReturnNothing()` are likewise markers, bound to a label that
   `Expression.Lambda` wraps around the function body, so a return anywhere in a nested block leaves
   the whole function. A body that ends with a statement, such as an `IfThenElse` returning on both
-  branches, takes its result type from its first `Return(value)`. Reaching the end of such a body
+  branches, takes its result type from its first `Return(value)`. A nullable value type among the
+  results, such as a `ConstantNull(Int())`, lifts the others to it. Reaching the end of such a body
   raises `KRPC.InvalidOperationException`.
 * Side effects: calls to procedures with no return value (including property setters) are ordinary
   statement expressions, and collections can be built imperatively.
