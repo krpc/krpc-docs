@@ -3,7 +3,8 @@
 **Status:** done, in review. The work ships as a stack of 19 PRs, one per phase (see "Phases").
 None of the stack is opened yet. It closes umbrella issue
 [#679](https://github.com/krpc/krpc/issues/679). Deferred calls and resumable functions are
-not built; their design is in [`yielding-procedures.md`](yielding-procedures.md).
+not built; their design is in [`yielding-procedures.md`](yielding-procedures.md). Compiling
+shared nodes once is not built either; its design is in [`shared-nodes.md`](shared-nodes.md).
 
 Linked issues: [#517](https://github.com/krpc/krpc/issues/517) (per-element calls in predicates),
 [#503](https://github.com/krpc/krpc/issues/503) (object constants),
@@ -1062,11 +1063,18 @@ that is enough.
 
 A client can still share a node by passing it to several factories, and the Python compiler reuses
 one `Lambda` for each call of a local function. LINQ compiles a shared node once per use, so a
-chain of steps that each use the step before twice doubles the compiled size at every step. The
-visitors that check, bind and rewrite a function throw past `MaxNodes`, 1,000,000 nodes counted
-per use, which compiled in 1.4 s in the core tests under .NET. Thirty such steps would otherwise
-hang the game for hours. `AddEvent`, `RunFunction` and `AddFunctionStream` also count the nodes
-before compiling, through `Expression.CheckSize`, a check separate from the marker checks.
+chain of steps that each use the step before twice doubles the compiled size at every step.
+Thirty such steps hang the game for hours, since compiling runs on the main thread and cannot be
+cancelled.
+
+The visitors that check, bind and rewrite a function therefore throw past `MaxNodes`, 1,000,000
+nodes counted per use. That many compiled in 1.4 s in the core tests under .NET. `AddEvent`,
+`RunFunction` and `AddFunctionStream` also count the nodes before compiling, through
+`Expression.CheckSize`, a check separate from the marker checks.
+
+The bound only stops the blowup. A program built from distinct nodes needs a million RPCs to reach
+it. Compiling each shared node once would make the work grow with the distinct nodes, and remove
+the bound. It is a follow-up, designed in [`shared-nodes.md`](shared-nodes.md).
 
 A function itself is never released either, nor its delegate or the constants interned for it. A
 client that builds a new function per call, such as `run_function(lambda)` in a loop, grows the
@@ -1392,5 +1400,7 @@ review went out separately as [#1108](https://github.com/krpc/krpc/pull/1108) an
 * Bounding the time a loop can run for, so that a runaway function cannot hang the game.
 * Deferred calls and resumable functions, designed in
   [`yielding-procedures.md`](yielding-procedures.md).
+* Compiling a shared node once, which would remove `MaxNodes`, designed in
+  [`shared-nodes.md`](shared-nodes.md).
 * Calling arbitrary CLR members from a function, sketched in
   [server-side-arbitrary-expressions.md](server-side-arbitrary-expressions.md).
