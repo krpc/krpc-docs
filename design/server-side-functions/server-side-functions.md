@@ -786,11 +786,13 @@ lambda is built.
 
 ## Yielding procedures inside a function
 
-Some procedures cannot finish within the tick they are called in. They signal this by throwing
-`YieldException`, which carries a delegate that resumes the work. `ProcedureCallContinuation.Run`
-catches it and rethrows a continuation wrapping `e.CallUntyped()`; the core parks that in
-`rpcYieldedContinuations` and calls it again on each update until it completes. The client never
-sees any of this: its call simply takes several ticks.
+### Background
+
+Some procedures cannot finish within the tick they are called in. Called as a normal RPC, such a
+procedure signals this by throwing `YieldException`, which carries a delegate that resumes the
+work. `ProcedureCallContinuation.Run` catches it and rethrows a continuation wrapping
+`e.CallUntyped()`; the core parks that in `rpcYieldedContinuations` and calls it again on each
+update until it completes. The client never sees any of this: its call simply takes several ticks.
 
 These are not obscure procedures. `Control.ActivateNextStage`, `SpaceCenter.WarpTo`,
 `SpaceCenter.LaunchVessel`, `Part.Separate`, `AutoPilot.Wait` and vessel switching all yield, which
