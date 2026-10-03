@@ -185,6 +185,7 @@ structures follow the same rules. A condition, and the operands of `Not`, `Condi
 | Factory | Notes |
 |---|---|
 | `ConstantDouble`, `ConstantFloat`, `ConstantInt`, `ConstantLong`, `ConstantUInt`, `ConstantULong`, `ConstantBool`, `ConstantString`, `ConstantBytes` | Value constants |
+| `ConstantNull(type)` | A null of `type`, made nullable |
 | `ConstantObject(ulong id)` | An object reference, by its object id |
 | `ConstantEnum(service, name, value)` | A member of a service's enumeration |
 
@@ -204,11 +205,10 @@ structures follow the same rules. A condition, and the operands of `Not`, `Condi
 
 ### Null values
 
-There is no null constant. A value can be null only where a procedure returns one, so the algebra
-tests for it rather than producing it: `IsNull(value)` is a boolean, `ReferenceEqual` against null
-for a reference type and `Equal` against a null `Nullable<T>` for a value type. A value that is not
-nullable is an error when the node is built, a string or class included. The compilers map
-`x is None` and `x == null` onto it.
+`ConstantNull(type)` produces a null, and `IsNull(value)` tests for one. `IsNull` is a boolean,
+`ReferenceEqual` against null for a reference type and `Equal` against a null `Nullable<T>` for a
+value type. `IsNull` of a value that is not nullable is an error when the node is built, a string
+or class included. The compilers map `x is None` and `x == null` onto it.
 
 Every node carries a spec, the same tree of type and nullable flag a `Type` wraps, beside its CLR
 type. The CLR type alone cannot say whether a string or class is nullable. A node that computes a
@@ -219,6 +219,7 @@ fresh value is not nullable. A node that passes a value on takes the spec of whe
 | A call | The procedure's return spec, its `[KRPCNullable]` positions included |
 | `GetField` | The structure field's spec |
 | `Cast`, `Parameter`, `Variable` | The `Type` given |
+| `ConstantNull` | The `Type` given, nullable |
 | `Conditional`, `CreateList`, `CreateDictionary` values, `Concat` and the like | Nullable wherever any input is |
 | `Get`, `First`, `Last`, `ElementAt`, `MinBy`, `MaxBy`, `ToList`, `DictionaryValues` | The element or value position of the collection |
 | `Select`, `SelectMany`, `Zip`, `Invoke` | The function's result, joined over its body and every `Return` |
@@ -992,8 +993,11 @@ list of them, `reversed` reaches `Reverse`,
   each element, with `x` evaluated once.
 * A shift follows Python where the server follows C#: a count of at least the width gives 0, or -1
   for a negative value shifted right, and a negative count raises `ValueError`.
-* `None` passed to a nullable parameter is a null constant argument of the call. Anywhere else it
-  is a compile error, since the algebra has no typed null constant.
+* `None` passed to a nullable parameter is a null argument of the call. Anywhere else it is a
+  `ConstantNull`, typed from its context: a conditional's other branch, a literal's other
+  elements, the function's other returns, the variable's other assignments, an `Optional[T]`
+  annotation on a variable or `->`, or `typing.cast(T, None)`. A `None` with no context is a
+  compile error. A bare `return` in a function that returns a value is an error, as in mypy.
 * `except ValueError` catches the three argument exceptions and `except KeyError` a missing key.
   `except RuntimeError` catches `InvalidOperationException` and every other exception a service
   declares, as the Python client raises a service exception as a `RuntimeError` subclass. A
@@ -1036,7 +1040,7 @@ boolean lambda, `AddStream` compiles compound lambdas, and `RunFunction` accepts
 
 Beyond the operator set: a comparison with `null` maps onto `IsNull`, or folds to a constant when
 the operand's `ReturnType` is not nullable, and a conversion between a value type and its nullable
-form is left to the server; `??`, `.HasValue`, `.Value` and
+form is left to the server; a `null` is a `ConstantNull` of its static type; `??`, `.HasValue`, `.Value` and
 `GetValueOrDefault` on a nullable remote value compile to `IsNull` and `Conditional`, with the
 value held in a variable; `System.Math` methods map onto `StdLib`;
 string `+` and `ToString` become `StringConcat` and `ConvertToString`; the bitwise complement and
@@ -1165,7 +1169,8 @@ The mechanism differs. `Expression` wraps an arbitrary LINQ tree, and those have
 equality, so a blanket `Equals` override is not available: value equality is well defined for
 constant nodes and for nothing else. The factories intern instead, through a
 `Dictionary<Tuple<System.Type, object>, Expression>` keyed on the constant's type and value,
-consulted by every value constant factory and `ConstantEnum`.
+consulted by every value constant factory and `ConstantEnum`. `ConstantNull` interns through a
+second dictionary keyed on the `TypeSpec`, since two specs can share a CLR type.
 Reference equality then does the deduplication in the object store with no equality override at all,
 and the allocation is avoided as well. Sharing is safe because LINQ trees are immutable and sharing
 a subexpression between trees is supported. The key includes the type so that `ConstantInt(1)`,
@@ -1418,7 +1423,7 @@ what a user sees, its changelog commit. Each builds and passes `//:test` on its 
 | --- | --- |
 | 0 | Remove the v0.6.0 server side expression API. The sub-orbital tutorial polls until phase 2 restores events |
 | 1 | `KRPC.Type`: class, enumeration, structure, collection and nullable types of any kind, and the `Code`, `Service`, `Name`, `Types` and `Nullable` properties |
-| 2 | `KRPC.Expression` core: the spec each node carries and the null check where a nullable value meets a position that is not, constants, numeric promotion, comparisons, content equality, logic, casts, conditionals, `IsNull`, lambdas and `Invoke`, calls compiled to direct method calls, `ReturnType`, the node limit, and `AddEvent` |
+| 2 | `KRPC.Expression` core: the spec each node carries and the null check where a nullable value meets a position that is not, constants including `ConstantNull`, numeric promotion, comparisons, content equality, logic, casts, conditionals, `IsNull`, lambdas and `Invoke`, calls compiled to direct method calls, `ReturnType`, the node limit, and `AddEvent` |
 | 3 | `KRPC.RunFunction` and `KRPC.AddFunctionStream` |
 | 4 | Building tuples, structures and collections, and `GetField` |
 | 5 | Collection and dictionary operations, and `KRPC.KeyNotFoundException` |
@@ -1430,7 +1435,7 @@ what a user sees, its changelog commit. Each builds and passes `//:test` on its 
 | 11 | Deferred calls |
 | 12 | `ExpressionTreePrinter` and the TestServer `DumpExpressionTree` RPC |
 | 13 | Python `run_function`, `add_function_stream`, `function_stream` and `add_event` over hand-built trees |
-| 14 | Python compiler, lambdas |
+| 14 | Python compiler, lambdas, and `None` typed from its context |
 | 15 | Python compiler, functions with statements |
 | 16 | Python `krpc.defer` |
 | 17 | C# compiler, `RunFunction`, `AddEvent` and the `AddStream` overloads |
