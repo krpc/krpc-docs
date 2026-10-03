@@ -369,8 +369,9 @@ this holds for strings, classes and collections as for numbers. A set element an
 key are never nullable, so a nullable one is checked for null as it goes in. An empty one names its element types, since there is no element to infer them
 from. Either is then mutated by
 `Append`, `Set`, `Remove`, `RemoveAt` and `Clear`, which "Collection operations named by what they
-do" below covers. `Get` of a missing dictionary key raises `KRPC.KeyNotFoundException`, added for
-it, which Python maps to `KeyError`. It maps the CLR `KeyNotFoundException` for every service, so
+do" below covers. `Get` of a missing dictionary key raises `KRPC.KeyNotFoundException`, and of a
+list index out of range `KRPC.IndexOutOfRangeException`. Both are added for it, and Python maps them to `KeyError`
+and `IndexError`. It maps the CLR `KeyNotFoundException` for every service, so
 any service's missing key now reaches a Python client as a `KeyError`. `ContainsKey` tests for a key, and `Contains`
 rejects a dictionary with a message pointing at it, since the CLR would compare key and value pairs.
 `StringSplit` gives a `List<string>`, so the parts can be appended to. An integer `Sum` wraps on
@@ -504,11 +505,28 @@ to infer the type from and it would have to be supplied explicitly at every use.
 give a `Throw` in one branch the type of the other, which the C# compiler uses for a client side
 branch that fails to evaluate.
 
-There are six exceptions to choose from and no service defines its own: `ArgumentException`,
-`ArgumentNullException`, `ArgumentOutOfRangeException`, `InvalidOperationException`,
-`KeyNotFoundException` and `ObjectDestroyedException`, all in the KRPC service. Signaling a condition therefore means throwing
-a generic type and putting the meaning in the message, which is worth documenting rather than
-leaving users to work out that there is no custom exception type to define.
+A function throws one of the KRPC service's exceptions, and a function cannot declare its own. The
+set covers the common conditions, with `Error` for any other, whose meaning goes in the message:
+
+| Exception | Maps the CLR type | Python |
+| --- | --- | --- |
+| `ArgumentException` | `System.ArgumentException` | `ValueError` |
+| `ArgumentNullException` | `System.ArgumentNullException` | `ValueError` |
+| `ArgumentOutOfRangeException` | `System.ArgumentOutOfRangeException` | `ValueError` |
+| `InvalidOperationException` | `System.InvalidOperationException` | `RuntimeError` |
+| `KeyNotFoundException` | `System.Collections.Generic.KeyNotFoundException` | `KeyError` |
+| `IndexOutOfRangeException` | `System.IndexOutOfRangeException` | `IndexError` |
+| `DivideByZeroException` | `System.DivideByZeroException` | `ZeroDivisionError` |
+| `NotSupportedException` | `System.NotSupportedException` | `NotImplementedError` |
+| `TimeoutException` | `System.TimeoutException` | `TimeoutError` |
+| `ObjectDestroyedException` | none | `RuntimeError` subclass |
+| `Error` | none | `RuntimeError` subclass |
+
+The Python client raises each exception as a subclass of the Python type in the table. `Get` on a
+list checks the index and throws `IndexOutOfRangeException`, since `List<T>` throws
+`ArgumentOutOfRangeException`. A service's own index check still throws the argument exception.
+The mappings apply to every service, so a service that throws one of the new CLR types reaches
+the client as a typed exception.
 
 **Handling** is `TryCatch(body, service, name, message, handler)` for a named exception,
 `TryCatchAll(body, message, handler)` for any, and `TryFinally(body, finalizer)` for cleanup that
@@ -525,7 +543,8 @@ assigns `.Message` from it as the first statement of the handler.
 **A name must resolve to every CLR type that reaches the client under it.** This is the one thing
 that has to be right, and the obvious implementation gets it wrong.
 `[KRPCException(MappedException = ...)]` maps a CLR exception type onto a kRPC one, and
-`HandleException` applies that mapping on the way out; five of the six kRPC exceptions have one.
+`HandleException` applies that mapping on the way out, for every exception in the table above
+apart from `ObjectDestroyedException` and `Error`.
 Services throw the CLR types, not the kRPC ones: `service/SpaceCenter/src` has 145
 `throw new InvalidOperationException`, 73 `ArgumentException`, 46 `ArgumentNullException` and 22
 `ArgumentOutOfRangeException`, and no service file imports the kRPC exception namespace, so every
@@ -997,14 +1016,14 @@ list of them, `reversed` reaches `Reverse`,
   elements, the function's other returns, the variable's other assignments, an `Optional[T]`
   annotation on a variable or `->`, or `typing.cast(T, None)`. A `None` with no context is a
   compile error. A bare `return` in a function that returns a value is an error, as in mypy.
-* `except ValueError` catches the three argument exceptions and `except KeyError` a missing key.
-  `except RuntimeError` catches `InvalidOperationException` and every other exception a service
-  declares, as the Python client raises a service exception as a `RuntimeError` subclass. A
+* `raise` and `except` name an exception by its Python type in the exceptions table.
+  `except ValueError` catches the three argument exceptions. `except RuntimeError` catches
+  `InvalidOperationException` and every exception a service declares, as the Python client raises
+  a service exception as a `RuntimeError` subclass. `raise Exception(message)` throws `Error`. A
   tuple in `except` gives one catch per exception, all recording the same clause.
 * Left as documented differences: integer overflow wraps, a server computed negative index or
   exponent, negative slice bounds, and `str()` of a float using the server's formatting. A float
-  divided by zero gives `inf` or `nan`. An integer divided by zero raises an error no `except`
-  clause names, and an index out of range raises `ValueError`.
+  divided by zero gives `inf` or `nan`.
 * Both compilers compile an enumeration value captured from the client to a `Cast` of an integer
   constant, so no compiler emits `ConstantEnum`. The value comes from the client's own
   enumeration, so it is a member.
@@ -1425,11 +1444,11 @@ what a user sees, its changelog commit. Each builds and passes `//:test` on its 
 | 2 | `KRPC.Expression` core: the spec each node carries and the null check where a nullable value meets a position that is not, constants including `ConstantNull`, numeric promotion, comparisons, content equality, logic, casts, conditionals, `IsNull`, lambdas and `Invoke`, calls compiled to direct method calls, `ReturnType`, the node limit, and `AddEvent` |
 | 3 | `KRPC.RunFunction` and `KRPC.AddFunctionStream` |
 | 4 | Building tuples, structures and collections, and `GetField` |
-| 5 | Collection and dictionary operations, and `KRPC.KeyNotFoundException` |
+| 5 | Collection and dictionary operations, `KRPC.KeyNotFoundException` and `KRPC.IndexOutOfRangeException` |
 | 6 | Statements and control flow: variables, blocks, loops, `Break`, `Continue`, `Return` |
 | 7 | Collection mutation: `Append`, `Set`, `Remove`, `RemoveAt`, `Clear` |
 | 8 | String operations |
-| 9 | Exceptions: `Throw`, `TryCatch`, `TryCatchAll`, `TryFinally` |
+| 9 | Exceptions: `Throw`, `TryCatch`, `TryCatchAll`, `TryFinally`, and `KRPC.DivideByZeroException`, `NotSupportedException`, `TimeoutException` and `Error` |
 | 10 | The `StdLib` service |
 | 11 | Deferred calls |
 | 12 | `ExpressionTreePrinter` and the TestServer `DumpExpressionTree` RPC |
@@ -1454,6 +1473,7 @@ review went out separately as [#1108](https://github.com/krpc/krpc/pull/1108) an
   helpers over hand-built trees.
 * Batched tree construction, designed above; client-side only, and gated on measuring real tree
   sizes first.
+* Declaring exception types. A function throws one from the KRPC service's fixed set.
 * Bounding the time a loop can run for, so that a runaway function cannot hang the game.
 * Resumable functions, designed under "Yielding procedures inside a function".
 * Calling arbitrary CLR members from a function, sketched in
