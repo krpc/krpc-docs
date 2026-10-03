@@ -58,7 +58,7 @@ A client needs only a function's root once it is built. The compilers can releas
 nodes right after, keeping one store entry per function. The nodes stay alive through the root.
 
 This is the same procedure applied early, so it needs no server change beyond 2. It costs a round
-trip per function, or none if [batched tree construction](server-side-functions.md#batched-tree-construction)
+trip per function, or none if [batched tree construction](batched-tree-construction.md)
 carries it.
 
 ### 4. Client caching
