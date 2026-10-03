@@ -182,27 +182,25 @@ structures follow the same rules. A condition, and the operands of `Not`, `Condi
 
 ### Constants
 
-Value constants are `ConstantDouble`, `ConstantFloat`, `ConstantInt`, `ConstantLong`,
-`ConstantUInt`, `ConstantULong`, `ConstantBool`, `ConstantString` and `ConstantBytes`. Both
-compilers use the wide integer constants, so a constant outside `int` keeps its value. The Python compiler gives
-an integer literal the narrowest of `int`, `long` and `ulong` that holds it, and the exact type of a
-parameter it is passed to.
+| Factory | Notes |
+|---|---|
+| `ConstantDouble`, `ConstantFloat`, `ConstantInt`, `ConstantLong`, `ConstantUInt`, `ConstantULong`, `ConstantBool`, `ConstantString`, `ConstantBytes` | Value constants |
+| `ConstantObject(ulong id)` | An object reference, by its object id |
+| `ConstantEnum(service, name, value)` | A member of a service's enumeration |
 
-`ConstantObject(ulong value)` is a constant object reference, passed as its object identifier (the
-same `uint64` the protocol already uses to encode class instances; `0` is null, which is rejected
-here). The server recovers the instance through `ObjectStore.GetInstance(id)` and uses its
-most-derived `KRPCClass` type as the node's static type, so no protocol change and no
-self-describing wire value is needed, which is what blocked
-[#503](https://github.com/krpc/krpc/issues/503). Clients already expose the identifier
-(`RemoteObject.id` in C#, `_object_id` in Python, `Object::_id` in C++, and in Java
-`RemoteObject.id`, which the Java phase makes public). An object of a KRPC service class, such as an
-`Expression`, is rejected: a function holding one could run or stream it, past the checks
-`RunFunction`, `AddEvent` and `AddFunctionStream` make.
-
-`ConstantEnum(service, name, value)` names a member of a service's enumeration. Casting an int to an
-enumeration type works too, but it makes the caller spell out a conversion that carries no
-information and cannot check the value against the enumeration's members; `ConstantEnum` does check
-it when the node is built.
+* **Integer literals.** Both compilers use the wide integer constants, so a constant outside `int`
+  keeps its value. The Python compiler gives a literal the exact type of the parameter it is passed
+  to, otherwise the narrowest of `int`, `long` and `ulong` that holds it.
+* **Object ids** start at 1, and `ConstantObject(0)` is an error. The server looks the id up with
+  `ObjectStore.GetInstance(id)`, and the node's static type is the instance's most-derived
+  `KRPCClass`. This needs no protocol change, which is what blocked
+  [#503](https://github.com/krpc/krpc/issues/503).
+* **Clients expose the id** as `RemoteObject.id` in C#, `_object_id` in Python, `Object::_id` in C++
+  and `RemoteObject.id` in Java, which the Java phase makes public.
+* **A KRPC service object is rejected**, such as an `Expression`. A function holding one could run
+  or stream it, bypassing the checks in `RunFunction`, `AddEvent` and `AddFunctionStream`.
+* **`ConstantEnum` checks the value** against the enumeration's members when the node is built.
+  Casting an int to the enumeration type also works, but checks nothing.
 
 ### Null values
 
