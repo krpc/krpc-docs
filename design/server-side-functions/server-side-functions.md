@@ -103,6 +103,7 @@ improvements (see "Interaction with planned protocol work").
 * `TupleType(valueTypes)`, `ListType(valueType)`, `SetType(valueType)` and
   `DictionaryType(keyType, valueType)` for collections.
 * `Double`, `Float`, `Int`, `Long`, `UInt`, `ULong`, `Bool`, `String` and `Bytes` for values.
+* `NullableType(valueType)` for a nullable number or enumeration. Any other value type is an error.
 
 Names avoid `class`/`list` style keyword collisions in generated clients. Class, enumeration and
 structure name resolution needs the CLR type, which the scanner has in hand when it builds
@@ -152,9 +153,12 @@ branches the same way. Explicit `Cast` remains available.
 
 `Equal`, `NotEqual` and `Contains` compare objects, tuples, bytes and collections by value, since a
 getter such as `SpaceCenter.ActiveVessel` returns a new object on each call. A list compares in
-order, a set as a set and a dictionary entry by entry, as Python does. They and `Conditional` keep a
-null:
-when either operand is a nullable number, both widen to the nullable common type.
+order, a set as a set and a dictionary entry by entry, as Python does. Numeric elements compare
+after widening, so a list of ints can equal a list of doubles. A structure compares field by field.
+Operands of unrelated types are a `KRPC.ArgumentException` when the node is built.
+
+Equality and `Conditional` keep a null. When either operand is a nullable number or enumeration,
+both widen to the nullable common type.
 
 `Negate` follows the unary form of the same rules: a `uint` is negated as a `long`, and a `ulong`
 is an error, as in C#. The compilers used to multiply by `-1`, which gave a `uint` operand the
@@ -174,9 +178,10 @@ implicit, and one that narrows needs `Cast`. The positions are:
 * a variable assignment (`Assign`), and an argument to `Invoke`.
 
 A nullable number, which a procedure returning a nullable value type produces as `Nullable<T>`,
-takes part in both rules as its underlying `T`: promotion and each position convert it to `T`
-first, which throws when the value is null. A nullable parameter takes it as it is, so a null
-passes through.
+takes part in promotion as its underlying `T`, which throws when the value is null. A position of a
+plain type converts it to `T` the same way. A nullable position takes a plain or nullable value of
+the same or a narrower numeric type, so a null passes through. A nullable enumeration follows the
+same rules.
 
 ### Constants
 
@@ -235,7 +240,9 @@ Any service's procedures can be called except the KRPC service's. That service b
 streams functions, so a function calling it could create a function at run time, past the checks
 made on the function it runs in, and could add a stream or an event on every update. For the same
 reason a plain `AddStream` of `RunFunction`, `AddFunctionStream` or `AddEvent` is rejected;
-`AddFunctionStream` is how a function is streamed.
+`AddFunctionStream` is how a function is streamed. A call to any procedure that returns an event or
+a stream is rejected when the call node is built. Creating one adds a stream to the client, and a
+function can be evaluated while the server iterates over the client's streams.
 
 `CallWithArguments` subsumes `Call`, and the two share one implementation, so the second factory
 costs a signature and nothing else. `Call` exists because it is the common case and the one a client
@@ -339,7 +346,8 @@ structure's position in the definitions.
 Collections are built from their elements by `CreateList`, `CreateSet` and `CreateDictionary`, or
 created empty by `CreateEmptyList`, `CreateEmptySet` and `CreateEmptyDictionary`. Numeric elements
 widen to their common type, as the operands of a binary operator do, and any other elements must
-share one type. An empty one names its element types, since there is no element to infer them
+share one type. A nullable number among them makes the common type nullable, and its nulls are
+kept. An empty one names its element types, since there is no element to infer them
 from. Either is then mutated by
 `Append`, `Set`, `Remove`, `RemoveAt` and `Clear`, which "Collection operations named by what they
 do" below covers. `Get` of a missing dictionary key raises `KRPC.KeyNotFoundException`, added for
@@ -348,7 +356,7 @@ any service's missing key now reaches a Python client as a `KeyError`. `Contains
 rejects a dictionary with a message pointing at it, since the CLR would compare key and value pairs.
 `StringSplit` gives a `List<string>`, so the parts can be appended to. An integer `Sum` wraps on
 overflow, and the aggregations accept unsigned integers. `Average` of longs is taken over doubles,
-since `Enumerable` sums longs checked.
+since `Enumerable` sums longs checked. Both apply to nullable integers too, with a null skipped.
 
 A collection built inside a function is typed by the interface a `Type` names: a list element, a
 dictionary value, a tuple element, a `Conditional` branch and a returned value that is a `List<T>`
@@ -669,8 +677,8 @@ decoding a value whose type the server reports rather than the stub declares.
 * **C#**: `Connection.AddStream<T>(Services.KRPC.Expression)` and `Connection.RunFunction<T>(...)`
   overloads, where the user supplies `T`; a non-generic `RunFunction` covers functions with no
   result. `T` is checked against the introspected type, so a void function or a mismatch throws
-  rather than decoding bytes as the wrong type. A compiled `Func<T>` lambda skips the check, as its
-  type comes from the lambda.
+  rather than decoding bytes as the wrong type. A compiled lambda skips the check, and is decoded
+  at the type of its body. An undecodable body type throws before the server runs anything.
 * **C++**: `run_function<T>` and `add_function_stream<T>` check `T` the same way, through a trait
   mapping C++ types onto type codes. Generated class, enumeration and structure types carry no
   names, so only their kind is compared.
@@ -898,7 +906,10 @@ instance as a fixed argument, and embedded with `Call`. The instance is a consta
 ### Python
 
 `Client.compile_function` compiles a lambda or a function from its source; `add_event`,
-`add_function_stream` and `run_function` accept functions directly.
+`add_function_stream` and `run_function` accept functions directly. A lambda is located in the
+parse of its whole source file by its exact position, from its code object. A lambda that cannot be
+identified is a compile error. `add_event` and `add_function_stream` reject a function that makes
+no remote call, and a stream read inside a function, as it would be evaluated once.
 
 * Expressions (`krpc/functioncompiler.py`): operators including floor division, true-division
   semantics, a remainder taking the sign of the divisor, the bitwise operators, and `is None`
@@ -912,7 +923,7 @@ instance as a fixed argument, and embedded with `Call`. The instance is a consta
   assignment to remote properties and to collection elements, `pass`, calls evaluated purely for
   their effects, and `krpc.defer(call)` for a procedure that pauses execution. A block holding
   only `pass` is an error, since the algebra has no empty block, except as the body of an
-  `except`.
+  `except`. List `+=` extends the list in place, as `list.extend` does.
 * Strings and collections dispatch on the statically tracked type: `len`, `[i]`, `[a:b]`, `in`,
   `.upper()` and `.split()` reach the string operations, with slicing compiling to
   `StringSubstring`. `min`/`max` with a `key` reach `MinBy`/`MaxBy`, taking several arguments as a
@@ -950,23 +961,33 @@ list of them, `reversed` reaches `Reverse`,
 * An operator whose operand type is known and is not a number is a compile error: arithmetic
   other than string and list `+`, ordering comparisons, `sum`, and `min`/`max` without a key. A
   bool takes part in `&`, `|` and `^` only. `str()` and an f-string take a string, a number or a
-  bool, as the server names the CLR type of any other value.
+  bool, as the server names the CLR type of any other value. `==`, `!=` and `in` between
+  operands of known types the server cannot compare, such as a bool and an int, are a compile
+  error.
+* `is None` on a value type that is not nullable is the constant `False`, with the operand still
+  evaluated. `len` of a tuple is its arity, and `x in (a, b)` compiles to equality tests against
+  each element, with `x` evaluated once.
 * A shift follows Python where the server follows C#: a count of at least the width gives 0, or -1
   for a negative value shifted right, and a negative count raises `ValueError`.
 * `None` passed to a nullable parameter is a null constant argument of the call. Anywhere else it
   is a compile error, since the algebra has no typed null constant.
-* `except ValueError` catches the three argument exceptions, `except KeyError` a missing key and
-  `except RuntimeError` an `InvalidOperationException`. A tuple in `except` gives one catch per
-  exception, all recording the same clause.
+* `except ValueError` catches the three argument exceptions and `except KeyError` a missing key.
+  `except RuntimeError` catches `InvalidOperationException` and every other exception a service
+  declares, as the Python client raises a service exception as a `RuntimeError` subclass. A
+  tuple in `except` gives one catch per exception, all recording the same clause.
 * Left as documented differences: integer overflow wraps, a server computed negative index or
-  exponent, negative slice bounds, and `str()` of a float using the server's formatting.
+  exponent, negative slice bounds, and `str()` of a float using the server's formatting. A float
+  divided by zero gives `inf` or `nan`. An integer divided by zero raises an error no `except`
+  clause names, and an index out of range raises `ValueError`.
 * Both compilers compile an enumeration value captured from the client to a `Cast` of an integer
   constant, so no compiler emits `ConstantEnum`. The value comes from the client's own
   enumeration, so it is a member.
-* A name assigned anywhere in the function is local throughout it, as in Python, and reading it
-  before its first assignment is an error. Declaring it up front would need its type, which only
-  the assignment gives. A local function defined in a nested block is callable only inside it,
-  since which branch's definition ran is known only at run time.
+* A name assigned anywhere in the function is local throughout it, as in Python. Reading it is a
+  compile error unless every path to the read assigns it first (`krpc/definiteassignment.py`).
+  The check is conservative, as C#'s is: an assignment in a loop or a `try` body does not count
+  after it. Declaring the name up front would need its type, which only the assignment gives. A
+  local function defined in a nested block is callable only inside it, since which branch's
+  definition ran is known only at run time.
 * Writing to or deleting an element of a captured collection is an error, as the server holds a
   copy. A valued function that can reach its end without a `return` is an error.
 * An argument, element or field narrowing to an integer type is an error, as assignment is.
@@ -991,7 +1012,9 @@ boolean lambda, `AddStream` compiles compound lambdas, and `RunFunction` accepts
 `Expression<Action>` overload so a lambda with no result compiles to a reusable object.
 
 Beyond the operator set: a comparison with `null` maps onto `IsNull`, and a conversion between a
-value type and its nullable form is left to the server; `System.Math` methods map onto `StdLib`;
+value type and its nullable form is left to the server; `??`, `.HasValue`, `.Value` and
+`GetValueOrDefault` on a nullable remote value compile to `IsNull` and `Conditional`, with the
+value held in a variable; `System.Math` methods map onto `StdLib`;
 string `+` and `ToString` become `StringConcat` and `ConvertToString`; the bitwise complement and
 the LINQ operators `Skip`, `Take`, `SelectMany`, `ToDictionary`, `Distinct`, `Reverse`, `Zip`,
 `Union`, `Intersect`, `Except`, `First`, `Last` and `ElementAt` are supported; captured collections
@@ -1005,7 +1028,9 @@ A client side subtree is evaluated once, as a whole, at the outermost node that 
 with the server, so a side effect in it happens once. A read of a `Stream<T>` is rejected, since it
 would be evaluated once, and so are `AddStream` and `AddEvent` of a lambda that makes no remote
 call. `AddStream` streams a single call as that call only when its arguments make no remote call;
-otherwise it compiles the lambda, so the arguments are evaluated on every update rather than once.
+otherwise it compiles the lambda, so the arguments are evaluated on every update. The instance
+of a single call is evaluated once, when the stream is created, even when it is itself a remote
+call, so `vessel.Flight(frame).MeanAltitude` stays a procedure stream.
 A tuple's `ItemN` maps onto `Get`, `Tuple.Create` onto `CreateTuple`, and a dictionary
 initializer onto `CreateDictionary`. An error from the server while building the tree is raised as
 a `FunctionCompilationException`, with the server's exception inside it.
@@ -1073,7 +1098,8 @@ one `Lambda` for each call of a local function. LINQ compiles a shared node once
 chain of steps that each use the step before twice doubles the compiled size at every step. The
 visitors that check, bind and rewrite a function throw past `MaxNodes`, 1,000,000 nodes counted
 per use, which compiled in 1.4 s in the core tests under .NET. Thirty such steps would otherwise
-hang the game for hours.
+hang the game for hours. `AddEvent`, `RunFunction` and `AddFunctionStream` also count the nodes
+before compiling, through `Expression.CheckSize`, a check separate from the marker checks.
 
 A function itself is never released either, nor its delegate or the constants interned for it. A
 client that builds a new function per call, such as `run_function(lambda)` in a loop, grows the
