@@ -102,7 +102,13 @@ improvements (see "Interaction with planned protocol work").
 * `TupleType(valueTypes)`, `ListType(valueType)`, `SetType(valueType)` and
   `DictionaryType(keyType, valueType)` for collections.
 * `Double`, `Float`, `Int`, `Long`, `UInt`, `ULong`, `Bool`, `String` and `Bytes` for values.
-* `NullableType(valueType)` for a nullable number or enumeration. Any other value type is an error.
+* `NullableType(valueType)` for a nullable value of any type, `bool`, strings, classes and
+  collections included. Naming a nullable type nullable again gives the same type.
+
+Nullability is part of the type, at every position. A `Type` wraps the server's `TypeSpec`, the
+tree of CLR type and nullable flag the encoder already works from, so equality includes it:
+`String()` and `NullableType(String())` are different types. A set element and a dictionary key
+are never nullable, as in the protocol, and `SetType` and `DictionaryType` reject a nullable one.
 
 Names avoid `class`/`list` style keyword collisions in generated clients. Class, enumeration and
 structure name resolution needs the CLR type, which the scanner has in hand when it builds
@@ -117,10 +123,13 @@ not declare:
   `SInt32`, `SInt64`, `UInt32`, `UInt64`, `Bool`, `String`, `Bytes`, `Class`, `Enumeration`,
   `Struct`, `Tuple`, `List`, `Set`, `Dictionary`.
 * Instance properties on `Type`: `Code`, `Service` and `Name` (empty unless the type is defined by a
-  service), `Types` (generic arguments, empty otherwise), and `Nullable`. A function's value is
-  encoded with a presence flag at each position whose type is a nullable number or enumeration, so
-  a client builds its type message with `nullable` set there. The C# and C++ return type checks
-  require a nullable element type at exactly those positions.
+  service), `Types` (generic arguments, with their own nullability, empty otherwise), and
+  `Nullable`. `Nullable` says whether a value of the type may be null; a `String` that is not
+  nullable refuses one, though a C# string can hold it. A function's value is encoded with a
+  presence flag at each nullable position, so a client builds its type message with `nullable` set
+  there. The C++ return type check requires `std::optional` at exactly those positions. The C#
+  check is exact at value-type positions and follows the server at reference-type ones, since a
+  C# reference type does not say at run time whether it is nullable.
 * `Expression.ReturnType` gives the `Type` an expression evaluates to, and `HasReturnType` reports
   whether it has one at all. `ReturnType` throws for types that cannot be returned to a client, such
   as the lazy `IEnumerable<T>` produced by `Select`/`Where`, and the message says to wrap it in
@@ -156,8 +165,8 @@ order, a set as a set and a dictionary entry by entry, as Python does. Numeric e
 after widening, so a list of ints can equal a list of doubles. A structure compares field by field.
 Operands of unrelated types are a `KRPC.ArgumentException` when the node is built.
 
-Equality and `Conditional` keep a null. When either operand is a nullable number or enumeration,
-both widen to the nullable common type.
+Equality and `Conditional` keep a null. When either operand is a nullable value type, both widen
+to the nullable common type.
 
 `Negate` follows the unary form of the same rules: a `uint` is negated as a `long`, and a `ulong`
 is an error, as in C#. The compilers used to multiply by `-1`, which gave a `uint` operand the
@@ -176,11 +185,12 @@ implicit, and one that narrows needs `Cast`. The positions are:
 * a structure field (`CreateStruct`);
 * a variable assignment (`Assign`), and an argument to `Invoke`.
 
-A nullable number, which a procedure returning a nullable value type produces as `Nullable<T>`,
-takes part in promotion as its underlying `T`, which throws when the value is null. A position of a
-plain type converts it to `T` the same way. A nullable position takes a plain or nullable value of
-the same or a narrower numeric type, so a null passes through. A nullable enumeration follows the
-same rules.
+A nullable value type, which a procedure returning one produces as `Nullable<T>`, takes part in
+promotion as its underlying `T`, which throws when the value is null. A position of a plain type
+converts it to `T` the same way. A nullable position takes a plain or nullable value of the same or
+a narrower numeric type, so a null passes through. Nullable enumerations, `bool?` and nullable
+structures follow the same rules. A condition, and the operands of `Not`, `ConditionalAnd` and
+`ConditionalOr`, take a `bool?` as its value, so a null there throws.
 
 ### Constants
 
@@ -210,9 +220,31 @@ it when the node is built.
 
 There is no null constant. A value can be null only where a procedure returns one, so the algebra
 tests for it rather than producing it: `IsNull(value)` is a boolean, `ReferenceEqual` against null
-for a class and `Equal` against a null `Nullable<T>` for a nullable number. A value whose type
-cannot hold null is an error when the node is built. The compilers map `x is None` and `x == null`
-onto it.
+for a reference type and `Equal` against a null `Nullable<T>` for a value type. A value that is not
+nullable is an error when the node is built, a string or class included. The compilers map
+`x is None` and `x == null` onto it.
+
+Every node carries a spec, the same tree of type and nullable flag a `Type` wraps, beside its CLR
+type. The CLR type alone cannot say whether a string or class is nullable. A node that computes a
+fresh value is not nullable. A node that passes a value on takes the spec of where it came from:
+
+| Node | Spec |
+| --- | --- |
+| A call | The procedure's return spec, its `[KRPCNullable]` positions included |
+| `GetField` | The structure field's spec |
+| `Cast`, `Parameter`, `Variable` | The `Type` given |
+| `Conditional`, `CreateList`, `CreateDictionary` values, `Concat` and the like | Nullable wherever any input is |
+| `Get`, `First`, `Last`, `ElementAt`, `MinBy`, `MaxBy`, `ToList`, `DictionaryValues` | The element or value position of the collection |
+| `Select`, `SelectMany`, `Zip`, `Invoke` | The function's result, joined over its body and every `Return` |
+| `Aggregate` | Nullable wherever the element, seed or function result is |
+
+A nullable value going into a position that is not nullable is checked when it is evaluated, and
+throws if it is null. A nullable value type is unwrapped as before. A reference type passes through
+a null check, and a collection whose nested positions differ is walked for nulls at those
+positions only. The positions are the ones listed under numeric promotion, plus conditions, string
+operands, the `Throw` message, a set element and a dictionary key. A lambda given to a collection
+operation is adapted the same way when its parameter is less nullable than the elements, and a
+predicate or key function's result is never nullable.
 
 ### Calls
 
@@ -271,7 +303,8 @@ Semantics match an ordinary RPC exactly, via three lean static helpers emitted a
 * `Services.CheckExpressionArgument(procedure, position, value)` around each computed argument of
   reference type at a parameter that is not nullable, the null check the dispatch path makes;
 * `Services.CheckExpressionReturnValue(procedure, value)` after invocation, emitted only for
-  reference-typed returns where null is not permitted. A direct typed call can only violate the
+  reference-typed returns where null is not permitted. The call node's spec is the procedure's
+  return spec, so a nullable return and its nullable element positions stay nullable. A direct typed call can only violate the
   declared return type by returning null, so the per-evaluation `IsInstanceOfType` reflection check
   of the boxed dispatch path is provably unnecessary.
 
@@ -345,8 +378,9 @@ structure's position in the definitions.
 Collections are built from their elements by `CreateList`, `CreateSet` and `CreateDictionary`, or
 created empty by `CreateEmptyList`, `CreateEmptySet` and `CreateEmptyDictionary`. Numeric elements
 widen to their common type, as the operands of a binary operator do, and any other elements must
-share one type. A nullable number among them makes the common type nullable, and its nulls are
-kept. An empty one names its element types, since there is no element to infer them
+share one type. A nullable element makes the common element nullable, and its nulls are kept;
+this holds for strings, classes and collections as for numbers. A set element and a dictionary
+key are never nullable, so a nullable one is checked for null as it goes in. An empty one names its element types, since there is no element to infer them
 from. Either is then mutated by
 `Append`, `Set`, `Remove`, `RemoveAt` and `Clear`, which "Collection operations named by what they
 do" below covers. `Get` of a missing dictionary key raises `KRPC.KeyNotFoundException`, added for
@@ -579,7 +613,8 @@ covers every stream of a client, so an error there would fail all of them, every
 `EventStream.UpdateInternal` has the same handling, so a predicate error becomes a stream error
 result (surfaced by existing client stream machinery as a raised exception) instead of propagating
 out of the per-frame update loop and starving every stream. `AddEvent` reports "The function must
-evaluate to a boolean value" when given anything else.
+evaluate to a boolean value" when given anything else. It takes a `bool?` as its value, so a null
+becomes an error on the event's stream.
 
 Both reject a function containing a deferred call, since it would start the call again on every
 update (see "Deferred calls").
@@ -623,11 +658,12 @@ decodes by payload length rather than by type would report `None` for an empty l
 A null value is carried by `ProcedureResult.is_null`, which `RunFunction` gets by declaring its
 `bytes` return nullable. That is the channel every other nullable return uses, and the rule
 [nested-nullable-values.md](../protocol/nested-nullable-values.md) sets for a value at the call
-boundary. A null nested inside the result is an error naming the position, since C# and C++ decode
-at a type the caller names: carrying one would mean writing
-`run_function<std::vector<std::optional<Vessel>>>` for a `std::vector<Vessel>`. A null result at
-a type that cannot hold one is an error: a C# value type that is not nullable, or a C++ type that is
-not a `std::optional`.
+boundary. The result is encoded with the function's spec, so a null nested inside it is carried
+at a nullable position and is an error naming the position elsewhere. A null result is an error
+when the function's spec is not nullable. On the client, a null result at a type that cannot hold
+one is an error too: a C# value type that is not nullable, or a C++ type that is not a
+`std::optional`. A C++ caller names `std::optional` at each nullable nested position, as in
+`run_function<std::vector<std::optional<Vessel>>>`.
 
 `YieldException` is turned into a plain error, since a procedure that pauses and resumes on a later
 tick cannot be honored by a call that must complete within this one.
@@ -963,8 +999,11 @@ list of them, `reversed` reaches `Reverse`,
   bool, as the server names the CLR type of any other value. `==`, `!=` and `in` between
   operands of known types the server cannot compare, such as a bool and an int, are a compile
   error.
-* `is None` on a value type that is not nullable is the constant `False`, with the operand still
-  evaluated. `len` of a tuple is its arity, and `x in (a, b)` compiles to equality tests against
+* `is None` on a value that is not nullable, of any type, is the constant `False`, with the
+  operand still evaluated. The compiler's type for a value keeps the server's nullable flag at
+  every position, since it decodes the result. A list literal, a conditional, the returns of a
+  function and the assignments to a variable join their types, nullable wherever one of them is,
+  and `Optional[T]` in an annotation is nullable. `len` of a tuple is its arity, and `x in (a, b)` compiles to equality tests against
   each element, with `x` evaluated once.
 * A shift follows Python where the server follows C#: a count of at least the width gives 0, or -1
   for a negative value shifted right, and a negative count raises `ValueError`.
@@ -1010,8 +1049,9 @@ boolean lambda, `AddStream` compiles compound lambdas, and `RunFunction` accepts
 `Function.Defer` is the one statement the compiler reaches, and `CompileFunction` has an
 `Expression<Action>` overload so a lambda with no result compiles to a reusable object.
 
-Beyond the operator set: a comparison with `null` maps onto `IsNull`, and a conversion between a
-value type and its nullable form is left to the server; `??`, `.HasValue`, `.Value` and
+Beyond the operator set: a comparison with `null` maps onto `IsNull`, or folds to a constant when
+the operand's `ReturnType` is not nullable, and a conversion between a value type and its nullable
+form is left to the server; `??`, `.HasValue`, `.Value` and
 `GetValueOrDefault` on a nullable remote value compile to `IsNull` and `Conditional`, with the
 value held in a variable; `System.Math` methods map onto `StdLib`;
 string `+` and `ToString` become `StringConcat` and `ConvertToString`; the bitwise complement and
@@ -1041,6 +1081,9 @@ Where C# semantics and the server differ, the compiler does the following:
   optional argument.
 * A comparison with a nullable number is a null test and the comparison, false on null as in C#.
   Arithmetic on a null still throws.
+* A local or lambda parameter of a reference type is nullable at its top level, as in C#.
+* A result is decoded at the type the caller names, with the server's nullable flag at each
+  reference-type position, which a C# type does not carry.
 * `checked` arithmetic is rejected, since server integer arithmetic wraps. Integer `Math.Abs`,
   `Min`, `Max` and `Clamp` are `Conditional` on temporaries, exact at their own type.
 * `List<T>.Contains`, `HashSet<T>.Contains` and an interpolated string with plain placeholders
@@ -1108,13 +1151,14 @@ and client-side caching of compiled lambdas are
 
 ### Types
 
-`Type` derives from `Equatable<Type>`, comparing `InternalType`. It is an immutable description of a
+`Type` derives from `Equatable<Type>`, comparing its spec: the CLR type and the nullable flag at
+every position. It is an immutable description of a
 type with no per-client state, so value equality is the correct semantics and sharing a single
 instance between clients is safe. No protocol or client change is involved.
 
 Composite types collapse for free: the CLR interns constructed generic types, so `MakeGenericType`
-returns the same `System.Type` for the same arguments, and `ListType(Double())` reduces to one id
-provided the nested `Double()` did. `Equatable<T>` brings `operator ==`/`!=` with it, so `== null`
+returns the same `System.Type` for the same arguments, and the spec compares structurally, so
+`ListType(Double())` reduces to one id provided the nested `Double()` did. `Equatable<T>` brings `operator ==`/`!=` with it, so `== null`
 comparisons on a `KRPC.Type` change path; they stay correct, since those operators are null-safe,
 and the code that builds trees compares with `ReferenceEquals` throughout in any case.
 
@@ -1388,8 +1432,8 @@ what a user sees, its changelog commit. Each builds and passes `//:test` on its 
 | Phase | Content |
 | --- | --- |
 | 0 | Remove the v0.6.0 server side expression API. The sub-orbital tutorial polls until phase 2 restores events |
-| 1 | `KRPC.Type`: class, enumeration, structure and collection types, and the `Code`, `Service`, `Name`, `Types` and `Nullable` properties |
-| 2 | `KRPC.Expression` core: constants, numeric promotion, comparisons, content equality, logic, casts, conditionals, `IsNull`, lambdas and `Invoke`, calls compiled to direct method calls, `ReturnType`, the node limit, and `AddEvent` |
+| 1 | `KRPC.Type`: class, enumeration, structure, collection and nullable types of any kind, and the `Code`, `Service`, `Name`, `Types` and `Nullable` properties |
+| 2 | `KRPC.Expression` core: the spec each node carries and the null check where a nullable value meets a position that is not, constants, numeric promotion, comparisons, content equality, logic, casts, conditionals, `IsNull`, lambdas and `Invoke`, calls compiled to direct method calls, `ReturnType`, the node limit, and `AddEvent` |
 | 3 | `KRPC.RunFunction` and `KRPC.AddFunctionStream` |
 | 4 | Building tuples, structures and collections, and `GetField` |
 | 5 | Collection and dictionary operations, and `KRPC.KeyNotFoundException` |
