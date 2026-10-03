@@ -1314,9 +1314,7 @@ what a user sees, its changelog commit. Each builds and passes `//:test` on its 
 | 17 | C++ `run_function` and `add_function_stream` helpers |
 | 18 | The tutorial and the in-game tests |
 
-The golden tree tests for each compiler land with that compiler. Two C++ stream fixes found in
-review went out separately as [#1108](https://github.com/krpc/krpc/pull/1108) and
-[#1109](https://github.com/krpc/krpc/pull/1109).
+The golden tree tests for each compiler land with that compiler.
 
 ## Out of scope
 
