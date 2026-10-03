@@ -28,45 +28,34 @@ processing, statements and control flow, and returning any serializable kRPC val
 
 ## Vocabulary
 
-Two things are named, and keeping them distinct is what the API names follow:
+| Term | Meaning | Examples |
+|---|---|---|
+| **expression** | A node of the algebra. Control flow nodes are expressions too. | `Add`, `Not`, `ConstantInt`, `While`, `Block`, `Break` |
+| **function** | The whole tree a client assembles, i.e. its root expression. The unit that is run, streamed or compiled. | |
 
-* an **expression** is a node of the algebra: `Add`, `Not`, `ConstantInt`, `While`, `Block`,
-  `Break`. Control flow included, this is an expression algebra, and every node is one.
-* a **function** is the whole program a client assembles out of them, and the only thing it ever
-  runs, streams or compiles.
+Naming rules:
 
-So the algebra keeps the name `Expression` and everything a user invokes is named for the function:
-`KRPC.RunFunction`, `KRPC.AddFunctionStream`, `Client.compile_function`,
-`Connection.CompileFunction`, `krpc/function_stream.hpp`. The class itself is not renamed: naming it
-`Function` would make every value node read as a function (`Function.ConstantInt(1)`), and
-`System.Linq.Expressions`, which the implementation compiles to directly, keeps the name
-`Expression` for a factory class that contains `Block`, `Loop`, `Goto` and `TryCatch` too. A user
-builds a function out of expressions, which is how every language describes itself.
+* The node class keeps the name `Expression`, as in `System.Linq.Expressions`, which it compiles to.
+  `Function` would make every node read as a function (`Function.ConstantInt(1)`).
+* Entry points are named for the function: `KRPC.RunFunction`, `KRPC.AddFunctionStream`,
+  `Client.compile_function`, `Connection.CompileFunction`, `krpc/function_stream.hpp`.
+* The split is a naming rule, not a type. `RunFunction`, `AddFunctionStream` and `AddEvent` take an
+  `Expression`, in a parameter named `function`.
+* The lambda node is `Expression.Lambda(parameters, body)`, after its LINQ node. It is `Invoke`d or
+  passed to `Select`/`Where`. A function needs no lambda around it, except one that uses `Return`,
+  which is a parameterless lambda, invoked (see "Statements, control flow and side effects").
+* Prose, error messages and XML summaries follow the same split. The API reference page keeps the
+  title `Expressions` and links the tutorial.
+* Factories are static members of the class in every client, not reached through a builder object
+  (`conn.Expression.Not(...)`).
 
-The split is a naming rule, not a type distinction. A function is the root expression of a tree, so
-`KRPC.RunFunction`, `KRPC.AddFunctionStream` and `KRPC.AddEvent` all take an `Expression`. Each
-names its parameter `function`, which is what tells a reader that the whole tree is wanted rather
-than a node of one. `KRPC.AddEvent` was renamed from `expression` for this. With the rename of
-`Expression.Function` to `Lambda` below, these are the two user-visible breaks the rule costs.
-`Function` is removed rather than kept as a deprecated alias, so a v0.6 client calling it fails.
-The new procedures are also declared among the released ones, and `Expression` is split into one
-partial class file per feature. Both renumber the `KRPC` service's procedure ids: a client that
-calls by id, as cnano does, needs stubs generated for this version.
+Breaking changes:
 
-The lambda node is `Expression.Lambda(parameters, body)`, after the LINQ node it maps to. It is
-`Invoke`d or handed to `Select`/`Where`; it is not the whole function, and a block can be handed
-straight to `RunFunction` with no lambda around it. A function that uses `Return` is the exception:
-it is a parameterless lambda, invoked, since `Return` binds to a lambda (see "Statements, control
-flow and side effects").
-
-Prose, error messages and XML doc summaries follow the same split: a node is an expression, the
-whole is a function. The tutorial's two properties are properties of a function, the yield message
-reports that a function is evaluated within a single tick, and the client guides introduce the
-feature as a server side function. The API reference page keeps the title `Expressions`, which
-names what it documents, and links the tutorial for the rest.
-
-Reaching the factories through a builder object (`conn.Expression.Not(...)`) was considered and not
-taken: the factories stay static members of the class in every client.
+| Change | Effect |
+|---|---|
+| `KRPC.AddEvent` parameter renamed `expression` to `function` | Breaks calls that pass it by name |
+| `Expression.Function` renamed `Lambda`, with no deprecated alias | A v0.6 client calling `Function` fails |
+| New procedures declared among the released ones, and `Expression` split into one partial class file per feature | `KRPC` procedure ids renumber; a client calling by id (cnano) needs regenerated stubs |
 
 ## Approach
 
