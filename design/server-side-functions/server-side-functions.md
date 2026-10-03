@@ -1,8 +1,7 @@
 # Server-side functions
 
-**Status:** done, in review. The work was opened as one change in
-[PR #1069](https://github.com/krpc/krpc/pull/1069), and is being split into a stack of 22 smaller
-PRs, one per phase (see "Phases"). None of the stack is opened yet. It closes umbrella issue
+**Status:** done, in review. The work ships as a stack of 22 PRs, one per phase (see "Phases").
+None of the stack is opened yet. It closes umbrella issue
 [#679](https://github.com/krpc/krpc/issues/679). Resumable functions are not built; their design
 moved to [`resumable-functions.md`](resumable-functions.md).
 

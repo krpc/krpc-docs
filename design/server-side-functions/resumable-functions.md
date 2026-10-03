@@ -1,8 +1,7 @@
 # Resumable server side functions
 
-**Status:** proposal — not started. A follow-up to server side functions
-([PR #1069](https://github.com/krpc/krpc/pull/1069), now being split into a stack of PRs), to be
-built once that stack merges. No GitHub issue filed yet.
+**Status:** proposal — not started. A follow-up to server side functions, to be built once
+their stack of PRs merges. No GitHub issue filed yet.
 
 Supersedes the "Resumable functions" sketch in
 [`server-side-functions.md`](server-side-functions.md), under "Yielding procedures inside a
