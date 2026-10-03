@@ -268,10 +268,10 @@ can build without knowing anything about parameter positions: a client already h
 `ProcedureCall` for any RPC it can make, and passing it is the whole call. Without it every embedded
 call, including those with no computed arguments at all, would have to pass an empty collection.
 
-Arguments are keyed by position rather than given as a list with null holes because nullable values
-([PR #1017](https://github.com/krpc/krpc/pull/1017)) signal null out of band rather than by an
-object id of 0, so a null element inside a collection is not encodable by any client. Positions need
-no placeholder, and there are no trailing nulls to trim.
+Arguments are keyed by position rather than given as a list with null holes. A null is signaled
+out of band, and only at a position marked nullable
+([PR #1017](https://github.com/krpc/krpc/pull/1017)), so a list of argument expressions cannot hold
+one. Positions need no placeholder, and there are no trailing nulls to trim.
 
 Both factories compile to a **direct, statically typed `LinqExpression.Call` of the procedure's
 underlying `MethodInfo`**, exposed as `IProcedureHandler.Method` by all three handler types
