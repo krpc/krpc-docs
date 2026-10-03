@@ -341,12 +341,10 @@ Void-typed nodes are the reason several things elsewhere are special-cased: an e
 is `void` has no return type to report, cannot be streamed, and is only meaningful under
 `RunFunction`.
 
-**A loop is not interruptible, and this is a hazard.** `MaxTimePerUpdate` is checked between
-continuations in the execution loop, never inside one evaluation, so a `While` whose condition never
-becomes false hangs the game's main thread with no recovery. Loops are what make that reachable, and
-closing it needs its own design: an iteration or time budget checked inside the loop costs something
-on every iteration of every loop, which is a trade worth deciding deliberately. It is documented as
-a limitation.
+**A loop runs to completion.** `MaxTimePerUpdate` is checked between continuations, never within
+one evaluation. A `While` whose condition never becomes false therefore hangs the game's main
+thread. An iteration or time budget would close this, at a cost on every iteration, and needs its
+own design. The tutorial documents it as a limitation.
 
 ### Tuples, collections and strings
 
