@@ -321,9 +321,10 @@ exposing it as factories with kRPC-shaped semantics.
   innermost-first.
 * Early exit: `Return(value)` and `ReturnNothing()` are likewise markers, bound to a label that
   `Expression.Lambda` wraps around the function body, so a return anywhere in a nested block leaves
-  the whole function. A body that ends with a statement, such as an `IfThenElse` returning on both
-  branches, takes its result type from its first `Return(value)`. A nullable value type among the
-  results, such as a `ConstantNull(Int())`, lifts the others to it. Reaching the end of such a body
+  the whole function. The result type is the common type of the body's value and every
+  `Return(value)`, by the rule in "The element type of a collection", so a `ConstantNull(Int())`
+  among them makes it nullable. A body that ends with a statement, such as an `IfThenElse`
+  returning on both branches, takes it from the returns alone. Reaching the end of such a body
   raises `KRPC.InvalidOperationException`.
 * Side effects: calls to procedures with no return value (including property setters) are ordinary
   statement expressions, and collections can be built imperatively.
@@ -367,12 +368,10 @@ and name; the Python compiler maps a pythonic attribute name back to the declare
 structure's position in the definitions.
 
 Collections are built from their elements by `CreateList`, `CreateSet` and `CreateDictionary`, or
-created empty by `CreateEmptyList`, `CreateEmptySet` and `CreateEmptyDictionary`. Numeric elements
-widen to their common type, as the operands of a binary operator do, and any other elements must
-share one type. A nullable element makes the common element nullable, and its nulls are kept;
-this holds for strings, classes and collections as for numbers. A set element and a dictionary
-key are never nullable, so a nullable one is checked for null as it goes in. An empty one names its element types, since there is no element to infer them
-from. Either is then mutated by
+created empty by `CreateEmptyList`, `CreateEmptySet` and `CreateEmptyDictionary`. The element
+type is the common type of the elements, as "The element type of a collection" below defines it.
+An empty one names its element types, since there is no element to infer them from. Either is
+then mutated by
 `Append`, `Set`, `Remove`, `RemoveAt` and `Clear`, which "Collection operations named by what they
 do" below covers. `Get` of a missing dictionary key raises `KRPC.KeyNotFoundException`, and of a
 list index out of range `KRPC.IndexOutOfRangeException`. Both are added for it, and Python maps them to `KeyError`
@@ -407,6 +406,63 @@ The query surface covers counting, membership, `Select`, `Where`,
 since `IGrouping` is not a type kRPC can carry and a dictionary is what the result is wanted for.
 Its key type is checked against the dictionary key rules when the node is built. `MinBy`, `MaxBy`
 and `GroupBy` are single-pass helpers rather than LINQ calls.
+
+#### The element type of a collection
+
+The element type of `CreateList` and `CreateSet`, and the key and value types of
+`CreateDictionary`, are the **common type** of the values. It is a function of the set of types
+present, computed over all of them at once:
+
+1. **Nullable** at a position wherever any value is nullable there. This holds for strings,
+   classes and collections as for numbers, and nulls are kept. A set element and a dictionary key
+   are never nullable, so a nullable one is checked for null as it goes in.
+2. **One type** gives that type. A `List<T>` counts as an `IList<T>`, and a `Dictionary<K,V>` as
+   an `IDictionary<K,V>`.
+3. **Numbers** give `double` if any is a `double`, else `float` if any is a `float`. Otherwise:
+   * any `ulong` gives `ulong` when every other is a `uint` or `ulong`, and an error otherwise;
+   * else any `long`, or both `int` and `uint`, gives `long`;
+   * else any `uint` gives `uint`, and only `int` gives `int`.
+4. **Tuples of one length, or collections of one kind**, give that tuple or collection with the
+   common type of the set of types at each position.
+5. **Anything else** is a `KRPC.ArgumentException` when the node is built. The message lists the
+   distinct types sorted by name.
+
+Each value then widens to the common type, as a value at any position of a fixed type does.
+
+| Values | Common type |
+| --- | --- |
+| `1`, `2.5` | `double` |
+| `1`, `2**63` | error: no integer type holds both |
+| `1`, `2**63`, `2.5f` | `float` |
+| `(1, "a")`, `(2.5, "b")` | `Tuple<double, string>` |
+| `1`, `null` of `long?` | `long?` |
+
+**The rule is a function of the set, not a fold.** The pairwise join of C# binary promotion is
+not associative. `int` and `ulong` have no common type, but joining `int` with `float` first and
+then `ulong` gives `float`. A fold over the values therefore depends on their order, and a set
+arrives in the order of the client's hash table. Taking the set of types at once makes order
+and repeats irrelevant, at every nested position. For two types the rule is binary promotion, so
+`Conditional` and the operators agree with it.
+
+**`int` with `ulong` is an error, not `float`.** In the implicit-widening order `float` is their
+least upper bound, which would make the join associative. It also turns a list of large `ulong`
+ids into floats silently, so it is rejected, as C# rejects `int + ulong`. A `float` or `double`
+among the values makes the precision loss explicit, and the rule then accepts it.
+
+The **result type of a function** follows the same rule. It is the common type of the body's
+value, when it has one, and of every `Return(value)`, and each returned value widens to it.
+
+**The type is deduced, not passed.** A client that wants a specific type already has three ways
+to state it:
+
+* `Cast(CreateList(values), ListType(Double()))` widens a list.
+* A typed variable, argument or structure field widens a collection used there.
+* Casting one element resolves an `int` and `ulong` mix.
+
+A required type parameter would make the Python compiler find a type it often does not know,
+such as the result of a call it has no definitions for. A typed overload would add three RPCs to
+every client for the case `Cast` covers. With an order-independent rule the deduced type is
+deterministic, and the Python compiler mirrors it to type its results.
 
 #### Collection operations named by what they do
 
