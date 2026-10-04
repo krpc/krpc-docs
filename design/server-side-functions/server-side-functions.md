@@ -609,6 +609,9 @@ the client as a typed exception.
 runs either way. Body and handler are evaluated as statements through the existing `AsStatement`, so
 they need not produce values of the same type.
 
+LINQ cannot compile a jump out of a finally block, so `Check` rejects a break, continue or return
+that leaves a finalizer, with a message naming the rule.
+
 `message` is an optional string variable that the caught exception's message is assigned to before
 the handler runs. **The exception object itself is never exposed.** Binding only the message keeps
 exceptions out of the value algebra entirely: nothing needs an exception-typed entry in `KRPC.Type`,
