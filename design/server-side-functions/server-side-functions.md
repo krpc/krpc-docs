@@ -237,10 +237,13 @@ fresh value is not nullable. A node that passes a value on takes the spec of whe
 | `Aggregate` | Nullable wherever the element, seed or function result is |
 
 A nullable value going into a position that is not nullable is checked when it is evaluated, and
-throws if it is null. A nullable value type is unwrapped as before. A reference type passes through
-a null check, and a collection whose nested positions differ is walked for nulls at those
-positions only. The positions are the ones listed under numeric promotion, plus conditions, string
-operands, the `Throw` message, a set element and a dictionary key. A lambda given to a collection
+throws `KRPC.NullReferenceException` if it is null, with a message naming the position. A nullable
+value type is unwrapped through the check. A reference type passes through a null check, and a
+collection whose nested positions differ is walked for nulls at those positions only. The
+positions are the ones listed under numeric promotion, plus operands, conditions, the collection
+an operation is given, string operands, the `Throw` message, a set element and a dictionary key.
+The check is emitted only where the spec allows a null, so a value that cannot be null costs
+nothing. A lambda given to a collection
 operation is adapted the same way when its parameter is less nullable than the elements, and a
 predicate or key function's result is never nullable.
 
@@ -580,6 +583,7 @@ set covers the common conditions, with `Error` for any other, whose meaning goes
 | `ArgumentException` | `System.ArgumentException` | `ValueError` |
 | `ArgumentNullException` | `System.ArgumentNullException` | `ValueError` |
 | `ArgumentOutOfRangeException` | `System.ArgumentOutOfRangeException` | `ValueError` |
+| `NullReferenceException` | `System.NullReferenceException` | `TypeError` |
 | `InvalidOperationException` | `System.InvalidOperationException` | `RuntimeError` |
 | `KeyNotFoundException` | `System.Collections.Generic.KeyNotFoundException` | `KeyError` |
 | `IndexOutOfRangeException` | `System.IndexOutOfRangeException` | `IndexError` |
@@ -1358,7 +1362,7 @@ what a user sees, its changelog commit. Each builds and passes `//:test` on its 
 | --- | --- |
 | 0 | Remove the v0.6.0 server side expression API. The sub-orbital tutorial polls until phase 2 restores events |
 | 1 | `KRPC.Type`: class, enumeration, structure, collection and nullable types of any kind, and the `Code`, `Service`, `Name`, `Types` and `Nullable` properties |
-| 2 | `KRPC.Expression` core: the spec each node carries and the null check where a nullable value meets a position that is not, constants including `ConstantNull`, numeric promotion, comparisons, content equality, logic, casts, conditionals, `IsNull`, lambdas and `Invoke`, calls compiled to direct method calls, `ReturnType`, the node limit, and `AddEvent` |
+| 2 | `KRPC.Expression` core: the spec each node carries and the null check where a nullable value meets a position that is not, `KRPC.NullReferenceException`, constants including `ConstantNull`, numeric promotion, comparisons, content equality, logic, casts, conditionals, `IsNull`, lambdas and `Invoke`, calls compiled to direct method calls, `ReturnType`, the node limit, and `AddEvent` |
 | 3 | `KRPC.RunFunction` and `KRPC.AddFunctionStream` |
 | 4 | Building tuples, structures and collections, and `GetField` |
 | 5 | Collection and dictionary operations, `KRPC.KeyNotFoundException` and `KRPC.IndexOutOfRangeException` |
