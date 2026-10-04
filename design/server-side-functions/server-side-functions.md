@@ -243,7 +243,8 @@ collection whose nested positions differ is walked for nulls at those positions 
 positions are the ones listed under numeric promotion, plus operands, conditions, the collection
 an operation is given, string operands, the `Throw` message, a set element and a dictionary key.
 The check is emitted only where the spec allows a null, so a value that cannot be null costs
-nothing. A lambda given to a collection
+nothing. A lookup is the exception: `Contains`, `ContainsKey` and `Remove` give false for a null
+sought in a collection that cannot hold one, as `Equal` gives false for a null. A lambda given to a collection
 operation is adapted the same way when its parameter is less nullable than the elements, and a
 predicate or key function's result is never nullable.
 
