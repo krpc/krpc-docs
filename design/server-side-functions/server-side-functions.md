@@ -159,6 +159,12 @@ order, a set as a set and a dictionary entry by entry, as Python does. Numeric e
 after widening, so a list of ints can equal a list of doubles. A structure compares field by field.
 Operands of unrelated types are a `KRPC.ArgumentException` when the node is built.
 
+Every collection compares its values the same way. A set the server builds hashes with a comparer
+that pairs this equality with an agreeing hash, so two equal lists or bytes values are one member.
+`Distinct`, `Union`, `Intersect` and `Except` take the same comparer. `Append`, `Remove` and
+`Contains` compare by value on a set a procedure returns too, since that set hashes by default
+equality.
+
 Equality and `Conditional` keep a null. When either operand is a nullable value type, both widen
 to the nullable common type.
 
