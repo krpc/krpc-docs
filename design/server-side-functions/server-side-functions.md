@@ -241,7 +241,8 @@ throws `KRPC.NullReferenceException` if it is null, with a message naming the po
 value type is unwrapped through the check. A reference type passes through a null check, and a
 collection whose nested positions differ is walked for nulls at those positions only. The
 positions are the ones listed under numeric promotion, plus operands, conditions, the collection
-an operation is given, string operands, the `Throw` message, a set element and a dictionary key.
+an operation is given, string operands, the value given to `ConvertToString`, the `Throw` message,
+a set element and a dictionary key.
 The check is emitted only where the spec allows a null, so a value that cannot be null costs
 nothing. A lookup is the exception: `Contains`, `ContainsKey` and `Remove` give false for a null
 sought in a collection that cannot hold one, as `Equal` gives false for a null. A lambda given to a collection
@@ -515,6 +516,9 @@ concept, and makes the family sort together in the generated reference and in `d
 | `StringSplit(s, separator)` | `IList<string>` |
 | `StringJoin(separator, strings)` | `string` |
 | `StringConcat(strings)` | `string` |
+
+`ConvertToString` throws for a null, since the text of a null differs between languages. The Python
+compiler writes `None` for one and the C# compiler an empty string, each with a conditional.
 
 `StringIndexOf` returns `-1` rather than a nullable `int`. Nullable values would be the more honest
 type, but `-1` is what `str.find` and `String.IndexOf` return in the languages both compilers
