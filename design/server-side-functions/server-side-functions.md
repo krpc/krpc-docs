@@ -10,6 +10,9 @@ Follow-ups, not built, each designed in its own doc:
 [`function-release.md`](function-release.md) (releasing functions) and
 [`batched-tree-construction.md`](batched-tree-construction.md).
 
+Arguments to `RunFunction` are designed in "Function arguments", and are to be folded into the
+stack before it is opened.
+
 Linked issues: [#517](https://github.com/krpc/krpc/issues/517) (per-element calls in predicates),
 [#503](https://github.com/krpc/krpc/issues/503) (object constants),
 [#521](https://github.com/krpc/krpc/issues/521) (multiplication/mixed-type arithmetic),
@@ -43,7 +46,7 @@ Naming rules:
 * The node class keeps the name `Expression`, as in `System.Linq.Expressions`, which it compiles to.
   `Function` would make every node read as a function (`Function.ConstantInt(1)`).
 * Entry points are named for the function: `KRPC.RunFunction`, `KRPC.AddFunctionStream`,
-  `Client.compile_function`, `Connection.CompileFunction`, `krpc/function_stream.hpp`.
+  `Client.compile`, `Connection.Compile`, `krpc/function_stream.hpp`.
 * The split is a naming rule, not a type. `RunFunction`, `AddFunctionStream` and `AddEvent` take an
   `Expression`, in a parameter named `function`.
 * The lambda node is `Expression.Lambda(parameters, body)`, after its LINQ node. It is `Invoke`d or
@@ -361,6 +364,23 @@ client.
 Void-typed nodes are the reason several things elsewhere are special-cased: an expression whose type
 is `void` has no return type to report, cannot be streamed, and is only meaningful under
 `RunFunction`.
+
+**State between evaluations.** A control loop run as a function stream needs a value that
+survives from one tick to the next, such as a PI controller's integral. A local variable lasts one
+evaluation and a captured value is a constant, so `StateVariable(name, initialValue)` provides it:
+
+* It evaluates `initialValue` once, when the factory is called, and holds the result in a
+  `StrongBox<T>` that the node owns. The node compiles to `Field(Constant(box), "Value")`, which
+  is writable, so it is read like a variable and is a valid `Assign` target.
+* Its type is the initial value's type. A narrowing assignment is an error, as for any variable.
+  A collection state variable is changed in place by the mutation statements.
+* The state belongs to the node. A built function keeps it across `RunFunction` calls, streams and
+  events, and two streams of one function are one stream with one state. Building the function
+  again resets it, and there is no reset RPC.
+* The box needs no lock, since functions are evaluated on the main thread only.
+
+A per-stream state array passed into the compiled delegate was rejected. A function run through
+`RunFunction` would lose its state between calls, unlike a Python closure.
 
 **A loop runs to completion.** `MaxTimePerUpdate` is checked between continuations, never within
 one evaluation. A `While` whose condition never becomes false therefore hangs the game's main
@@ -742,6 +762,14 @@ expression objects are interior nodes of a larger tree and are never run on thei
 every one of them would pay the cost hundreds of times over for a single function. `RunFunction`,
 `FunctionStream` and `AddEvent` share the cached delegate. Checking the tree for unbound `Break`/`Continue`/`Return` markers is cached the same way.
 
+`KRPC.CompileFunction(Expression)` checks and compiles a function without running it. Compiling
+runs on the game's main thread, so a large function stalls the frame it is compiled in. Compiling
+it in advance moves that stall to a moment the client chooses, such as before launch, and its first
+run is then as fast as later ones. The clients' `compile` and `Compile` call it,
+since a compiled function is one meant for reuse. The helpers that compile a function for a single
+use do not, as the run compiles it anyway. Compiling on a worker thread, with `RunFunction` waiting
+for the delegate, would remove the stall altogether, at the cost of threading under KSP's Mono.
+
 The return value is a `bytes` payload rather than a typed value, since the procedure's declared
 return type cannot depend on the expression: the server encodes the value with the runtime-typed
 `Encoder.Encode` and the client decodes it using `Expression.ReturnType` (dynamic clients) or a
@@ -761,6 +789,94 @@ one is an error too: a C# value type that is not nullable, or a C++ type that is
 
 `YieldException` is turned into a plain error, since a procedure that pauses and resumes on a later
 tick cannot be honored by a call that must complete within this one.
+
+### Function arguments
+
+**Status:** built, and folded into the stack's phases (see "Phases"). Where the build diverged
+from the design is noted below.
+
+A function compiled once can be run many times with different inputs. Capturing a new value
+otherwise means building the tree again, one RPC per node, and compiling it again on the server.
+`RunFunction` takes zero or more argument values. Streams and events take functions with no
+parameters, since nothing would supply the arguments on each update.
+
+```python
+@conn.compile
+def burn_time(delta_v: float) -> float:
+    ...
+for dv in (100.0, 250.0, 400.0):
+    print(conn.run_function(burn_time, dv))
+```
+
+**Server.**
+
+| Item | Design |
+|---|---|
+| Shape | A function with parameters is a `Lambda` at the root. A root `Lambda` is called with the arguments; any other root is a function with no parameters, as now |
+| `RunFunction(Expression function, IList<byte[]> arguments)` | Arguments by position, one per parameter. Elements nullable (`[KRPCNullable (Position.Element)]`); the parameter defaults to an empty list, so a call with no arguments is unchanged |
+| Decoding | Each argument is decoded at its parameter's spec, as the result is encoded at the function's. A null at a parameter that is not nullable, a wrong count, or bytes that do not decode are a `KRPC.ArgumentException` naming the parameter, before anything runs |
+| `ReturnType`, `HasReturnType` | Of a `Lambda`, describe the value it returns when called. A delegate type is never a valid result, so the meaning is unambiguous |
+| `ParameterTypes` | New `IList<Type>` property: the types of a root `Lambda`'s parameters, with their nullability. Empty for any other function |
+| Compiled delegate | `Func<object[], object>`, unpacking the array into the lambda's parameters. Cached on the `Expression` as now, shared by `RunFunction`, `CompileFunction`, streams and events |
+| Streams and events | `AddFunctionStream` and `AddEvent` accept a `Lambda` with no parameters. One with parameters is a `KRPC.ArgumentException`: "A streamed function cannot take parameters" |
+
+Arguments are encoded values rather than `Expression` constants. A constant is an RPC per value, and
+the server caches every constant for the life of the connection, so a constant per call is the cost
+this removes. Encoded bytes mirror the result, which is already sent as bytes and decoded at a type
+the client learns from the function.
+
+**Clients.** Each client encodes an argument at its parameter's type. A Python function carries
+its parameter types from the compiler. Any other function's are read from `ParameterTypes` once
+and cached by object id, as `ReturnType` is, including a compiled C# lambda, whose reference-type
+nullability only the server records. A client introspects only when it is given arguments, so a
+function run with none costs no extra round trip.
+
+| Client | API |
+|---|---|
+| Python | `run_function(function, *args, **kwargs)`. `compile` accepts a function with parameters; `add_function_stream`, `function_stream` and `add_event` reject one before calling the server |
+| C# | `RunFunction<TResult>(Expression function, params object[] args)` and the non-generic form. `Compile` overloads for `Func<T1, ..., TResult>` and `Action<T1, ...>` up to four parameters. A number widens as C# widens it, and an argument the parameter's type cannot hold throws before the call |
+| C++ | `run_function<T = void>(function, args...)`, one template for a value and for effects, since separate overloads are ambiguous for `run_function<int>(f, 3)`. Each argument is checked against `ParameterTypes` by kind, as `T` is against `ReturnType`. `std::nullopt` or `nullptr` is a null, and a string literal is a string |
+| Java | `runFunction(function, Object... args)`, encoded at the introspected `ParameterTypes`, with a number widened as Java widens it |
+| Lua | No helper. The raw `RunFunction` takes the encoded arguments |
+
+**Python parameters.** Only a `def` takes parameters, each annotated with a form a variable
+annotation accepts: `float`, `list[int]`, `Optional[str]`, `Vessel`. A lambda with parameters, or
+a parameter without an annotation, is a compile error naming the fix.
+
+* Defaults, keyword arguments, positional-only and keyword-only parameters are bound on the client
+  by `inspect.signature(func).bind`, which applies Python's own rules and raises its `TypeError`.
+  The server sees every argument, by position.
+* A default is the value the `def` evaluated, as in Python, checked against the parameter's type
+  when the function is compiled.
+* `compile` records the signature against the function's object id, beside its types, for
+  `run_function` to bind with. A hand-built function takes positional arguments only.
+* `*args` and `**kwargs` are a compile error, since a `Lambda` has a fixed parameter list.
+
+The compiled tree of a top-level `def` with parameters is the `Lambda` from `compile_function`,
+without the `Invoke` a parameterless function wraps it in. `run_function` given an uncompiled
+`def` compiles it on each call, as now.
+
+A parameter annotation names a type where the function is defined, which need not be a free
+variable of the function. The compiler resolves annotation names from the evaluated
+`__annotations__` first. A class reached through a service, as in `Vessel = conn.space_center.Vessel`,
+is a wrapped subclass of the stub class with the pre-generated stubs, and is unwrapped.
+
+Defaults stay on the client. Server-side defaults would serve hand-built C++ and Java trees only,
+since a C# expression-tree lambda cannot declare one, and would need position-keyed arguments and a
+default introspected per parameter.
+
+**C#.** `FunctionCompiler.Compile` maps the lambda's parameters to `Parameter` nodes through the
+dictionary the nested-lambda support already keeps, and wraps the body in a `Lambda`. The types
+come from the delegate's generic arguments, with a reference type nullable at its top level, as a
+local is.
+
+**Testing.**
+
+* Core: argument count, null and decode errors; `ParameterTypes`; a nullable parameter; streams
+  and events rejecting parameters; a parameterless root `Lambda` streamed and run.
+* Python and C# golden trees for a function with parameters; client tests running one with
+  several argument sets, including an object and a collection.
+* C++ and Java client tests against the TestServer, and one in-game test.
 
 ### The StdLib service
 
@@ -830,7 +946,7 @@ cannot change, so it is cached against the expression's object identifier.
 against the Python function would freeze its captured values across calls, when they may have
 changed. The compiler tracks the result type as it builds the tree, so the helper takes the type
 from it instead of introspecting, and caches nothing for a function compiled for a single use. A
-program that runs the same function repeatedly compiles it once with `compile_function` and passes
+program that runs the same function repeatedly compiles it once with `compile` and passes
 the result, as the docstrings say.
 
 ### Documentation ([#608](https://github.com/krpc/krpc/issues/608))
@@ -960,11 +1076,13 @@ instance as a fixed argument, and embedded with `Call`. The instance is a consta
 
 ### Python
 
-`Client.compile_function` compiles a lambda or a function from its source; `add_event`,
-`add_function_stream` and `run_function` accept functions directly. A lambda is located in the
-parse of its whole source file by its exact position, from its code object. A lambda that cannot be
-identified is a compile error. `add_event` and `add_function_stream` reject a function that makes
-no remote call, and a stream read inside a function, as it would be evaluated once.
+`Client.compile` compiles a lambda or a function from its source, and a `def` with parameters as "Function
+arguments" describes; `add_event`, `add_function_stream`
+and `run_function` accept functions directly. `compile` returns the compiled function, so it also
+works as a decorator. A lambda is located in the parse of its whole source file by its exact
+position, from its code object. A lambda that cannot be identified is a compile error. `add_event`
+and `add_function_stream` reject a function that makes no remote call, and a stream read inside a
+function, as it would be evaluated once.
 
 * Expressions (`krpc/functioncompiler.py`): operators including floor division, true-division
   semantics, a remainder taking the sign of the divisor, the bitwise operators, and `is None`
@@ -979,6 +1097,10 @@ no remote call, and a stream read inside a function, as it would be evaluated on
   their effects. A block holding
   only `pass` is an error, since the algebra has no empty block, except as the body of an
   `except`. List `+=` extends the list in place, as `list.extend` does.
+* `nonlocal x` at the top level of the compiled function makes `x` a `StateVariable`. Its initial
+  value is the closure cell's value at compile time, and the cell is never updated. A compiled
+  function keeps its state, and an uncompiled one is rebuilt on each call, so it starts again from
+  the cell. The type comes from the initial value, so the guide says to start a float at `0.0`.
 * Strings and collections dispatch on the statically tracked type: `len`, `[i]`, `[a:b]`, `in`,
   `.upper()` and `.split()` reach the string operations, with slicing compiling to
   `StringSubstring`. `min`/`max` with a `key` reach `MinBy`/`MaxBy`, taking several arguments as a
@@ -1067,12 +1189,13 @@ list of them, `reversed` reaches `Reverse`,
 
 ### C#
 
-`Connection.CompileFunction` translates a LINQ expression tree, which the compiler hands the client
+`Connection.Compile` translates a LINQ expression tree, which the compiler hands the client
 for free from an `Expression<Func<TResult>>` lambda, into the same server tree. `AddEvent` accepts a
 boolean lambda, `AddStream` compiles compound lambdas, and `RunFunction` accepts
 `Expression<Action>` lambdas so side-effecting functions can be written in the same style.
 
-`CompileFunction` has an `Expression<Action>` overload so a lambda with no result compiles to a reusable object.
+`Compile` has an `Expression<Action>` overload so a lambda with no result compiles to a reusable object,
+and overloads for lambdas with parameters (see "Function arguments").
 
 Beyond the operator set: a comparison with `null` maps onto `IsNull`, or folds to a constant when
 the operand's `ReturnType` is not nullable, and a conversion between a value type and its nullable
@@ -1123,7 +1246,8 @@ Three things are deliberately out of reach. `GroupBy` is not mapped, since the n
 differs from LINQ's. `MinBy`/`MaxBy` have no syntax at net472, where `Enumerable.MinBy` does not
 exist. Exceptions are unreachable in either direction, since an expression-tree lambda may neither
 contain a throw expression nor have a statement body, which is consistent with that compiler being
-limited to single-expression lambdas.
+limited to single-expression lambdas. For the same reason a `StateVariable` is reachable only
+through the raw factory.
 
 ### Semantics that differ from running locally
 
@@ -1396,21 +1520,21 @@ what a user sees, its changelog commit. Each builds and passes `//:test` on its 
 | 0 | Remove the v0.6.0 server side expression API. The sub-orbital tutorial polls until phase 2 restores events |
 | 1 | `KRPC.Type`: class, enumeration, structure, collection and nullable types of any kind, and the `Code`, `Service`, `Name`, `Types` and `Nullable` properties |
 | 2 | `KRPC.Expression` core: the spec each node carries and the null check where a nullable value meets a position that is not, `KRPC.NullReferenceException`, constants including `ConstantNull`, numeric promotion, comparisons, content equality, logic, casts, conditionals, `IsNull`, lambdas and `Invoke`, calls compiled to direct method calls, `ReturnType`, the node limit, and `AddEvent` |
-| 3 | `KRPC.RunFunction` and `KRPC.AddFunctionStream` |
+| 3 | `KRPC.RunFunction` with arguments, `KRPC.AddFunctionStream`, `KRPC.CompileFunction` and `Expression.ParameterTypes` |
 | 4 | Building tuples, structures and collections, and `GetField` |
 | 5 | Collection and dictionary operations, `KRPC.KeyNotFoundException` and `KRPC.IndexOutOfRangeException` |
-| 6 | Statements and control flow: variables, blocks, loops, `Break`, `Continue`, `Return` |
+| 6 | Statements and control flow: variables, blocks, loops, `Break`, `Continue`, `Return`, `StateVariable` |
 | 7 | Collection mutation: `Append`, `Set`, `Remove`, `RemoveAt`, `Clear` |
 | 8 | String operations |
 | 9 | Exceptions: `Throw`, `TryCatch`, `TryCatchAll`, `TryFinally`, and `KRPC.DivideByZeroException`, `NotSupportedException`, `TimeoutException` and `Error` |
 | 10 | The `StdLib` service |
 | 11 | `ExpressionTreePrinter` and the TestServer `DumpExpressionTree` RPC |
-| 12 | Python `run_function`, `add_function_stream`, `function_stream` and `add_event` over hand-built trees |
+| 12 | Python `run_function` with arguments, `add_function_stream`, `function_stream` and `add_event` over hand-built trees |
 | 13 | Python compiler, lambdas, and `None` typed from its context |
-| 14 | Python compiler, functions with statements |
-| 15 | C# compiler, `RunFunction`, `AddEvent` and the `AddStream` overloads |
-| 16 | Java `runFunction` and `addStream` helpers, and a public `RemoteObject.id` |
-| 17 | C++ `run_function` and `add_function_stream` helpers |
+| 14 | Python compiler, functions with statements and parameters, and `nonlocal` state variables |
+| 15 | C# compiler including lambdas with parameters, `RunFunction` with arguments, `AddEvent` and the `AddStream` overloads |
+| 16 | Java `runFunction` with arguments and `addStream` helpers, and a public `RemoteObject.id` |
+| 17 | C++ `run_function` with arguments and `add_function_stream` helpers |
 | 18 | The tutorial and the in-game tests |
 
 The golden tree tests for each compiler land with that compiler.
@@ -1423,6 +1547,8 @@ The golden tree tests for each compiler land with that compiler.
 * Batched tree construction, designed in
   [`batched-tree-construction.md`](batched-tree-construction.md); client-side only, and gated on
   measuring real tree sizes first.
+* `nonlocal` in a nested local function, meaning a local of the compiled function. It is
+  ordinary scoping in the compiler, with no server change. `global` stays unsupported.
 * Declaring exception types. A function throws one from the KRPC service's fixed set.
 * Bounding the time a loop can run for, so that a runaway function cannot hang the game.
 * Deferred calls and resumable functions, designed in
