@@ -1,6 +1,6 @@
 # Reference-counted streams (issue #902)
 
-**Status:** superseded by [stream-lifetime.md](stream-lifetime.md) (2026-10-10); never implemented. Proposal agreed 2026-07-03.
+**Status:** superseded by [stream-and-event-improvements.md](stream-and-event-improvements.md) (2026-10-10); never implemented. Proposal agreed 2026-07-03.
 
 ## Context
 

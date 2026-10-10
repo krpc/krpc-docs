@@ -1,4 +1,4 @@
-# Stream and event lifetime
+# Stream and Event Improvements and Fixes
 
 **Status:** proposal (2026-10-10). Covers [#877](https://github.com/krpc/krpc/issues/877),
 [#902](https://github.com/krpc/krpc/issues/902), [#198](https://github.com/krpc/krpc/issues/198) and

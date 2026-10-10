@@ -32,7 +32,7 @@ Four things landed in `krpc` that bear on this design. None of them start it, an
 
 This connection change is one component of the v1.0 protocol rewrite — a single breaking wire format
 carrying message ids and async messages, client-to-server streams, batching/transactions, tick
-control ([#251](https://github.com/krpc/krpc/issues/251)), and the stream-lifetime rework. The
+control ([#251](https://github.com/krpc/krpc/issues/251)), and the stream and event rework. The
 components land together because they share the wire format.
 
 | Component | Issue | Design |
