@@ -167,7 +167,8 @@ is the main lever available for latency-bound control scripts. Tracked as part o
 
 **`AddStream(call, start=true)`.** All four stream-capable clients hard-code `start=false` and
 then issue a separate `StartStream`, spending an extra round trip on every stream created.
-The eager-start path is unreachable from every client.
+The eager-start path is unreachable from every client. Designed away by start on add in
+[stream-and-event-improvements.md](protocol/stream-and-event-improvements.md).
 
 **Numeric `service_id` / `procedure_id`.** Only cnano uses them; every other client sends
 procedure name strings on every call. Note the documented caveat

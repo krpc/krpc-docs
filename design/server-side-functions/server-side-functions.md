@@ -753,7 +753,7 @@ classes, enumerations and structures.
 
 ### Computed streams and events
 
-`KRPC.AddFunctionStream(Expression function, bool start = true)` returns a `Stream` message,
+`KRPC.AddFunctionStream(Expression function)` returns a `Stream` message, started, and is
 symmetric with `AddStream`. It validates at creation time that the function's type is a
 serializable kRPC type (`TypeUtils.IsAValidType` on the static type), with an error message pointing
 at `ToList`/`ToSet` for lazy enumerables. A void function and a protocol buffer message type, which
