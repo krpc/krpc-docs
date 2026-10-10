@@ -157,7 +157,8 @@ branches the same way. Explicit `Cast` remains available.
 getter such as `SpaceCenter.ActiveVessel` returns a new object on each call. A list compares in
 order, a set as a set and a dictionary entry by entry, as Python does. Numeric elements compare
 after widening, so a list of ints can equal a list of doubles. A structure compares field by field.
-Operands of unrelated types are a `KRPC.ArgumentException` when the node is built.
+Operands of unrelated types are a `KRPC.ArgumentException` when the node is built. Two collections
+or tuples are related when they are of the same kind and their elements are related.
 
 Every collection compares its values the same way. A set the server builds hashes with a comparer
 that pairs this equality with an agreeing hash, so two equal lists or bytes values are one member.
@@ -299,12 +300,14 @@ signature and `Nullable<T>` on the method, and only the latter types the call. T
 down to `Math.Sqrt`, measured 38.4 to 7.8 ns/call with gen-0 collections eliminated, which matters
 under Unity's Boehm GC.
 
-Semantics match an ordinary RPC exactly, via three lean static helpers emitted around the call:
+Semantics match an ordinary RPC exactly, via four lean static helpers emitted around the call:
 
 * `Services.CheckExpressionGameScene(procedure)` before every invocation, the same scene-mask check
   and `RPCException` as the ordinary dispatch path;
 * `Services.CheckExpressionArgument(procedure, position, value)` around each computed argument of
   reference type at a parameter that is not nullable, the null check the dispatch path makes;
+* `Services.CheckExpressionValueArgument(procedure, position, value)` around each computed
+  nullable value-type argument at a parameter that is not nullable, which unwraps it or throws;
 * `Services.CheckExpressionReturnValue(procedure, value)` after invocation, emitted only for
   reference-typed returns where null is not permitted. The call node's spec is the procedure's
   return spec, so a nullable return and its nullable element positions stay nullable. A direct typed call can only violate the
@@ -322,8 +325,8 @@ anything it could write in a loop locally. LINQ expression trees support all of 
 exposing it as factories with kRPC-shaped semantics.
 
 * Local state: `Variable(name, type)` declares one, `Assign(variable, value)` writes it, and
-  `BlockWithVariables(variables, expressions)` scopes them. `Block(expressions)` is the
-  no-declaration form. A block evaluates to its last expression.
+  `BlockWithVariables(variables, statements)` scopes them. `Block(statements)` is the
+  no-declaration form. A block evaluates to its last statement.
 * Control flow: `IfThen`/`IfThenElse`, `While(condition, body)` and
   `ForEach(variable, collection, body)`, with `Break()` and `Continue()` inside loops. `While` and
   `ForEach` are desugared into LINQ's loop and label primitives. `Break`/`Continue` are emitted as
@@ -345,8 +348,9 @@ loops over. Over any other collection it desugars to an enumerator loop wrapped 
 that disposes the enumerator,
 matching what a C# `foreach` statement compiles to. It matters for a loop over a lazy sequence,
 whose enumerator holds the enumerator of its source. The loop variable is a `Variable` that an
-enclosing `BlockWithVariables` declares, as LINQ requires. `ForEach` does not check this, so a
-missing declaration surfaces as LINQ's own error when the function is compiled.
+enclosing `BlockWithVariables` declares, as LINQ requires. `ForEach` does not check this
+itself. `Expression.Check` rejects a variable used outside the block that declares it before the
+function is compiled.
 
 `Return` is bound when `Lambda` is built, and a function that returns early is therefore
 `Invoke(Lambda([], body), {})`, which is what the Python compiler emits for a function with
@@ -381,8 +385,10 @@ structure's position in the definitions.
 Collections are built from their elements by `CreateList`, `CreateSet` and `CreateDictionary`, or
 created empty by `CreateEmptyList`, `CreateEmptySet` and `CreateEmptyDictionary`. The element
 type is the common type of the elements, as "The element type of a collection" below defines it.
-An empty one names its element types, since there is no element to infer them from. Either is
-then mutated by
+An empty one names its element types, since there is no element to infer them from, nullable
+positions included. `CreateSet` takes a set of values, so the order it evaluates them in is
+unspecified. A key repeated in `CreateDictionary` takes the last of its values. Either is then
+mutated by
 `Append`, `Set`, `Remove`, `RemoveAt` and `Clear`, which "Collection operations named by what they
 do" below covers. `Get` of a missing dictionary key raises `KRPC.KeyNotFoundException`, and of a
 list index out of range `KRPC.IndexOutOfRangeException`. Both are added for it, and Python maps them to `KeyError`
@@ -411,12 +417,19 @@ The query surface covers counting, membership, `Select`, `Where`,
   value producing the smallest or largest key rather than the key.
 * **Reshaping**: `SelectMany`, `Distinct`, `Reverse`, `Zip`, `Union`/`Intersect`/`Except`, `Concat`,
   `OrderBy`, `GroupBy`, and `BuildDictionary`, which builds a dictionary from a collection by
-  running a key function and a value function on every element.
+  running a key function and a value function on every element. A repeated key takes the last
+  of its values, as in `CreateDictionary`.
+
+`Concat`, `Union`, `Intersect` and `Except` combine collections whose values have a common type,
+and widen each value to it, so a list of ints and a list of nullable doubles give nullable
+doubles.
 
 `GroupBy` produces `IDictionary<K, IList<T>>` rather than LINQ's `IEnumerable<IGrouping<K,T>>`,
 since `IGrouping` is not a type kRPC can carry and a dictionary is what the result is wanted for.
-Its key type is checked against the dictionary key rules when the node is built. `MinBy`, `MaxBy`
-and `GroupBy` are single-pass helpers rather than LINQ calls.
+Its key type is checked against the dictionary key rules when the node is built. The key of
+`OrderBy`, `MinBy` and `MaxBy` must have an order: a number, string, boolean or enumeration, a
+nullable one, or a tuple of them, checked when the node is built. `MinBy`, `MaxBy` and `GroupBy`
+are single-pass helpers rather than LINQ calls.
 
 #### The element type of a collection
 
@@ -518,7 +531,9 @@ concept, and makes the family sort together in the generated reference and in `d
 | `StringConcat(strings)` | `string` |
 
 `ConvertToString` throws for a null, since the text of a null differs between languages. The Python
-compiler writes `None` for one and the C# compiler an empty string, each with a conditional.
+compiler writes `None` for one and the C# compiler an empty string, each with a conditional. A value
+other than a number, boolean, string or enumeration converts as .NET formats it, which for a
+collection is the name of its type. The Python compiler formats collections itself.
 
 `StringIndexOf` returns `-1` rather than a nullable `int`. Nullable values would be the more honest
 type, but `-1` is what `str.find` and `String.IndexOf` return in the languages both compilers
@@ -703,8 +718,8 @@ becomes an error on the event's stream.
 they share the compiled delegate, which the `Expression` caches, so a second `AddFunctionStream` of
 the same function by the same client returns the existing stream's id, as `AddStream` does for an
 equal call. The consequence is the one [#902](https://github.com/krpc/krpc/issues/902) describes:
-one `RemoveStream` removes it for both. An event is not deduplicated, because `AddEvent` compiles a
-fresh delegate on every call rather than reusing the cached one.
+one `RemoveStream` removes it for both. An event is not deduplicated, because an event's stream
+compares by reference.
 
 **Streams are not unified with procedure-call streams on the server, and are in the clients where
 the language allows.** `AddStream` takes an encoded `ProcedureCall` and `AddFunctionStream` takes an
@@ -724,9 +739,8 @@ the calling tick, and returns its result.
 The compiled delegate is cached on the `Expression` object, so a function is compiled the first time
 it is run and reused on every later call. It is not compiled when the object is created: most
 expression objects are interior nodes of a larger tree and are never run on their own, so compiling
-every one of them would pay the cost hundreds of times over for a single function. `RunFunction`
-and `FunctionStream` share the cached delegate; `AddEvent` compiles its own `Func<bool>` on every
-call. Checking the tree for unbound `Break`/`Continue`/`Return` markers is cached the same way.
+every one of them would pay the cost hundreds of times over for a single function. `RunFunction`,
+`FunctionStream` and `AddEvent` share the cached delegate. Checking the tree for unbound `Break`/`Continue`/`Return` markers is cached the same way.
 
 The return value is a `bytes` payload rather than a typed value, since the procedure's declared
 return type cannot depend on the expression: the server encodes the value with the runtime-typed
@@ -768,6 +782,9 @@ the missing primitives as ordinary RPCs:
 * vectors and quaternions over the tuple types the SpaceCenter service already uses:
   `VectorAdd`/`Subtract`/`Scale`/`Dot`/`Cross`/`Magnitude`/`Normalize`/`Distance`/`Angle`/`Lerp`,
   and `QuaternionMultiply`/`Inverse`/`Angle`/`Slerp`/`FromAxisAngle`/`RotateVector`.
+* `Print`, which writes a line starting `Print:` to the game's log, for debugging a function.
+  Python's `print` and C#'s `Console.WriteLine` compile to it. A function a stream or an event
+  evaluates prints on every update.
 
 These exist to be called from inside functions, and are what the client compilers target when they
 see `math.sqrt` (Python) or `System.Math.Sqrt` (C#). Each compiler holds the number of arguments its
@@ -954,8 +971,8 @@ no remote call, and a stream read inside a function, as it would be evaluated on
   and `is not None` through `IsNull`; comprehensions (list, set and dict, nested) and generator
   expressions; `any`/`all`/`sum`/`min`/`max`/`len`/`sorted`/`abs`/`round`/`int`/`float`/`str`;
   subscripts and slices; f-strings; conditional expressions through `Expression.Conditional`;
-  assignment expressions in a function body; parameterless lambdas and local function calls; and `math` module calls
-  mapped onto `StdLib`.
+  assignment expressions in a function body; parameterless lambdas and local function calls; `math` module calls
+  mapped onto `StdLib`; and `print`, with a constant `sep`, mapped onto `StdLib.Print`.
 * Statements (`krpc/functionstatements.py`): `if`/`elif`/`else`, `while` and `for` with
   `break`/`continue`, early `return`, local variables including augmented and annotated assignment,
   assignment to remote properties and to collection elements, `pass`, calls evaluated purely for
@@ -970,7 +987,7 @@ list of them, `reversed` reaches `Reverse`,
 * Some reshaping operations have syntax: `sorted` reaches `OrderBy`, `reversed` reaches `Reverse`,
   a slice of a collection reaches `Skip` and `Take`, and a nested comprehension reaches
   `SelectMany`. A dict comprehension is a `ForEach` that sets each key, so a repeated key takes the
-  last value as in Python; `BuildDictionary` throws on one, as C#'s `ToDictionary` does. `zip(a, b)` and `d.items()` reach `Zip`.
+  last value, as in Python and in `BuildDictionary`. `zip(a, b)` and `d.items()` reach `Zip`.
   `list + list` reaches `Concat` and `ToList`. The rest are factory-only. Their natural syntax does
   not name them in its error: `set(xs)` reports a client side function called with an argument
   computed on the server.
@@ -983,7 +1000,7 @@ list of them, `reversed` reaches `Reverse`,
   | iterating `d` | over `DictionaryKeys(d)` |
   | `k in d` | `ContainsKey(d, k)` |
   | tuple targets | `Get` by constant index, from a hidden variable in statements |
-  | truth of a condition | `!= 0`, a length or count `!= 0`, or `IsNull` |
+  | truth of a condition | `!= 0`, a length or count `!= 0`, or `IsNull`, after an `IsNull` test of a nullable value |
   | `a or b` on non-booleans | `Conditional` on the truth of a temporary holding `a` |
 
   A `Range` node would replace the `range` lowering. A client side call written as a statement is
@@ -993,9 +1010,10 @@ list of them, `reversed` reaches `Reverse`,
   `int()` and `round()` of an integer are the integer itself, and of a float give an `int`. A
   negative constant index counts from the end through `Count` or `StringLength`, and a string
   slice clamps its bounds to the length, as Python does.
-* A final `if`/`else` whose branches both return compiles to a `Conditional` of two blocks, so
-  the function's value is its last expression. A final `try` whose body or `else`, and every
-  handler, return is accepted too, with its returns bound by the function's `Lambda`.
+* A final `if`/`else` whose branches both return a value, or are a single `raise`, compiles to a
+  `Conditional` of two blocks, so the function's value is its last expression. Any other final
+  `if` that returns or raises on every path, and a final `try` whose body and every handler
+  return, is a statement, with its returns bound by the function's `Lambda`.
 * An operator whose operand type is known and is not a number is a compile error: arithmetic
   other than string and list `+`, ordering comparisons, `sum`, and `min`/`max` without a key. A
   bool takes part in `&`, `|` and `^` only. `str()` and an f-string take a string, a number or a
@@ -1015,6 +1033,8 @@ list of them, `reversed` reaches `Reverse`,
   elements, the function's other returns, the variable's other assignments, an `Optional[T]`
   annotation on a variable or `->`, or `typing.cast(T, None)`. A `None` with no context is a
   compile error. A bare `return` in a function that returns a value is an error, as in mypy.
+* `typing.cast(T, value)` of any other value is a `Cast`, so it can narrow, such as a float to
+  an `int`. It is the explicit form of the narrowing an assignment rejects.
 * `raise` and `except` name an exception by its Python type in the exceptions table.
   `except ValueError` catches the three argument exceptions. `except RuntimeError` catches
   `InvalidOperationException` and every exception a service declares, as the Python client raises
@@ -1058,7 +1078,8 @@ Beyond the operator set: a comparison with `null` maps onto `IsNull`, or folds t
 the operand's `ReturnType` is not nullable, and a conversion between a value type and its nullable
 form is left to the server; a `null` is a `ConstantNull` of its static type; `??`, `.HasValue`, `.Value` and
 `GetValueOrDefault` on a nullable remote value compile to `IsNull` and `Conditional`, with the
-value held in a variable; `System.Math` methods map onto `StdLib`;
+value held in a variable; `System.Math` methods map onto `StdLib`, and `Console.WriteLine` onto
+`StdLib.Print`, its arguments formatted as `string.Format` formats them;
 string `+` and `ToString` become `StringConcat` and `ConvertToString`; the bitwise complement and
 the LINQ operators `Skip`, `Take`, `SelectMany`, `ToDictionary`, `Distinct`, `Reverse`, `Zip`,
 `Union`, `Intersect`, `Except`, `First`, `Last` and `ElementAt` are supported; captured collections
@@ -1085,7 +1106,8 @@ Where C# semantics and the server differ, the compiler does the following:
   takes its default, and is otherwise sent as a null argument. An expression tree cannot omit an
   optional argument.
 * A comparison with a nullable number is a null test and the comparison, false on null as in C#.
-  Arithmetic on a null still throws.
+  Arithmetic and logic on a null still throw.
+* `Math.Round` takes any number of decimal places, where C# throws outside 0 to 15.
 * A local or lambda parameter of a reference type is nullable at its top level, as in C#.
 * A result is decoded at the type the caller names, with the server's nullable flag at each
   reference-type position, which a C# type does not carry.
@@ -1124,6 +1146,9 @@ on the server as it is locally. Adding `b` only when needed keeps `0.1 % 360` ex
 remainder in range. The C# compiler maps `%` straight onto `Modulo`, which is C#'s own
 semantics.
 
+**A repeated key in C#'s `ToDictionary` takes the last of its values.** It compiles to
+`BuildDictionary`, where C# itself throws. The C# guide says so.
+
 ## Object identity and lifetime
 
 Every object a factory returns becomes an entry in the object store, and the store collapses
@@ -1148,7 +1173,7 @@ cancelled.
 The visitors that check, bind and rewrite a function therefore throw past `MaxNodes`, 1,000,000
 nodes counted per use. That many compiled in 1.4 s in the core tests under .NET. `AddEvent`,
 `RunFunction` and `AddFunctionStream` also count the nodes before compiling, through
-`Expression.CheckSize`, a check separate from the marker checks.
+`Expression.Check`, which checks the markers and scopes in the same pass.
 
 The bound only stops the blowup. A program built from distinct nodes needs a million RPCs to reach
 it. Compiling each shared node once would make the work grow with the distinct nodes, and remove
