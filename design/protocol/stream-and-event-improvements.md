@@ -174,10 +174,10 @@ exception.
 | Stream ended | raises the ending, per "Endings and Errors" | same |
 
 * The timeout is a deadline. A wake before it with nothing new waits for the remaining time.
-* Returning `bool` from the timed form changes the return type in place, in every client. The C#,
-  Java and C++ forms return `void` today, and Python returns `None`. The change is source compatible,
-  as a call used as a statement discards its result. It is a binary break in the C#, Java and C++
-  libraries, which ship with each release, so callers recompile.
+* The timed form returns `bool`: `true` when a new value or firing arrived, `false` on timeout.
+  Every client changes it in place, where it returns `void` or `None` today. Existing code compiles
+  unchanged, as a call used as a statement discards the result. Programs built against the C# or
+  Java library must be recompiled, as the return type is part of the compiled method reference there.
 * Stream callbacks receive values only. Errors and endings are not passed, so typed callback
   signatures stay typed.
 * Each handle can take an `on end` callback, which receives the ending exception. It is called once,
@@ -443,7 +443,7 @@ extraction only, with no protocol change.
 Decided 2026-10-10:
 
 * Timed waits of streams and events return `bool`, changed in place in every client. The binary
-  break in the C#, Java and C++ libraries is accepted.
+  break in the C# and Java libraries is accepted.
 * A held function evaluation restores its `StateVariable` values (SSF, after rebasing).
 * Holds are bounded by fixing the settle check for zero counts, not by a time limit.
 * The load counter is `KRPC.GameStateLoads`.
