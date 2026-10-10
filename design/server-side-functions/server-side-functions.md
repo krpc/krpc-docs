@@ -1,7 +1,7 @@
 # Server-side functions
 
-**Status:** done, in review. The work ships as a stack of 19 PRs, one per phase (see "Phases").
-None of the stack is opened yet. It closes umbrella issue
+**Status:** done, in review. The work ships as a stack of 7 PRs grouping its 19 phases (see
+"Phases"). None of the stack is opened yet. It closes umbrella issue
 [#679](https://github.com/krpc/krpc/issues/679).
 
 Follow-ups, not built, each designed in its own doc:
@@ -9,9 +9,6 @@ Follow-ups, not built, each designed in its own doc:
 [`shared-nodes.md`](shared-nodes.md) (compiling shared nodes once),
 [`function-release.md`](function-release.md) (releasing functions) and
 [`batched-tree-construction.md`](batched-tree-construction.md).
-
-Arguments to `RunFunction` are designed in "Function arguments", and are to be folded into the
-stack before it is opened.
 
 Linked issues: [#517](https://github.com/krpc/krpc/issues/517) (per-element calls in predicates),
 [#503](https://github.com/krpc/krpc/issues/503) (object constants),
@@ -45,8 +42,11 @@ Naming rules:
 
 * The node class keeps the name `Expression`, as in `System.Linq.Expressions`, which it compiles to.
   `Function` would make every node read as a function (`Function.ConstantInt(1)`).
-* Entry points are named for the function: `KRPC.RunFunction`, `KRPC.AddFunctionStream`,
-  `Client.compile`, `Connection.Compile`, `krpc/function_stream.hpp`.
+* Server entry points are named for the function: `KRPC.RunFunction`, `KRPC.AddFunctionStream`,
+  `KRPC.CompileFunction`, `krpc/function_stream.hpp`.
+* Client methods drop the suffix: `compile`, `run`, and `add_stream`, which takes a remote
+  procedure or a function. C# and Java spell them `Compile`, `Run`, `AddStream` and `run`,
+  `addStream`.
 * The split is a naming rule, not a type. `RunFunction`, `AddFunctionStream` and `AddEvent` take an
   `Expression`, in a parameter named `function`.
 * The lambda node is `Expression.Lambda(parameters, body)`, after its LINQ node. It is `Invoke`d or
@@ -64,6 +64,12 @@ Breaking changes:
 | `KRPC.AddEvent` parameter renamed `expression` to `function` | Breaks calls that pass it by name |
 | `Expression.Function` renamed `Lambda`, with no deprecated alias | A v0.6 client calling `Function` fails |
 | New procedures declared among the released ones, and `Expression` split into one partial class file per feature | `KRPC` procedure ids renumber; a client calling by id (cnano) needs regenerated stubs |
+| `Power` takes the common type of its operands | The result takes the common type, not the first operand's type |
+| `Get` on a tuple takes a constant index | A computed tuple index is an error |
+| `CreateTuple` takes at most seven elements | An eight-element tuple is an error |
+| Calls to `KRPC` service procedures are rejected in a function | A function calling one fails when built |
+| Any service's null, missing key, index, division by zero, unsupported, timeout and overflow errors reach Python, C# and Java as built-in exceptions | Breaks code that catches `RPCError` or `RPCException` for them, such as a timeout from `AutoPilot.Wait` |
+| C# `AddStream` of a single call with a remote procedure call in an argument | The argument's call is made on every update, not once when the stream is created |
 
 ## Approach
 
@@ -124,9 +130,10 @@ not declare:
   `Nullable`. `Nullable` says whether a value of the type may be null; a `String` that is not
   nullable refuses one, though a C# string can hold it. A function's value is encoded with a
   presence flag at each nullable position, so a client builds its type message with `nullable` set
-  there. The C++ return type check requires `std::optional` at exactly those positions. The C#
-  check is exact at value-type positions and follows the server at reference-type ones, since a
-  C# reference type does not say at run time whether it is nullable.
+  there. The C++ return type check requires `std::optional` at exactly the nested nullable
+  positions. The value itself may be a `std::optional` or not, and reading a null into a plain type
+  throws `std::runtime_error`. The C# check is exact at value-type positions and follows the server
+  at reference-type ones, since a C# reference type does not say at run time whether it is nullable.
 * `Expression.ReturnType` gives the `Type` an expression evaluates to, and `HasReturnType` reports
   whether it has one at all. `ReturnType` throws for types that cannot be returned to a client, such
   as the lazy `IEnumerable<T>` produced by `Select`/`Where`, and the message says to wrap it in
@@ -138,7 +145,7 @@ clients do not need this: the user supplies the expected type as a generic param
 
 **As built, Java walks `ReturnType` too.** Its `Stream<T>` is constructed from a protobuf `Type`
 rather than from a `Class<T>`, and its decoder takes the same message, so there is nothing for a
-type argument alone to drive. `Connection.runFunction` and `Connection.addStream` therefore
+type argument alone to drive. `Connection.run` and `Connection.addStream` therefore
 introspect the type and cast the decoded value to `T`, which the compiler cannot check. C# and C++
 follow the design and decode at the type the user names.
 
@@ -154,7 +161,8 @@ is a signed type that cannot be implicitly converted); else `long` to `long`; el
 are numeric and differ. `Power` of integers is exact, by repeated squaring, and wraps on overflow
 as the other integer operators do; a negative integer exponent goes through `Math.Pow` and
 truncates. `Power` of floating point operands uses `Math.Pow`. `Conditional` promotes its two
-branches the same way. Explicit `Cast` remains available.
+branches the same way. Branches with no common type are an `InvalidOperationException`, as for the
+values of a collection. Explicit `Cast` remains available.
 
 `Equal`, `NotEqual` and `Contains` compare objects, tuples, bytes and collections by value, since a
 getter such as `SpaceCenter.ActiveVessel` returns a new object on each call. A list compares in
@@ -184,9 +192,14 @@ implicit, and one that narrows needs `Cast`. The positions are:
 
 * a procedure argument (`CallWithArguments`);
 * a collection element, a dictionary key or value, the value given to `Append`, `Set`, `Remove`
-  and `Contains`, and the key given to `Get` on a dictionary;
+  and `Contains`, and the key given to `Get`, `ContainsKey` and `Remove` on a dictionary;
 * a structure field (`CreateStruct`);
-* a variable assignment (`Assign`), and an argument to `Invoke`.
+* a variable assignment (`Assign`), and an argument to `Invoke`;
+* the seed of `AggregateWithSeed`, which widens to the type the function accumulates.
+
+A value of an unrelated type at any of these positions is an `InvalidOperationException`. An index
+or count, as given to `Get` on a list, `ElementAt`, `Set`, `RemoveAt`, `Skip` and `Take`, takes
+exactly an `int`, and any other type needs `Cast`.
 
 A nullable value type, which a procedure returning one produces as `Nullable<T>`, takes part in
 promotion as its underlying `T`, which throws when the value is null. A position of a plain type
@@ -243,15 +256,21 @@ fresh value is not nullable. A node that passes a value on takes the spec of whe
 A nullable value going into a position that is not nullable is checked when it is evaluated, and
 throws `KRPC.NullReferenceException` if it is null, with a message naming the position. A nullable
 value type is unwrapped through the check. A reference type passes through a null check, and a
-collection whose nested positions differ is walked for nulls at those positions only. The
-positions are the ones listed under numeric promotion, plus operands, conditions, the collection
-an operation is given, string operands, the value given to `ConvertToString`, the `Throw` message,
-a set element and a dictionary key.
+collection whose nested reference positions differ is walked for nulls at those positions only.
+A nullable value type nested in a collection or tuple goes only to a nullable position, and the
+error says to convert the values with `Select`. A plain value type widens to a nullable position.
+The positions are the ones listed under numeric promotion, plus operands, conditions, the
+collection an operation is given, string operands, the value given to `ConvertToString`, the
+`Throw` message, a set element and a dictionary key.
+
 The check is emitted only where the spec allows a null, so a value that cannot be null costs
-nothing. A lookup is the exception: `Contains`, `ContainsKey` and `Remove` give false for a null
-sought in a collection that cannot hold one, as `Equal` gives false for a null. A lambda given to a collection
-operation is adapted the same way when its parameter is less nullable than the elements, and a
-predicate or key function's result is never nullable.
+nothing. A call checks more: a computed reference argument for a parameter that is not nullable, and
+a reference a procedure returns where its return is not nullable, are checked on every evaluation,
+as for an ordinary RPC. A lookup is the exception: `Contains`, `ContainsKey` and `Remove` give false
+for a null sought in a collection that cannot hold one, as `Equal` gives false for a null. A lambda
+given to a collection operation is adapted the same way when its parameter is less nullable than the
+elements. A predicate's result is never nullable. A key function's result can be, and `OrderBy`,
+`MinBy` and `MaxBy` order a null key first.
 
 ### Calls
 
@@ -313,9 +332,15 @@ Semantics match an ordinary RPC exactly, via four lean static helpers emitted ar
   nullable value-type argument at a parameter that is not nullable, which unwraps it or throws;
 * `Services.CheckExpressionReturnValue(procedure, value)` after invocation, emitted only for
   reference-typed returns where null is not permitted. The call node's spec is the procedure's
-  return spec, so a nullable return and its nullable element positions stay nullable. A direct typed call can only violate the
-  declared return type by returning null, so the per-evaluation `IsInstanceOfType` reflection check
-  of the boxed dispatch path is provably unnecessary.
+  return spec, so a nullable return and its nullable element positions stay nullable. A direct typed
+  call can only violate the declared return type by returning null, so the per-evaluation
+  `IsInstanceOfType` reflection check of the boxed dispatch path is provably unnecessary.
+
+A call's result is copied where it holds a collection. Each list, set and dictionary in it is
+rebuilt, including nested ones and those in a tuple or structure field, as decoding the value for a
+client would. A function therefore never holds a collection the procedure keeps, such as the list
+`SpaceCenter.Contract.Keywords` returns. A mutation statement, or a state variable initialized from
+a call, changes only the function's copy.
 
 RPC errors are thrown as exceptions, so they propagate to whatever is evaluating the expression.
 `YieldException` propagates too, and is reported as an error; see "Yielding procedures inside a
@@ -348,18 +373,17 @@ exposing it as factories with kRPC-shaped semantics.
 
 `ForEach` over a list iterates by position, as Python does, so the body can append to the list it
 loops over. Over any other collection it desugars to an enumerator loop wrapped in a `try`/`finally`
-that disposes the enumerator,
-matching what a C# `foreach` statement compiles to. It matters for a loop over a lazy sequence,
-whose enumerator holds the enumerator of its source. The loop variable is a `Variable` that an
-enclosing `BlockWithVariables` declares, as LINQ requires. `ForEach` does not check this
-itself. `Expression.Check` rejects a variable used outside the block that declares it before the
-function is compiled.
+that disposes the enumerator, matching what a C# `foreach` statement compiles to. It matters for a
+loop over a lazy sequence, whose enumerator holds the enumerator of its source. The loop variable is
+a `Variable` that an enclosing `BlockWithVariables` declares, as LINQ requires. `ForEach` does not
+check this itself. `Expression.Check` rejects a variable used outside the block that declares it
+before the function is compiled.
 
 `Return` is bound when `Lambda` is built, and a function that returns early is therefore
 `Invoke(Lambda([], body), {})`, which is what the Python compiler emits for a function with
 statements. A block containing `Return` handed straight to `RunFunction` is reported as an unbound
-marker. A bare `Lambda` is rejected too, since its type is a delegate, which cannot be sent to a
-client.
+marker. A `Lambda` at the root is called with the `RunFunction` arguments, as "Function
+arguments" describes.
 
 Void-typed nodes are the reason several things elsewhere are special-cased: an expression whose type
 is `void` has no return type to report, cannot be streamed, and is only meaningful under
@@ -372,12 +396,19 @@ evaluation and a captured value is a constant, so `StateVariable(name, initialVa
 * It evaluates `initialValue` once, when the factory is called, and holds the result in a
   `StrongBox<T>` that the node owns. The node compiles to `Field(Constant(box), "Value")`, which
   is writable, so it is read like a variable and is a valid `Assign` target.
-* Its type is the initial value's type. A narrowing assignment is an error, as for any variable.
-  A collection state variable is changed in place by the mutation statements.
+* Its type is the initial value's type, which cannot be a function. A narrowing assignment is an
+  error, as for any variable. A collection state variable is changed in place by the mutation
+  statements.
 * The state belongs to the node. A built function keeps it across `RunFunction` calls, streams and
-  events, and two streams of one function are one stream with one state. Building the function
-  again resets it, and there is no reset RPC.
+  events. Each evaluation advances it once. For one client, two streams of one function are one
+  stream, and two events of one function are one event, so each advances it once per update. A
+  stream and an event of one function are two evaluations. Building the function again resets it,
+  and there is no reset RPC.
 * The box needs no lock, since functions are evaluated on the main thread only.
+* A plain `AddStream` of `StateVariable` is rejected, as each update would evaluate the initial
+  value again.
+* A lazily evaluated initial value, such as from `Select`, is a `KRPC.ArgumentException` pointing
+  to `ToList` or `ToSet`.
 
 A per-stream state array passed into the compiled delegate was rejected. A function run through
 `RunFunction` would lose its state between calls, unlike a Python closure.
@@ -408,21 +439,22 @@ type is the common type of the elements, as "The element type of a collection" b
 An empty one names its element types, since there is no element to infer them from, nullable
 positions included. `CreateSet` takes a set of values, so the order it evaluates them in is
 unspecified. A key repeated in `CreateDictionary` takes the last of its values. Either is then
-mutated by
-`Append`, `Set`, `Remove`, `RemoveAt` and `Clear`, which "Collection operations named by what they
-do" below covers. `Get` of a missing dictionary key raises `KRPC.KeyNotFoundException`, and of a
-list index out of range `KRPC.IndexOutOfRangeException`. Both are added for it, and Python maps them to `KeyError`
-and `IndexError`. It maps the CLR `KeyNotFoundException` for every service, so
-any service's missing key now reaches a Python client as a `KeyError`. `ContainsKey` tests for a key, and `Contains`
-rejects a dictionary with a message pointing at it, since the CLR would compare key and value pairs.
-`StringSplit` gives a `List<string>`, so the parts can be appended to. An integer `Sum` wraps on
-overflow, and the aggregations accept unsigned integers. `Average` of longs is taken over doubles,
-since `Enumerable` sums longs checked. Both apply to nullable integers too, with a null skipped.
+mutated by `Append`, `Set`, `Remove`, `RemoveAt` and `Clear`, which "Collection operations named by
+what they do" below covers. `Get` of a missing dictionary key raises `KRPC.KeyNotFoundException`. A
+list index out of range in `Get`, `ElementAt`, `Set` or `RemoveAt`, and a string index in
+`StringGet` or `StringSubstring`, raise `KRPC.IndexOutOfRangeException`. Both are added for it, and
+Python maps them to `KeyError` and `IndexError`. It maps the CLR `KeyNotFoundException` for every
+service, so any service's missing key now reaches a Python client as a `KeyError`. `ContainsKey`
+tests for a key, and `Contains` rejects a dictionary with a message pointing at it, since the CLR
+would compare key and value pairs. `StringSplit` gives an `IList<string>`, so the parts can be
+appended to. An integer `Sum` wraps on overflow, and the aggregations accept unsigned integers.
+`Average` of longs is taken over doubles, since `Enumerable` sums longs checked. Both apply to
+nullable integers too, with a null skipped.
 
-A collection built inside a function is typed by the interface a `Type` names: a list element, a
-dictionary value, a tuple element, a `Conditional` branch and a returned value that is a `List<T>`
-or a `Dictionary<K,V>` is used as an `IList<T>` or `IDictionary<K,V>`. A variable of a nested type,
-such as `IList<IList<int>>`, can then hold a list of lists the function builds. A tuple widens
+A collection built inside a function is typed by the interface a `Type` names. The collection
+factories, `ToList` and `BuildDictionary` give an `IList<T>` or `IDictionary<K,V>`, so their
+`ReturnType` is the `ListType` or `DictionaryType`. A variable of a nested type, such as
+`IList<IList<int>>`, can then hold a list of lists the function builds. A tuple widens
 element by element to a tuple type it is used at, as an argument, a variable or a structure field,
 so `(x, 0, 0)` with a double `x` is a `Tuple<double,double,double>` argument.
 The query surface covers counting, membership, `Select`, `Where`,
@@ -468,8 +500,9 @@ present, computed over all of them at once:
    * else any `uint` gives `uint`, and only `int` gives `int`.
 4. **Tuples of one length, or collections of one kind**, give that tuple or collection with the
    common type of the set of types at each position.
-5. **Anything else** is a `KRPC.ArgumentException` when the node is built. The message lists the
-   distinct types sorted by name.
+5. **Anything else** is a `KRPC.InvalidOperationException` when the node is built, as for
+   `Concat`, `Union`, `Intersect` and `Except`. The message lists the distinct types sorted by
+   name.
 
 Each value then widens to the common type, as a value at any position of a fixed type does.
 
@@ -499,7 +532,8 @@ value, when it has one, and of every `Return(value)`, and each returned value wi
 **The type is deduced, not passed.** A client that wants a specific type already has three ways
 to state it:
 
-* `Cast(CreateList(values), ListType(Double()))` widens a list.
+* `Cast(CreateList(values), ListType(Double()))` converts a list element by element, narrowing
+  too, as a `Cast` of each element would.
 * A typed variable, argument or structure field widens a collection used there.
 * Casting one element resolves an `int` and `ulong` mix.
 
@@ -561,7 +595,7 @@ translate from, so it keeps the mapping transparent. `StringTrim` trims whitespa
 character set, matching the no-argument form of both.
 
 **Every one of these is culture sensitive and must be pinned.** `ToUpper`/`ToLower` are culture
-sensitive in C#, and so are the default `IndexOf`, `StartsWith`, `EndsWith` and `Replace` overloads.
+sensitive in C#, and so are the default `IndexOf`, `StartsWith` and `EndsWith` overloads.
 Left alone they would make the same function return different answers on a German or Turkish game,
 which is the class of bug the [locale hardening](../locale-hardening.md) work fixed by hand and the
 [culture analyzers](../build-tools/culture-analyzers.md) rules `CA1307`, `CA1310` and `CA1311` exist
@@ -615,27 +649,33 @@ to infer the type from and it would have to be supplied explicitly at every use.
 give a `Throw` in one branch the type of the other, which the C# compiler uses for a client side
 branch that fails to evaluate.
 
-A function throws one of the KRPC service's exceptions, and a function cannot declare its own. The
-set covers the common conditions, with `Error` for any other, whose meaning goes in the message:
+A function throws an exception a service declares with `[KRPCException]`, and a function cannot
+declare its own. The KRPC service's set covers the common conditions, with `Error` for any other,
+whose meaning goes in the message:
 
-| Exception | Maps the CLR type | Python |
-| --- | --- | --- |
-| `ArgumentException` | `System.ArgumentException` | `ValueError` |
-| `ArgumentNullException` | `System.ArgumentNullException` | `ValueError` |
-| `ArgumentOutOfRangeException` | `System.ArgumentOutOfRangeException` | `ValueError` |
-| `NullReferenceException` | `System.NullReferenceException` | `TypeError` |
-| `InvalidOperationException` | `System.InvalidOperationException` | `RuntimeError` |
-| `KeyNotFoundException` | `System.Collections.Generic.KeyNotFoundException` | `KeyError` |
-| `IndexOutOfRangeException` | `System.IndexOutOfRangeException` | `IndexError` |
-| `DivideByZeroException` | `System.DivideByZeroException` | `ZeroDivisionError` |
-| `NotSupportedException` | `System.NotSupportedException` | `NotImplementedError` |
-| `TimeoutException` | `System.TimeoutException` | `TimeoutError` |
-| `ObjectDestroyedException` | none | `RuntimeError` subclass |
-| `Error` | none | `RuntimeError` subclass |
+| Exception | Maps the CLR type | Python | C# | Java |
+| --- | --- | --- | --- | --- |
+| `ArgumentException` | `System.ArgumentException` | `ValueError` | `ArgumentException` | `IllegalArgumentException` |
+| `ArgumentNullException` | `System.ArgumentNullException` | `ValueError` | `ArgumentNullException` | `IllegalArgumentException` |
+| `ArgumentOutOfRangeException` | `System.ArgumentOutOfRangeException` | `ValueError` | `ArgumentOutOfRangeException` | `IndexOutOfBoundsException` |
+| `NullReferenceException` | `System.NullReferenceException` | `TypeError` | `NullReferenceException` | `NullPointerException` |
+| `InvalidOperationException` | `System.InvalidOperationException` | `RuntimeError` | `InvalidOperationException` | `UnsupportedOperationException` |
+| `KeyNotFoundException` | `System.Collections.Generic.KeyNotFoundException` | `KeyError` | `KeyNotFoundException` | `NoSuchElementException` |
+| `IndexOutOfRangeException` | `System.IndexOutOfRangeException` | `IndexError` | `IndexOutOfRangeException` | `IndexOutOfBoundsException` |
+| `DivideByZeroException` | `System.DivideByZeroException` | `ZeroDivisionError` | `DivideByZeroException` | `ArithmeticException` |
+| `NotSupportedException` | `System.NotSupportedException` | `NotImplementedError` | `NotSupportedException` | `UnsupportedOperationException` |
+| `TimeoutException` | `System.TimeoutException` | `TimeoutError` | `TimeoutException` | generated |
+| `OverflowException` | `System.OverflowException` | `OverflowError` | `OverflowException` | `ArithmeticException` |
+| `ObjectDestroyedException` | none | generated | generated | generated |
+| `Error` | none | generated | generated | generated |
 
-The Python client raises each exception as a subclass of the Python type in the table. `Get` on a
-list checks the index and throws `IndexOutOfRangeException`, since `List<T>` throws
-`ArgumentOutOfRangeException`. A service's own index check still throws the argument exception.
+The Python, C# and Java clients raise the built-in type in the table itself. "generated" is the
+class the client generates for the exception, a `RuntimeError` subclass in Python. Java keeps the
+generated `TimeoutException`, as Java's own is a checked exception. The C++ client raises the
+generated class for every exception. `Get`, `ElementAt`, `StringGet`, `StringSubstring` and the
+list mutation statements check the index and throw `IndexOutOfRangeException`, and so does `Get`
+with a constant tuple index, when the node is built. A service's own
+index check still throws the argument exception.
 The mappings apply to every service, so a service that throws one of the new CLR types reaches
 the client as a typed exception.
 
@@ -670,16 +710,17 @@ the node at all. So a name resolves to a **set**: the kRPC type plus every type 
 obtained by inverting `Services.MappedExceptionTypes`, with one LINQ catch block emitted per type
 over a shared handler. The set is fixed when the scanner runs.
 
-**The set must not widen either, and a CLR catch block widens it.** `catch (System.ArgumentException)`
-also catches `ArgumentNullException` and `ArgumentOutOfRangeException`, which map to kRPC types of
-their own, and `catch (System.InvalidOperationException)` catches `ObjectDisposedException`, which
-maps to nothing and so reaches the client with no name at all. `HandleException` maps by exact type, so each of those arrives under a name the
-catch did not name, and the kRPC exception classes are flat: they are all `sealed` and derive from
-`System.Exception`, so no client can express the subclass relationship the catch is assuming. Each
-handler therefore opens with `Services.ExpressionExceptionIsNamed(caught, type)` and rethrows when
-it is false. An exception filter would say the same thing more directly, and is avoided here for the
-reason `TryCatchAll` avoids it. The rule the two halves buy is one sentence: a name catches exactly
-the exceptions that reach the client under it.
+**The set must not widen either, and a CLR catch block widens it.** `catch
+(System.ArgumentException)` also catches `ArgumentNullException` and `ArgumentOutOfRangeException`,
+which map to kRPC types of their own, and `catch (System.InvalidOperationException)` catches
+`ObjectDisposedException`, which maps to nothing and so reaches the client with no name at all.
+`HandleException` maps by exact type, so each of those arrives under a name the catch did not name,
+and the kRPC exception classes are flat: they are all `sealed` and derive from `System.Exception`,
+so no client can express the subclass relationship the catch is assuming. Each handler therefore
+opens with `Services.ExpressionExceptionIsNamed(caught, type)` and rethrows when it is false. An
+exception filter would say the same thing more directly, and is avoided here for the reason
+`TryCatchAll` avoids it. The rule the two halves buy is one sentence: a name catches exactly the
+exceptions that reach the client under it.
 
 **An RPC failure is not nameable, and is documented as such.** Direct call emission means there is
 no `ExecuteCall` wrapper, so a procedure's own exception propagates as it is, and the two checks
@@ -717,15 +758,16 @@ serializable kRPC type (`TypeUtils.IsAValidType` on the static type), with an er
 at `ToList`/`ToSet` for lazy enumerables. A void function and a protocol buffer message type, which
 `Type.Code` cannot describe, each get their own message, and `ReturnType` applies the same check.
 
-`FunctionStream : Stream` compiles `Lambda<Func<object>>(Convert(expr, object))` once.
-`UpdateInternal` evaluates it and turns any exception into a `Result.Error`. A `YieldException`
-becomes an `InvalidOperationException` naming the pause, per "A yield is an error, and nothing
-retries". Value-change detection through `ValueUtils.Equal` mirrors `ProcedureCallStream`, so
-unchanged values are not resent. The `TypeSpec` built at creation time tells `Encoder.Encode` how to
-serialize the boxed result, so no per-update type routing is needed.
+`FunctionStream : Stream` evaluates the `Func<object[], object>` the `Expression` caches, with no
+arguments. `UpdateInternal` turns any exception into a `Result.Error`. A `YieldException` becomes an
+`InvalidOperationException` naming the pause, per "A yield is an error, and nothing retries". Each
+value is compared with the last one sent by its encoding, so an unchanged value is not resent. A
+collection changed in place is the same object with a new encoding, so it is sent. The `TypeSpec`
+built at creation time tells `Encoder.Encode` how to serialize the boxed result, so no per-update
+type routing is needed.
 
 A value that cannot be encoded, such as a null element in a list of objects, is turned into an
-error result by encoding it in `UpdateInternal` whenever it changes. The encode that sends an update
+error result by encoding it in `UpdateInternal`. The encode that sends an update
 covers every stream of a client, so an error there would fail all of them, every update.
 
 `EventStream.UpdateInternal` has the same handling, so a predicate error becomes a stream error
@@ -734,12 +776,12 @@ out of the per-frame update loop and starving every stream. `AddEvent` reports "
 evaluate to a boolean value" when given anything else. It takes a `bool?` as its value, so a null
 becomes an error on the event's stream.
 
-**Function streams deduplicate like procedure call streams.** Two `FunctionStream`s are equal when
-they share the compiled delegate, which the `Expression` caches, so a second `AddFunctionStream` of
-the same function by the same client returns the existing stream's id, as `AddStream` does for an
-equal call. The consequence is the one [#902](https://github.com/krpc/krpc/issues/902) describes:
-one `RemoveStream` removes it for both. An event is not deduplicated, because an event's stream
-compares by reference.
+**Function streams and events deduplicate like procedure call streams.** Two `FunctionStream`s
+are equal when they evaluate the same `Expression` object, so a second `AddFunctionStream` of the
+same function by the same client returns the existing stream's id, as `AddStream` does for an
+equal call. `AddEvent` does the same for an event over the same function. The consequence is the
+one [#902](https://github.com/krpc/krpc/issues/902) describes: one `RemoveStream` removes it for
+both.
 
 **Streams are not unified with procedure-call streams on the server, and are in the clients where
 the language allows.** `AddStream` takes an encoded `ProcedureCall` and `AddFunctionStream` takes an
@@ -747,20 +789,23 @@ the language allows.** `AddStream` takes an encoded `ProcedureCall` and `AddFunc
 and reject one of them at runtime, replacing a signature that says what it accepts with an error
 that says what it did not. The clients whose type systems overload do so: C# has an
 `AddStream<T>(Expression)` overload and Java an `addStream(Expression)` overload, so a user of those
-writes the same call for either. Python and C++ name them separately, matching how those clients
-name everything else.
+writes the same call for either. Python's `add_stream` takes either a remote procedure or a
+function. C++ has a `krpc::add_stream` function for a function, and a procedure call stream comes
+from the generated `_stream` method.
 
 ### Run-once functions
 
 Events and streams re-evaluate on every update, which makes them the wrong home for a function with
-side effects. `KRPC.RunFunction(Expression)` compiles the expression, invokes it exactly once inside
-the calling tick, and returns its result.
+side effects. `KRPC.RunFunction(Expression, IList<byte[]> arguments)` compiles the
+expression, invokes it exactly once with the arguments inside the calling tick, and returns its
+result.
 
 The compiled delegate is cached on the `Expression` object, so a function is compiled the first time
 it is run and reused on every later call. It is not compiled when the object is created: most
 expression objects are interior nodes of a larger tree and are never run on their own, so compiling
 every one of them would pay the cost hundreds of times over for a single function. `RunFunction`,
-`FunctionStream` and `AddEvent` share the cached delegate. Checking the tree for unbound `Break`/`Continue`/`Return` markers is cached the same way.
+`FunctionStream` and `AddEvent` share the cached delegate. Checking the tree for unbound
+`Break`/`Continue`/`Return` markers is cached the same way.
 
 `KRPC.CompileFunction(Expression)` checks and compiles a function without running it. Compiling
 runs on the game's main thread, so a large function stalls the frame it is compiled in. Compiling
@@ -780,12 +825,13 @@ decodes by payload length rather than by type would report `None` for an empty l
 A null value is carried by `ProcedureResult.is_null`, which `RunFunction` gets by declaring its
 `bytes` return nullable. That is the channel every other nullable return uses, and the rule
 [nested-nullable-values.md](../protocol/nested-nullable-values.md) sets for a value at the call
-boundary. The result is encoded with the function's spec, so a null nested inside it is carried
-at a nullable position and is an error naming the position elsewhere. A null result is an error
-when the function's spec is not nullable. On the client, a null result at a type that cannot hold
-one is an error too: a C# value type that is not nullable, or a C++ type that is not a
-`std::optional`. A C++ caller names `std::optional` at each nullable nested position, as in
-`run_function<std::vector<std::optional<Vessel>>>`.
+boundary. The result is encoded with the function's spec, so a null nested inside it is carried at a
+nullable position and is an error naming the position elsewhere. A null result is an error when the
+function's spec is not nullable. On the client, a null result at a type that cannot hold one is an
+error too: a C# value type that is not nullable, or a C++ type that is not a `std::optional`. A C++
+function stream read with such a type throws `std::runtime_error`. In a stream callback that error
+is written to stderr and the callback does not run. A C++ caller names `std::optional` at each
+nullable nested position, as in `run<std::vector<std::optional<Vessel>>>`.
 
 `YieldException` is turned into a plain error, since a procedure that pauses and resumes on a later
 tick cannot be honored by a call that must complete within this one.
@@ -805,7 +851,7 @@ parameters, since nothing would supply the arguments on each update.
 def burn_time(delta_v: float) -> float:
     ...
 for dv in (100.0, 250.0, 400.0):
-    print(conn.run_function(burn_time, dv))
+    print(conn.run(burn_time, dv))
 ```
 
 **Server.**
@@ -814,11 +860,11 @@ for dv in (100.0, 250.0, 400.0):
 |---|---|
 | Shape | A function with parameters is a `Lambda` at the root. A root `Lambda` is called with the arguments; any other root is a function with no parameters, as now |
 | `RunFunction(Expression function, IList<byte[]> arguments)` | Arguments by position, one per parameter. Elements nullable (`[KRPCNullable (Position.Element)]`); the parameter defaults to an empty list, so a call with no arguments is unchanged |
-| Decoding | Each argument is decoded at its parameter's spec, as the result is encoded at the function's. A null at a parameter that is not nullable, a wrong count, or bytes that do not decode are a `KRPC.ArgumentException` naming the parameter, before anything runs |
+| Decoding | Each argument is decoded at its parameter's spec, as the result is encoded at the function's. A null at a parameter that is not nullable, a wrong count, or bytes that do not decode to the parameter's type, such as an object of another class, are a `KRPC.ArgumentException` naming the parameter, before anything runs |
 | `ReturnType`, `HasReturnType` | Of a `Lambda`, describe the value it returns when called. A delegate type is never a valid result, so the meaning is unambiguous |
 | `ParameterTypes` | New `IList<Type>` property: the types of a root `Lambda`'s parameters, with their nullability. Empty for any other function |
 | Compiled delegate | `Func<object[], object>`, unpacking the array into the lambda's parameters. Cached on the `Expression` as now, shared by `RunFunction`, `CompileFunction`, streams and events |
-| Streams and events | `AddFunctionStream` and `AddEvent` accept a `Lambda` with no parameters. One with parameters is a `KRPC.ArgumentException`: "A streamed function cannot take parameters" |
+| Streams and events | `AddFunctionStream` and `AddEvent` accept a `Lambda` with no parameters. One with parameters is a `KRPC.ArgumentException`: "A function that is streamed, or checked for an event, cannot take parameters" |
 
 Arguments are encoded values rather than `Expression` constants. A constant is an RPC per value, and
 the server caches every constant for the life of the connection, so a constant per call is the cost
@@ -828,15 +874,16 @@ the client learns from the function.
 **Clients.** Each client encodes an argument at its parameter's type. A Python function carries
 its parameter types from the compiler. Any other function's are read from `ParameterTypes` once
 and cached by object id, as `ReturnType` is, including a compiled C# lambda, whose reference-type
-nullability only the server records. A client introspects only when it is given arguments, so a
-function run with none costs no extra round trip.
+nullability only the server records. Every client introspects a function without compiler types
+on its first run, given arguments or not. A wrong argument count, including none, is then a
+client side error, a `TypeError` in Python.
 
 | Client | API |
 |---|---|
-| Python | `run_function(function, *args, **kwargs)`. `compile` accepts a function with parameters; `add_function_stream`, `function_stream` and `add_event` reject one before calling the server |
-| C# | `RunFunction<TResult>(Expression function, params object[] args)` and the non-generic form. `Compile` overloads for `Func<T1, ..., TResult>` and `Action<T1, ...>` up to four parameters. A number widens as C# widens it, and an argument the parameter's type cannot hold throws before the call |
-| C++ | `run_function<T = void>(function, args...)`, one template for a value and for effects, since separate overloads are ambiguous for `run_function<int>(f, 3)`. Each argument is checked against `ParameterTypes` by kind, as `T` is against `ReturnType`. `std::nullopt` or `nullptr` is a null, and a string literal is a string |
-| Java | `runFunction(function, Object... args)`, encoded at the introspected `ParameterTypes`, with a number widened as Java widens it |
+| Python | `run(function, *args, **kwargs)`. Each argument is coerced as an ordinary call's is and checked against its parameter, a `TypeError` naming the argument's position. `compile` accepts a function with parameters; `add_stream`, `stream` and `add_event` reject one before calling the server, an uncompiled `def` as a compile error and a compiled one as a `StreamError` |
+| C# | `Run<TResult>(Expression function, params object[] args)` and the non-generic form. `Compile` overloads for `Func<T1, ..., TResult>` and `Action<T1, ...>` up to four parameters. A number widens as C# widens it, including `sbyte`, `byte`, `short`, `ushort` and `char`. A signed integer that is not negative converts to an unsigned parameter at least as wide: `sbyte`, `short` and `int` to `uint` or `ulong`, `long` to `ulong`. An array other than `object[]` passed as the only argument of a one-parameter function is that argument. The argument count is checked on the client, including for no arguments. An argument the parameter's type cannot hold, including a null element of a collection that cannot hold one, throws an `ArgumentException` before the call, naming the argument's position. A null for a parameter that is not nullable is checked by the server |
+| C++ | `run<T = void>(function, args...)`, one template for a value and for effects, since separate overloads are ambiguous for `run<int>(f, 3)`. Each argument is checked against `ParameterTypes`: by structure for collections and tuples, and by kind only for classes, enumerations and structures. A nested nullable position takes a `std::optional` or a plain value, a non-nullable one only a plain value, and a `std::string` matches `String` or `Bytes`. A number converts to a `double`, and an integer or a `float` to a `float`, as C++ converts it implicitly, which can round. An integer converts to a signed parameter that holds every value of its type, and an integer that is not negative to an unsigned parameter at least as wide. A number a collection or tuple holds converts the same way. `std::nullopt` or `nullptr` is a null. The argument count is checked on the client, including for no arguments. A mismatch names the argument's position. The server checks an object's class and a null for a parameter that is not nullable (`ArgumentException`) |
+| Java | `run(function, Object... args)`, encoded at the introspected `ParameterTypes`, with a number widened as Java widens it (`byte`, `short`, `int`, `long`, `float`, `double` only). The client holds unsigned values in signed types bit for bit, so an `int` passes to `UINT32` and a `long` to `UINT64` with any value. A `byte` or `short`, and an `int` for `UINT64`, must not be negative. A mismatch, a wrong argument count including for no arguments, or an argument that fails to encode is an `IllegalArgumentException` naming the argument's position, and the item within a collection, tuple or structure. The server checks a null for a parameter that is not nullable and an object's class, also an `IllegalArgumentException`, with no client position |
 | Lua | No helper. The raw `RunFunction` takes the encoded arguments |
 
 **Python parameters.** Only a `def` takes parameters, each annotated with a form a variable
@@ -849,17 +896,17 @@ a parameter without an annotation, is a compile error naming the fix.
 * A default is the value the `def` evaluated, as in Python, checked against the parameter's type
   when the function is compiled.
 * `compile` records the signature against the function's object id, beside its types, for
-  `run_function` to bind with. A hand-built function takes positional arguments only.
+  `run` to bind with. A hand-built function takes positional arguments only.
 * `*args` and `**kwargs` are a compile error, since a `Lambda` has a fixed parameter list.
 
 The compiled tree of a top-level `def` with parameters is the `Lambda` from `compile_function`,
-without the `Invoke` a parameterless function wraps it in. `run_function` given an uncompiled
+without the `Invoke` a parameterless function wraps it in. `run` given an uncompiled
 `def` compiles it on each call, as now.
 
-A parameter annotation names a type where the function is defined, which need not be a free
-variable of the function. The compiler resolves annotation names from the evaluated
-`__annotations__` first. A class reached through a service, as in `Vessel = conn.space_center.Vessel`,
-is a wrapped subclass of the stub class with the pre-generated stubs, and is unwrapped.
+A parameter annotation names a type where the function is defined, which need not be a free variable
+of the function. The compiler resolves annotation names from the evaluated `__annotations__` first.
+A class reached through a service, as in `Vessel = conn.space_center.Vessel`, is a wrapped subclass
+of the stub class with the pre-generated stubs, and is unwrapped.
 
 Defaults stay on the client. Server-side defaults would serve hand-built C++ and Java trees only,
 since a C# expression-tree lambda cannot declare one, and would need position-keyed arguments and a
@@ -886,21 +933,36 @@ the missing primitives as ordinary RPCs:
 
 * scalars: `Abs`, `Sqrt`, `Exp`, `Log`, `Log10`, `Floor`, `Ceiling`, `Sign`, `Clamp`, `Min`,
   `Max`, the trigonometric functions (`Sin`/`Cos`/`Tan`/`Asin`/`Acos`/`Atan`/`Atan2`) and
-  `DegreesToRadians`/`RadiansToDegrees`. Exponentiation is the `Power` operator node.
+  `DegreesToRadians`/`RadiansToDegrees`. Exponentiation is the `Power` operator node. `Clamp`
+  throws if its minimum is greater than its maximum.
+* further scalars: `CopySign`, `IsNan`, `IsFinite`, `Hypot`, scaled so its squares do not
+  overflow, `Lerp`, which extrapolates outside 0 to 1 and is exact at both ends, and
+  `InverseLerp`, which is limited to 0 to 1 and gives 0 when the two ends are equal.
 * the constants `Pi` and `E`, as properties. A client that folds its own `math.pi` into a
   constant node never calls them, and a tree built through the expression API has no other
   source for them.
-* one procedure per midpoint rounding rule, matching `Floor` and `Ceiling` beside them rather
-  than taking a mode: `Round` rounds a halfway value to even, as Python and C# do, and
-  `RoundHalfAwayFromZero` and `RoundHalfUp` are the C and Java rules. A client can then round
-  the way its own language does. Each takes the number of decimal places, and `Log` takes the
-  base of the logarithm, so a quantity is a parameter where a rule is a name.
+* one procedure per midpoint rounding rule, matching `Floor` and `Ceiling` beside them rather than
+  taking a mode: `Round` rounds a halfway value to even, as Python and C# do, and
+  `RoundHalfAwayFromZero` and `RoundHalfUp` are the C and Java rules. A client can then round the
+  way its own language does. Each takes the number of decimal places, and decides on the exact value
+  of the double, as Python's `round` does, so `Round(2.675, 2)` is 2.67. A NaN or an infinity passes
+  through, more than 323 places returns the number unchanged, and fewer than -308 gives 0, as in
+  Python. A result too large for a double throws `OverflowException`. `Log` takes the base of the
+  logarithm, so a quantity is a parameter where a rule is a name.
 * vectors and quaternions over the tuple types the SpaceCenter service already uses:
   `VectorAdd`/`Subtract`/`Scale`/`Dot`/`Cross`/`Magnitude`/`Normalize`/`Distance`/`Angle`/`Lerp`,
-  and `QuaternionMultiply`/`Inverse`/`Angle`/`Slerp`/`FromAxisAngle`/`RotateVector`.
-* `Print`, which writes a line starting `Print:` to the game's log, for debugging a function.
-  Python's `print` and C#'s `Console.WriteLine` compile to it. A function a stream or an event
-  evaluates prints on every update.
+  and `QuaternionMultiply`/`Inverse`/`Angle`/`Slerp`/`FromAxisAngle`/`RotateVector`. A magnitude
+  is scaled, as `Hypot` is, and a vector is divided by its largest component before it is
+  normalized, so a vector of any finite size normalizes. `VectorAngle` and `QuaternionAngle` use
+  an arc tangent, precise near 0 and pi, and `QuaternionSlerp` follows the arc down to 1e-8
+  radians. Every quaternion procedure throws for a zero quaternion.
+* `QuaternionToAxisAngle`, giving a unit axis, or zero for no rotation, and an angle between 0
+  and pi; `QuaternionFromToRotation`, the shortest rotation between two directions, a half turn
+  within 1e-8 radians of opposite; and `QuaternionLookRotation`, Unity's convention of the z
+  axis forward and the y axis toward up, an error when the two are parallel.
+* `Print`, which writes the message to the game's log at the Info level, for debugging a function.
+  Python's `print` and C#'s `Console.WriteLine` compile to it. A function evaluated by a stream
+  or an event prints on every update.
 
 These exist to be called from inside functions, and are what the client compilers target when they
 see `math.sqrt` (Python) or `System.Math.Sqrt` (C#). Each compiler holds the number of arguments its
@@ -908,7 +970,8 @@ target takes, so an overload with no equivalent, `Math.Round(x, MidpointRounding
 instance, is reported when the function is compiled rather than when the server runs it. Only
 `ToEven` and `AwayFromZero` map: `ToZero`, `ToNegativeInfinity` and `ToPositiveInfinity` are
 directed rounding rather than midpoint rules, and no procedure performs them. A rounding mode
-selects the procedure, so it has to be a constant. Because calls compile to direct typed invocations
+selects the procedure, so it has to be a value the client computes, such as a constant or a
+captured variable. Because calls compile to direct typed invocations
 of the underlying method, the JIT inlines them, so the indirection costs nothing at evaluation time.
 
 ### Client libraries
@@ -917,37 +980,56 @@ Building a tree needs no client work, since the factories are ordinary generated
 stubs. Running a function as a stream or as a one-shot needs a small helper per client, in each case
 decoding a value whose type the server reports rather than the stub declares.
 
-* **Python** (dynamic): `Client.add_function_stream(function)` and the `Client.function_stream(...)`
-  context manager call the RPC, walk `function.return_type` to rebuild the protobuf `Type`, and wrap
-  the stream id with `Stream.from_stream_id(client, id, types.as_type(...))`, all existing
-  machinery. `Client.run_function(function)` decodes the `RunFunction` payload the same way,
-  returning `None` for a void function.
-* **C#**: `Connection.AddStream<T>(Services.KRPC.Expression)` and `Connection.RunFunction<T>(...)`
-  overloads, where the user supplies `T`; a non-generic `RunFunction` covers functions with no
+* **Python** (dynamic): `Client.add_stream(function)` and the `Client.stream(...)` context manager
+  take a function where they take a remote procedure. They tell the two apart by the call builder
+  every remote procedure carries, and reject arguments to a function. For a function they call the
+  RPC, walk `function.return_type` to rebuild the protobuf `Type`, and wrap the stream id with
+  `Stream.from_stream_id(client, id, types.as_type(...))`, all existing machinery.
+  `Client.run(function, *args, **kwargs)` passes the arguments and decodes the `RunFunction`
+  payload the same way, returning `None` for a void function. `Client.add_event(function)` checks
+  for a stream connection, as `add_stream` does.
+* **C#**: `Connection.AddStream<T>(Services.KRPC.Expression)` and `Connection.Run<T>(...)`
+  overloads, where the user supplies `T`; a non-generic `Run` covers functions with no
   result. `T` is checked against the introspected type, so a void function or a mismatch throws
-  rather than decoding bytes as the wrong type. A compiled lambda skips the check, and is decoded
-  at the type of its body. An undecodable body type throws before the server runs anything.
-* **C++**: `run_function<T>` and `add_function_stream<T>` check `T` the same way, through a trait
+  rather than decoding bytes as the wrong type. A lambda passed to a helper skips the check, and
+  is decoded at the type of its body, which `T` must be able to hold. Where that type holds a
+  reference in a collection or tuple, whose nullability only the server records, the helper
+  introspects it on every call, uncached, as the lambda is compiled for that call only. An
+  undecodable body type throws before the server runs anything. `AddStream` and `AddEvent` need
+  a stream connection. An argument converts as C# converts it, and a signed integer that is not
+  negative converts to an unsigned parameter at least as wide, so a `long` converts to a `ulong`
+  but not a `uint`.
+* **C++**: `krpc::run<T>` and `krpc::add_stream<T>` check `T` the same way, through a trait
   mapping C++ types onto type codes. Generated class, enumeration and structure types carry no
-  names, so only their kind is compared.
+  names, so only their kind is compared. `krpc::add_event` creates an event from a function.
+  `add_stream` and `add_event` check for a stream connection and throw `StreamError`
+  without one.
 * **Java**: typed helpers matching the client's stream-construction idiom, plus a run-once
-  helper. Java decodes by the introspected type, per "Types and introspection", so there is no
-  `T` to check.
+  helper and `Connection.addEvent`. Java decodes by the introspected type, per "Types and
+  introspection", so there is no `T` to check. Java always has a stream connection.
 * **Lua**: no helper. A Lua client builds trees through the ordinary factories, and `RunFunction`
   hands it back encoded bytes to decode itself. Events and function streams need streams, which
   the Lua client does not have. The tutorial says which clients support what.
 
-Each helper introspects the type once per function and keeps it. Walking `ReturnType` is a round
-trip per property of every type it is built from, and `run_function` would otherwise pay all of them
-on every call, which is the opposite of what the procedure is for. The type a function returns
-cannot change, so it is cached against the expression's object identifier.
+In every client, two events or streams over one function share a stream. Once one is removed, the
+other throws on a wait, a read, or a start. Java's plain `start()` does not check. Removing it
+again through the other handle does nothing. A stream callback is not called for an update that
+is an error, and reading the stream throws it.
+
+Each helper introspects the type once per function and keeps it, apart from the C# lambda case
+above. Walking `ReturnType` is a round trip per property of every type it is built from, and
+`run` would otherwise pay all of them on every call, which is the opposite of what the
+procedure is for. The type a function returns cannot change, so it is cached against the
+expression's object identifier. Python's `compile` keeps the type the compiler tracked against the
+function it returns, so a compiled function is not introspected on its first run.
 
 **A Python function given to a helper is compiled on every call.** Caching the compiled function
 against the Python function would freeze its captured values across calls, when they may have
 changed. The compiler tracks the result type as it builds the tree, so the helper takes the type
-from it instead of introspecting, and caches nothing for a function compiled for a single use. A
-program that runs the same function repeatedly compiles it once with `compile` and passes
-the result, as the docstrings say.
+from it instead of introspecting, and caches nothing for a function compiled for a single use.
+The compiler reports a function with no value apart from one whose type it does not know, so a
+function with no value is never introspected. A program that runs the same function repeatedly
+compiles it once with `compile` and passes the result, as the docstrings say.
 
 ### Documentation ([#608](https://github.com/krpc/krpc/issues/608))
 
@@ -955,8 +1037,13 @@ the result, as the docstrings say.
   server side functions are and when to use them, custom events, computed streams, run-once
   functions and side effects, `Parameter`/`Lambda`/`Invoke` and how named parameters bind, `Select`
   versus `Where`, per-element RPC calls, object constants, type promotion and `Cast`, and errors and
-  the yield limitation. Examples in all client languages, following the existing doc example
-  conventions.
+  the yield limitation. The expression API examples cover Python, C#, Java and C++, the
+  clients with streams; the compiled examples cover Python and C#, the clients with compilers.
+  C, Lua and cnano build functions with the generated stubs, without examples of their own.
+* The launch into orbit tutorial waits with events in place of busy loops, and the sub-orbital
+  flight tutorial builds its events with each client's event helper. The control loops and
+  buoyancy tutorials read a consistent tick with a function run once, and the parts tutorial
+  deploys every parachute in one tick. The client guides link to the tutorial.
 * Reference documentation for the `StdLib` service and for each client's compiler: what subset of
   the language is accepted, and the semantics that differ from running the code locally.
 * XML doc summaries on every `Expression` and `Type` member, which feed the generated API reference
@@ -983,12 +1070,11 @@ mistake travels before it is reported:
 
 **Unbound `Break`, `Continue` and `Return` are reported when the function is compiled.** The marker
 methods are only rewritten when a loop or lambda node is built, so a `Break` with no enclosing loop,
-or a `Return` with no enclosing lambda, is left as an ordinary call to a method that throws: it
-compiles, and fails only when the function is evaluated, which for a stream means on every update.
-The tree is therefore checked for residual marker calls at each point it is compiled, rather than
-only in `Expression.Lambda`, since a block can be handed straight to `RunFunction` with no lambda
-wrapper. A `Return` inside a lambda is also type-checked against the lambda's result type when the
-lambda is built.
+or a `Return` with no enclosing lambda, is left as a call to an empty marker method.
+`Expression.Check` rejects a leftover marker at each point the tree is compiled, rather than only in
+`Expression.Lambda`, since a block can be handed straight to `RunFunction` with no lambda wrapper. A
+`Return` inside a lambda is also type-checked against the lambda's result type when the lambda is
+built.
 
 ## Yielding procedures inside a function
 
@@ -1076,48 +1162,69 @@ instance as a fixed argument, and embedded with `Call`. The instance is a consta
 
 ### Python
 
-`Client.compile` compiles a lambda or a function from its source, and a `def` with parameters as "Function
-arguments" describes; `add_event`, `add_function_stream`
-and `run_function` accept functions directly. `compile` returns the compiled function, so it also
-works as a decorator. A lambda is located in the parse of its whole source file by its exact
-position, from its code object. A lambda that cannot be identified is a compile error. `add_event`
-and `add_function_stream` reject a function that makes no remote call, and a stream read inside a
-function, as it would be evaluated once.
+`Client.compile` compiles a lambda or a function from its source, and a `def` with parameters as
+"Function arguments" describes; `add_event`, `add_stream` and `run` accept
+functions directly. `compile` returns the compiled function, so it also works as a decorator. A
+lambda is located in the parse of its whole source file by its exact position, from its code
+object. A lambda that cannot be identified is a compile error. Every compile rejects a stream read
+inside a function, as it would be evaluated once. `add_event` and `add_stream` reject a
+Python function passed without `compile` that makes no remote call and uses no state variable; a
+compiled one is accepted. A `StdLib` call or property does not count as a remote call, as it gives
+the same value for the same arguments.
 
 * Expressions (`krpc/functioncompiler.py`): operators including floor division, true-division
   semantics, a remainder taking the sign of the divisor, the bitwise operators, and `is None`
   and `is not None` through `IsNull`; comprehensions (list, set and dict, nested) and generator
   expressions; `any`/`all`/`sum`/`min`/`max`/`len`/`sorted`/`abs`/`round`/`int`/`float`/`str`;
   subscripts and slices; f-strings; conditional expressions through `Expression.Conditional`;
-  assignment expressions in a function body; parameterless lambdas and local function calls; `math` module calls
-  mapped onto `StdLib`; and `print`, with a constant `sep`, mapped onto `StdLib.Print`.
+  assignment expressions in a function body, where one in a lambda binds a variable of the
+  lambda; parameterless lambdas and local function calls; `math` module calls mapped onto
+  `StdLib`; and `print`, with a constant `sep`, mapped onto `StdLib.Print`.
+  A generator expression compiles to a list, so it can be held or passed. `any` and `all` over a
+  generator expression nest the quantifier per `for` clause, so they stop at the deciding value;
+  one held in a variable is computed in full. Arithmetic, `math` calls and `sum` widen a `float`
+  operand to `double`, as Python holds a single precision value as a double. `math.dist` takes
+  tuples of any length, through `StdLib.Hypot` where they are not 3-D. Float floor division
+  follows CPython's remainder-based algorithm, and float `min` and `max` keep the first value
+  unless a later one compares smaller or larger, as Python does with a NaN. A condition tests a
+  tuple, an enumeration value or a structure as true unless null, and bytes as true unless
+  empty. A dictionary display, keyword arguments and structure fields are evaluated in source
+  order, held in variables where the server's order differs.
 * Statements (`krpc/functionstatements.py`): `if`/`elif`/`else`, `while` and `for` with
   `break`/`continue`, early `return`, local variables including augmented and annotated assignment,
   assignment to remote properties and to collection elements, `pass`, calls evaluated purely for
-  their effects. A block holding
-  only `pass` is an error, since the algebra has no empty block, except as the body of an
-  `except`. List `+=` extends the list in place, as `list.extend` does.
+  their effects. A block holding only `pass` statements or local function definitions compiles
+  to a no-op. List `+=` extends the list in place, as `list.extend` does.
 * `nonlocal x` at the top level of the compiled function makes `x` a `StateVariable`. Its initial
   value is the closure cell's value at compile time, and the cell is never updated. A compiled
   function keeps its state, and an uncompiled one is rebuilt on each call, so it starts again from
-  the cell. The type comes from the initial value, so the guide says to start a float at `0.0`.
+  the cell. The type comes from the initial value. A statement `x = cast(T, x)` of the function's
+  body, before any other use of `x`, gives it the type `T` instead, so it can start as `None` or
+  an empty collection; an annotation cannot, as Python forbids one on a `nonlocal` name. A cast in
+  a nested block or after a use is a compile error. A state variable can be a `for` target, assigned
+  from a hidden loop variable, since `ForEach` takes a variable. A variable first assigned a single
+  precision value is declared a `double`, as Python holds one as a double, so arithmetic on it
+  assigns back. A `for` loop over single precision values assigns each to its variable from a
+  hidden loop variable.
 * Strings and collections dispatch on the statically tracked type: `len`, `[i]`, `[a:b]`, `in`,
   `.upper()` and `.split()` reach the string operations, with slicing compiling to
-  `StringSubstring`. `min`/`max` with a `key` reach `MinBy`/`MaxBy`, taking several arguments as a
-list of them, `reversed` reaches `Reverse`,
-  and the list, set and dictionary methods reach removal and clearing.
+  `StringSubstring`. `min`/`max` with a `key` reach `MinBy`/`MaxBy`, taking several arguments as
+  a list of them, and the list, set and dictionary methods reach appending, removal and clearing.
+  `keys()` and `values()` reach the dictionary views.
 * Some reshaping operations have syntax: `sorted` reaches `OrderBy`, `reversed` reaches `Reverse`,
   a slice of a collection reaches `Skip` and `Take`, and a nested comprehension reaches
   `SelectMany`. A dict comprehension is a `ForEach` that sets each key, so a repeated key takes the
   last value, as in Python and in `BuildDictionary`. `zip(a, b)` and `d.items()` reach `Zip`.
   `list + list` reaches `Concat` and `ToList`. The rest are factory-only. Their natural syntax does
   not name them in its error: `set(xs)` reports a client side function called with an argument
-  computed on the server.
+  computed on the server. A client side function called when compiling, such as a captured helper
+  or a property of a captured object, is an error if it makes a remote procedure call. The
+  compiler counts the calls each thread sends through the connection while the function runs.
 * Constructs with no node of their own lower onto existing ones, with no server change:
 
   | Construct | Lowering |
   |---|---|
-  | `range`, `enumerate` | a value block building a list in a `While` or `ForEach` loop; `range` needs a constant step, whose sign picks the comparison. A constant `range` is lowered the same way, so its size does not set the size of the tree |
+  | `range`, `enumerate` | a value block building a list in a `While` or `ForEach` loop; `range` needs a constant step, whose sign picks the comparison. A constant `range` is lowered the same way, so its size does not set the size of the tree. The loop counts in a long, so a range ending near the limits of an int ends |
   | `d.items()` | `Zip` of `DictionaryKeys` and `DictionaryValues`, with the dictionary in a temporary |
   | iterating `d` | over `DictionaryKeys(d)` |
   | `k in d` | `ContainsKey(d, k)` |
@@ -1129,42 +1236,80 @@ list of them, `reversed` reaches `Reverse`,
   an error, since it would run once, at compile time.
 * Integer results keep their server type. `//` is an exact integer floor division built from
   `Divide` and `Modulo`, and integer `abs`, `min` and `max` are `Conditional` on temporaries.
-  `int()` and `round()` of an integer are the integer itself, and of a float give an `int`. A
-  negative constant index counts from the end through `Count` or `StringLength`, and a string
-  slice clamps its bounds to the length, as Python does.
+  `int()` of an integer, and `round()` of one to a place at or after the point, are the integer
+  itself. `round()` of an integer to negative places is computed in the integer's type, half to
+  even. `int()` and `round()` of a float give an `int`. `min` and `max` of an empty collection
+  raise `ValueError`. A negative constant index counts from the end through `Count` or
+  `StringLength`, and a string slice clamps its bounds to the length, as Python does. A `None`
+  slice bound is no bound, and a computed tuple sliced by constant bounds is a `CreateTuple` of
+  `Get`s. `int()`, `float()`, `round()` and `abs()` of a nullable number cast it to its plain type
+  first, which raises `TypeError` for `None`. Inverting a `uint` with `~` gives a `long`, as
+  negation does, and inverting a `ulong` is an error. A float remainder of zero takes the sign of
+  the divisor, and a float floor quotient of zero the sign of the true quotient.
 * A final `if`/`else` whose branches both return a value, or are a single `raise`, compiles to a
   `Conditional` of two blocks, so the function's value is its last expression. Any other final
   `if` that returns or raises on every path, and a final `try` whose body and every handler
-  return, is a statement, with its returns bound by the function's `Lambda`.
+  return, is a statement, with its returns bound by the function's `Lambda`. A final `while True`
+  with no `break` returns on every path. A function annotated with a return type whose every path
+  raises, including a final `if`/`else` that raises in both branches, ends with an unreached
+  `Cast` of a null to that type, so the server gives it the annotated type.
 * An operator whose operand type is known and is not a number is a compile error: arithmetic
-  other than string and list `+`, ordering comparisons, `sum`, and `min`/`max` without a key. A
-  bool takes part in `&`, `|` and `^` only. `str()` and an f-string take a string, a number or a
+  other than string and list `+`, ordering comparisons, `sum`, and `min`/`max` without a key.
+  `&`, `|` and `^` take integers or bools. `str()` and an f-string take a string, a number or a
   bool, as the server names the CLR type of any other value. `==`, `!=` and `in` between
   operands of known types the server cannot compare, such as a bool and an int, are a compile
-  error.
-* `is None` on a value that is not nullable, of any type, is the constant `False`, with the
-  operand still evaluated. The compiler's type for a value keeps the server's nullable flag at
+  error. So are an arithmetic operator, comparison or `in` between a `ulong` and a signed
+  integer, which have no common type (a shift takes a count of any integer type), a computed
+  tuple index, an index into a value that is not a string, list, dictionary or tuple, `in` on a
+  value that is not a string or collection, `len` of bytes, `==`, `!=` or `in` between objects of
+  different classes, `math.dist` of non-numeric coordinates, a dictionary key type the server
+  rejects (keys are integers, bools or strings), a `typing.cast` to an unrelated type, a list or
+  string index that is not an `int`, and a tuple of more than 7 values. Slicing or reversing a
+  set, `len` of a number, and `sorted`, `min` or `max` of values Python cannot order (objects,
+  enumeration values) are compile errors too. So are an unsupported method of a server side
+  string or collection, and a return, break or continue leaving a `finally`.
+* `is None` on a value that is not nullable is the constant `False` when the operand only reads
+  names and constants. Otherwise the operand is evaluated, as it can have an effect or raise, and
+  the result is `False`. The compiler's type for a value keeps the server's nullable flag at
   every position, since it decodes the result. A list literal, a conditional, the returns of a
   function and the assignments to a variable join their types, nullable wherever one of them is,
-  and `Optional[T]` in an annotation is nullable. `len` of a tuple is its arity, and `x in (a, b)` compiles to equality tests against
-  each element, with `x` evaluated once.
+  and `Optional[T]` in an annotation is nullable. The values of a set and the keys of a
+  dictionary are never nullable, as the server unwraps them. A bitwise operator on a nullable bool
+  gives a bool. `len` of a tuple is its arity, with the tuple evaluated unless it only reads names
+  and constants, and `x in (a, b)` compiles to equality tests
+  against each element, with `x` evaluated once.
 * A shift follows Python where the server follows C#: a count of at least the width gives 0, or -1
-  for a negative value shifted right, and a negative count raises `ValueError`.
+  for a negative value shifted right, and a negative count raises `ValueError`. The count keeps its
+  own type, and the value widens to the common type of the two, or keeps its own when they have
+  none.
 * `None` passed to a nullable parameter is a null argument of the call. Anywhere else it is a
   `ConstantNull`, typed from its context: a conditional's other branch, a literal's other
   elements, the function's other returns, the variable's other assignments, an `Optional[T]`
   annotation on a variable or `->`, or `typing.cast(T, None)`. A `None` with no context is a
   compile error. A bare `return` in a function that returns a value is an error, as in mypy.
+  An empty list, set or dictionary is typed from the same contexts, from a parameter and from
+  the other operand of a binary operator, built as a `CreateEmptyList`, `CreateEmptySet` or
+  `CreateEmptyDictionary`. `x in []` is `False`. `x in d` with a nullable key gives `False` for
+  `None`, and a key of a wider numeric type than the dictionary's keys is compared with each key
+  widened. An empty collection given the type of another kind of collection is an error naming
+  the empty value to use, as is a parameter default of another kind.
 * `typing.cast(T, value)` of any other value is a `Cast`, so it can narrow, such as a float to
-  an `int`. It is the explicit form of the narrowing an assignment rejects.
+  an `int`. It is the explicit form of the narrowing an assignment rejects. A cast to a type the
+  value cannot convert to is a compile error.
 * `raise` and `except` name an exception by its Python type in the exceptions table.
   `except ValueError` catches the three argument exceptions. `except RuntimeError` catches
-  `InvalidOperationException` and every exception a service declares, as the Python client raises
-  a service exception as a `RuntimeError` subclass. `raise Exception(message)` throws `Error`. A
-  tuple in `except` gives one catch per exception, all recording the same clause.
+  `InvalidOperationException` and every exception a service declares apart from `Error`, as the
+  Python client raises a service exception as a `RuntimeError` subclass.
+  `raise Exception(message)` throws `Error`, which `except RuntimeError` does not catch, as in
+  Python. The message is the argument as `str()` gives it. A tuple in `except` gives one catch
+  per exception, all recording the same clause. A tuple naming `Exception` catches every
+  exception.
 * Left as documented differences: integer overflow wraps, a server computed negative index or
   exponent, negative slice bounds, and `str()` of a float using the server's formatting. A float
-  divided by zero gives `inf` or `nan`.
+  divided by zero gives `inf` or `nan`. A math function outside its domain gives `nan` or `inf`
+  where Python raises, such as `math.sqrt(-1)`. `sum`, `min` and `max` skip a `None` among the
+  values, and `sorted` puts it first, where Python raises `TypeError`. `sum` of floats adds in
+  order, where CPython 3.12 and later compensate for rounding.
 * Both compilers compile an enumeration value captured from the client to a `Cast` of an integer
   constant, so no compiler emits `ConstantEnum`. The value comes from the client's own
   enumeration, so it is a member.
@@ -1191,37 +1336,65 @@ list of them, `reversed` reaches `Reverse`,
 
 `Connection.Compile` translates a LINQ expression tree, which the compiler hands the client
 for free from an `Expression<Func<TResult>>` lambda, into the same server tree. `AddEvent` accepts a
-boolean lambda, `AddStream` compiles compound lambdas, and `RunFunction` accepts
+boolean lambda, `AddStream` compiles compound lambdas, and `Run` accepts
 `Expression<Action>` lambdas so side-effecting functions can be written in the same style.
 
-`Compile` has an `Expression<Action>` overload so a lambda with no result compiles to a reusable object,
-and overloads for lambdas with parameters (see "Function arguments").
+`Compile` has an `Expression<Action>` overload so a lambda with no result compiles to a reusable
+object, and overloads for lambdas with parameters (see "Function arguments").
 
 Beyond the operator set: a comparison with `null` maps onto `IsNull`, or folds to a constant when
 the operand's `ReturnType` is not nullable, and a conversion between a value type and its nullable
-form is left to the server; a `null` is a `ConstantNull` of its static type; `??`, `.HasValue`, `.Value` and
-`GetValueOrDefault` on a nullable remote value compile to `IsNull` and `Conditional`, with the
-value held in a variable; `System.Math` methods map onto `StdLib`, and `Console.WriteLine` onto
-`StdLib.Print`, its arguments formatted as `string.Format` formats them;
+form is left to the server; a `null` is a `ConstantNull` of its static type; `??`, `.HasValue`,
+`.Value` and `GetValueOrDefault` on a nullable remote value compile to `IsNull` and `Conditional`,
+with the value held in a variable; a lifted arithmetic, bitwise or shift operator is cast back to
+its nullable type, since the server unwraps a nullable operand and throws on a null; `??` and
+`GetValueOrDefault` cast the held value to the expression's type, so `int? ?? long` is a `long`;
+a dictionary's `Keys` and `Values` map onto `DictionaryKeys` and `DictionaryValues`;
+`System.Math` methods map onto `StdLib`, and `Console.WriteLine` onto
+`StdLib.Print`, its arguments formatted as `string.Format` formats them, so a number computed on
+the server needs an invariant `ToString` first;
 string `+` and `ToString` become `StringConcat` and `ConvertToString`; the bitwise complement and
 the LINQ operators `Skip`, `Take`, `SelectMany`, `ToDictionary`, `Distinct`, `Reverse`, `Zip`,
 `Union`, `Intersect`, `Except`, `First`, `Last` and `ElementAt` are supported; captured collections
-are folded into constants; and `.Length`, `.Substring`, `.ToUpper` and `.Contains` dispatch onto the
-string operations by static type.
+are folded into constants; and `.Length`, `.Substring`, `.ToUpperInvariant` and `.Contains`
+dispatch onto the string operations by static type.
+
+**Culture.** The server formats and compares strings with the invariant culture, so a call whose
+result depends on the current culture is a `FunctionCompilationException`: `ToString`, a
+concatenation or a format of a number computed on the server without
+`CultureInfo.InvariantCulture`; `IndexOf`, `StartsWith` and `EndsWith` of a string without
+`StringComparison.Ordinal`; `ToUpper` and `ToLower` without the invariant culture; and `OrderBy`
+of a string key without `StringComparer.Ordinal`. A format specifier or alignment in a format
+string is rejected too. A value the client computed is formatted on the client, as C# formats
+it.
 
 A lazy `IEnumerable<T>` result is wrapped in `ToList` and decoded as `IList<T>`. Only an
 `IOrderedEnumerable<T>` result type is rejected, with a hint to call `ToList`.
 
 A client side subtree is evaluated once, as a whole, at the outermost node that does not interact
-with the server, so a side effect in it happens once. A read of a `Stream<T>` is rejected, since it
-would be evaluated once, and so are `AddStream` and `AddEvent` of a lambda that makes no remote
-call. `AddStream` streams a single call as that call only when its arguments make no remote call;
-otherwise it compiles the lambda, so the arguments are evaluated on every update. The instance
-of a single call is evaluated once, when the stream is created, even when it is itself a remote
-call, so `vessel.Flight(frame).MeanAltitude` stays a procedure stream.
-A tuple's `ItemN` maps onto `Get`, `Tuple.Create` onto `CreateTuple`, and a dictionary
-initializer onto `CreateDictionary`. An error from the server while building the tree is raised as
-a `FunctionCompilationException`, with the server's exception inside it.
+with the server, so a side effect in it happens once. A delegate call in it is rejected, including a
+call through `Invoke`. So is a call to a method, a constructor, a property getter or setter with a
+body, or a user-defined operator or conversion, defined outside the .NET base library, the kRPC
+client and the generated service stubs, as a remote call made inside it would run only then. Passing
+the base library a delegate other than a lambda or a base-library method group, or a value whose
+type implements a virtual method outside those assemblies, is rejected too, since the library can
+call it. This covers a `ToString` override in a concatenation or format, and a user `IEnumerable<T>`
+or `IComparer<T>` given to LINQ. So is reading `Lazy<T>.Value`. An auto-property, whose getter is
+compiler generated, is folded, so a captured settings object can be read. A read of a `Stream<T>` is
+rejected, since it would be evaluated once, and so are `AddStream` and `AddEvent` of a lambda that
+makes no remote call, and a lambda with no value that makes none, which has no effect on the server.
+A streamed lambda with parameters is rejected before a single call in it is streamed as that call.
+
+`AddStream` streams a single call as that call only when its arguments make no remote call;
+otherwise it compiles the lambda, so the arguments are evaluated on every update. The instance of a
+single call is evaluated once, when the stream is created, even when it is itself a remote call, so
+`vessel.Flight(frame).MeanAltitude` stays a procedure stream. A call of a `KRPC` service procedure
+wrapped only in conversions is streamed as that call too, with the conversions made on the client,
+since a function cannot call the `KRPC` service.
+
+A tuple's `ItemN` maps onto `Get`, `Tuple.Create` onto `CreateTuple`, and a dictionary initializer
+onto `CreateDictionary`. An error from the server while building the tree is raised as a
+`FunctionCompilationException`, with the server's exception inside it.
 
 Where C# semantics and the server differ, the compiler does the following:
 
@@ -1231,6 +1404,10 @@ Where C# semantics and the server differ, the compiler does the following:
 * A comparison with a nullable number is a null test and the comparison, false on null as in C#.
   Arithmetic and logic on a null still throw.
 * `Math.Round` takes any number of decimal places, where C# throws outside 0 to 15.
+* `Math.Sign` of a float or double throws for a NaN, as C# does, where `StdLib.Sign` gives 0.
+* A null new value in `Replace`, a null separator in `string.Join`, and a null element of the
+  collection `string.Join` or `string.Concat` takes are empty strings, and `Trim` of a null array
+  trims white space, as in C#.
 * A local or lambda parameter of a reference type is nullable at its top level, as in C#.
 * A result is decoded at the type the caller names, with the server's nullable flag at each
   reference-type position, which a C# type does not carry.
@@ -1239,21 +1416,35 @@ Where C# semantics and the server differ, the compiler does the following:
 * `List<T>.Contains`, `HashSet<T>.Contains` and an interpolated string with plain placeholders
   compile to `Contains` and `StringConcat`. A client side subtree with no case of its own is
   folded, and `&&`/`||` with a client side left operand short-circuit at compile time.
-* A client side branch of a server side `?:` that fails to evaluate becomes a `Throw` in that
-  branch, so the error is raised only when the branch is chosen.
+* A branch of a server side `?:`, or the right operand of a server side `&&` or `||`, that holds a
+  client side sub-expression that fails to evaluate becomes a `Throw`, so the error is raised only
+  when that operand is evaluated.
+* `==` and `!=` on tuples and collections compare by content on the server, where C# compares
+  references.
+* A reference upcast, such as a set to `IEnumerable<T>` or `ICollection<T>`, leaves the value as
+  it is. A `?:` choosing between a set and a list chooses between lists.
+* A `checked` conversion between an enumeration and its underlying type, or a wider one, is
+  allowed. `<`, `>`, `<=` and `>=` on structures are a `FunctionCompilationException`.
+* `ToString` of an object computed on the server gives the server's class name, which can differ
+  from the client's. A `double` converted to a string on the server is formatted by KSP's Mono,
+  which can print fewer digits than a .NET Core client.
+* An index out of range throws `IndexOutOfRangeException`, where C# throws
+  `ArgumentOutOfRangeException`.
 
-Three things are deliberately out of reach. `GroupBy` is not mapped, since the node's result type
-differs from LINQ's. `MinBy`/`MaxBy` have no syntax at net472, where `Enumerable.MinBy` does not
-exist. Exceptions are unreachable in either direction, since an expression-tree lambda may neither
-contain a throw expression nor have a statement body, which is consistent with that compiler being
-limited to single-expression lambdas. For the same reason a `StateVariable` is reachable only
-through the raw factory.
+Four things are deliberately out of reach. `GroupBy` is not mapped, since the node's result type
+differs from LINQ's. `Aggregate` is not mapped either; a fold over a collection is built with the
+expression API's `Aggregate`. `MinBy`/`MaxBy` are not mapped: net472 has no `Enumerable.MinBy`, and
+on a later framework the call is rejected as an unsupported collection operation. Exceptions are
+unreachable in either direction, since an expression-tree lambda may neither contain a throw
+expression nor have a statement body, which is consistent with that compiler being limited to
+single-expression lambdas. For the same reason a `StateVariable` is reachable only through the raw
+factory.
 
 ### Semantics that differ from running locally
 
-Documented for both compilers, because they are the surprises: captured values are frozen at compile
-time, so only remote calls re-evaluate per tick; and a procedure that pauses execution cannot be
-called inside a function.
+Documented because they are the surprises: captured values are frozen at compile time, so only
+remote calls re-evaluate per tick, which both client guides say; and a procedure that pauses
+execution cannot be called inside a function, which the tutorial says.
 
 **Short-circuiting is not one of them.** `And` and `Or` compile to LINQ's `And`/`Or`, which evaluate
 both operands, and mapping `and`/`or` and `&&`/`||` onto them would silently drop the guard in
@@ -1304,7 +1495,7 @@ it. Compiling each shared node once would make the work grow with the distinct n
 the bound. It is a follow-up, designed in [`shared-nodes.md`](shared-nodes.md).
 
 A function itself is never released either, nor its delegate or the constants interned for it. A
-client that builds a new function per call, such as `run_function(lambda)` in a loop, grows the
+client that builds a new function per call, such as `run(lambda)` in a loop, grows the
 store without bound. The tutorial says to compile once and reuse the function. A release procedure
 and client-side caching of compiled lambdas are a follow-up, designed in
 [`function-release.md`](function-release.md).
@@ -1318,9 +1509,10 @@ instance between clients is safe. No protocol or client change is involved.
 
 Composite types collapse for free: the CLR interns constructed generic types, so `MakeGenericType`
 returns the same `System.Type` for the same arguments, and the spec compares structurally, so
-`ListType(Double())` reduces to one id provided the nested `Double()` did. `Equatable<T>` brings `operator ==`/`!=` with it, so `== null`
-comparisons on a `KRPC.Type` change path; they stay correct, since those operators are null-safe,
-and the code that builds trees compares with `ReferenceEquals` throughout in any case.
+`ListType(Double())` reduces to one id provided the nested `Double()` did. `Equatable<T>` brings
+`operator ==`/`!=` with it, so `== null` comparisons on a `KRPC.Type` change path; they stay
+correct, since those operators are null-safe, and the code that builds trees compares with
+`ReferenceEquals` throughout in any case.
 
 The client half matters as much as the server half, because each factory call is also a round trip
 ([`batched-tree-construction.md`](batched-tree-construction.md)).
@@ -1458,16 +1650,21 @@ encoded is pinned the same way, which is what #771 and #1051 are about, and it i
   versus `ConstantDouble(1.0)`) do not collide. `ObjectStoreTest` covers the equality path itself.
 * Python integration tests against TestServer, part of `//:test`: computed streams end-to-end
   (value, collection and object results, and server-reported type decode), per-element call events,
-  object constants, mixed-type arithmetic events, error surfacing, and `run_function` covering
+  object constants, mixed-type arithmetic events, error surfacing, and `run` covering
   results, side effects and the void case.
 * C#, Java and C++ client tests for the typed stream and run-once helpers, following each client's
   existing event and stream test structure.
+* `test_mapped_exceptions` in the Python and C++ client tests, `MappedExceptions` in the C#
+  `ConnectionTest` and `testMappedExceptions` in the Java `ConnectionTest`: each mapped kRPC
+  exception reaches the client as its built-in or generated type.
 * Compiler tests per client covering the accepted language subset and the diagnostics raised for
   unsupported constructs.
 * `service/SpaceCenter/test/test_server_side_functions.py`, in the in-game suite, against a vessel
   on the launchpad: reading the game state, a single tick shared by every call, comprehensions and
-  loops over the vessel's parts, side effects, `StdLib` on the game's vectors, a function stream, an
-  event, and the error a yielding procedure produces.
+  loops over the vessel's parts, side effects, a function compiled in advance and one taking
+  arguments, `StdLib` on the game's vectors, a function stream, a state variable kept across
+  stream updates, an event, a compiled handler catching a service exception, the unnamed error
+  from a procedure unavailable in the scene, and the error a yielding procedure produces.
 
 Three behaviors are decided rather than merely implemented, and each is covered explicitly: the
 collection operations reject a string with the intended message rather than an internal exception;
@@ -1484,18 +1681,27 @@ globbed.
 
 ### Golden expression-tree tests
 
-A deterministic tree printer (`core/src/Service/KRPC/ExpressionTreePrinter.cs`: indented
-`NodeType<Type> detail` lines, sequential ids for parameters, variables and labels, invariant
-round-trip numeric formatting, and object constants printed as type name only so no run-to-run
-identity leaks) is exposed through a test-only `DumpExpressionTree(Expression)` RPC on TestServer's
-`TestService`. Three golden suites compare dumps
-against expected strings, verifying the exact trees the API generates without depending on the
-brittle compiled IL:
+A deterministic tree printer (`core/src/Service/KRPC/ExpressionTreePrinter.cs`) prints one
+indented `NodeType<Type> detail` line per node. Parameters, variables, state variables and labels
+get sequential ids, and a name that is not an identifier is quoted. Block variables print with
+their type, as in `(x#0: System.Int32)`, and a binary or unary node prints its operator method.
+Numbers use invariant round-trip formatting. Collection, tuple and structure constants print value
+by value, a type prints as `typeof(...)` and a procedure as its name. Any other object constant
+prints as its type name only, so no run-to-run identity leaks. A node kind or part of a tree the
+printer does not render, such as a catch filter, throws.
+
+A test-only `DumpExpressionTree(Expression)` RPC on TestServer's `TestService` exposes the printer.
+It checks the function first, so the node limit bounds the output. Three golden suites compare
+dumps against expected strings, verifying the exact trees the API generates without depending on
+the brittle compiled IL:
 
 * `core/test/Service/KRPC/ExpressionTreePrinterTest.cs`, the factory API: direct-call emission
   (scene check, and null-return check only for non-nullable reference returns), numeric promotion
-  `Convert` insertion, `While`/`ForEach` desugaring, marker-to-goto rewriting, and label binding of
-  early returns.
+  `Convert` insertion, `While`/`ForEach` desugaring over lists and sets, marker-to-goto rewriting,
+  label binding of early returns, state variables, catch and catch-all blocks, structures,
+  `Invoke`, constants, negative zero, type spec constants, a type nested in a generic type and
+  string escaping, `Set`, `Conditional`, `ConstantNull` and `CallWithArguments`, operator methods,
+  quoted names, and the error for a node kind or part the printer does not render.
 * `client/python/krpc/test/test_expressiontree.py`, Python compiler output end-to-end in both stub
   modes: getter null-check blocks, true-division converts, `math.sqrt` to `StdLib.Sqrt`, statement
   functions as `Invoke(Lambda)`, loops with declared variables, void setter functions, and
@@ -1503,39 +1709,43 @@ brittle compiled IL:
 * `client/csharp/test/ExpressionTreeTest.cs`, C# LINQ compiler output: `Math.Sqrt` mapping, folded
   captured collections, string `+` to `String.Concat`, and ternary conditionals.
 
-Sets are deliberately excluded from the goldens, since client-side set iteration order is
-nondeterministic. Generated C++ service headers do not include cross-service headers, so the C++
-test sources include `krpc/services/krpc.hpp` before `services/test_service.hpp` for the new RPC's
-`KRPC::Expression` parameter.
+Sets built on the client are excluded from the Python and C# goldens, since their iteration order
+is nondeterministic. A set built on the server enumerates in insertion order, so the core suite
+has one. Generated C++ service headers do not include cross-service headers. The C++ test sources
+and `client/cpp/benchmark/benchmark.cpp` therefore include `krpc/services/krpc.hpp` before
+`services/test_service.hpp` for the new RPC's `KRPC::Expression` parameter, and
+`client/cnano/benchmark/benchmark.c` includes `krpc_cnano/services/krpc.h` before
+`services/test_service.h`.
 
 ## Phases
 
 The first phase removes the v0.6.0 `Expression`, `Type` and `AddEvent`, so each later phase is an
 addition reviewed on its own. The stack's net change against v0.6.0 is the design above, and the
-breaking changes it lists are relative to v0.6.0. Each phase is a code commit and, when it changes
-what a user sees, its changelog commit. Each builds and passes `//:test` on its own.
+breaking changes it lists are relative to v0.6.0. The phases are grouped into 7 PRs. Each phase
+is a commit, and each PR that changes what a user sees ends with one commit holding its changelog
+entries. Each phase builds and passes `//:test` on its own.
 
-| Phase | Content |
-| --- | --- |
-| 0 | Remove the v0.6.0 server side expression API. The sub-orbital tutorial polls until phase 2 restores events |
-| 1 | `KRPC.Type`: class, enumeration, structure, collection and nullable types of any kind, and the `Code`, `Service`, `Name`, `Types` and `Nullable` properties |
-| 2 | `KRPC.Expression` core: the spec each node carries and the null check where a nullable value meets a position that is not, `KRPC.NullReferenceException`, constants including `ConstantNull`, numeric promotion, comparisons, content equality, logic, casts, conditionals, `IsNull`, lambdas and `Invoke`, calls compiled to direct method calls, `ReturnType`, the node limit, and `AddEvent` |
-| 3 | `KRPC.RunFunction` with arguments, `KRPC.AddFunctionStream`, `KRPC.CompileFunction` and `Expression.ParameterTypes` |
-| 4 | Building tuples, structures and collections, and `GetField` |
-| 5 | Collection and dictionary operations, `KRPC.KeyNotFoundException` and `KRPC.IndexOutOfRangeException` |
-| 6 | Statements and control flow: variables, blocks, loops, `Break`, `Continue`, `Return`, `StateVariable` |
-| 7 | Collection mutation: `Append`, `Set`, `Remove`, `RemoveAt`, `Clear` |
-| 8 | String operations |
-| 9 | Exceptions: `Throw`, `TryCatch`, `TryCatchAll`, `TryFinally`, and `KRPC.DivideByZeroException`, `NotSupportedException`, `TimeoutException` and `Error` |
-| 10 | The `StdLib` service |
-| 11 | `ExpressionTreePrinter` and the TestServer `DumpExpressionTree` RPC |
-| 12 | Python `run_function` with arguments, `add_function_stream`, `function_stream` and `add_event` over hand-built trees |
-| 13 | Python compiler, lambdas, and `None` typed from its context |
-| 14 | Python compiler, functions with statements and parameters, and `nonlocal` state variables |
-| 15 | C# compiler including lambdas with parameters, `RunFunction` with arguments, `AddEvent` and the `AddStream` overloads |
-| 16 | Java `runFunction` with arguments and `addStream` helpers, and a public `RemoteObject.id` |
-| 17 | C++ `run_function` with arguments and `add_function_stream` helpers |
-| 18 | The tutorial and the in-game tests |
+| PR | Phase | Content |
+| --- | --- | --- |
+| `core` | 0 | Remove the v0.6.0 server side expression API. The sub-orbital tutorial polls until phase 2 restores events |
+| `core` | 1 | `KRPC.Type`: class, enumeration, structure, collection and nullable types of any kind, the `Long`, `UInt`, `ULong` and `Bytes` types, `KRPC.TypeCode`, and the `Code`, `Service`, `Name`, `Types` and `Nullable` properties |
+| `core` | 2 | `KRPC.Expression` core: the spec each node carries and the null check where a nullable value meets a position that is not, `KRPC.NullReferenceException` and its client mappings, constants including `ConstantNull`, numeric promotion, comparisons, content equality, logic, casts, conditionals, `IsNull`, lambdas and `Invoke`, calls compiled to direct method calls and `CallWithArguments`, `ReturnType` and `HasReturnType`, the node limit, and `AddEvent`, with which the client guides' event sections return |
+| `core` | 3 | `KRPC.RunFunction` with arguments, `KRPC.AddFunctionStream`, `KRPC.CompileFunction` and `Expression.ParameterTypes` |
+| `core` | 4 | Building tuples, structures and collections, and `GetField` |
+| `core` | 5 | Collection and dictionary operations, `KRPC.KeyNotFoundException` and `KRPC.IndexOutOfRangeException` with their client mappings |
+| `core` | 6 | Statements and control flow: variables, blocks, loops, `Break`, `Continue`, `Return`, `StateVariable` |
+| `core` | 7 | Collection mutation: `Append`, `Set`, `Remove`, `RemoveAt`, `Clear` |
+| `core` | 8 | String operations |
+| `core` | 9 | Exceptions: `Throw`, `TryCatch`, `TryCatchAll`, `TryFinally`, and `KRPC.DivideByZeroException`, `NotSupportedException`, `TimeoutException`, `OverflowException` and `Error` with their client mappings |
+| `stdlib` | 10 | The `StdLib` service |
+| `tree-printer` | 11 | `ExpressionTreePrinter` and the TestServer `DumpExpressionTree` RPC |
+| `python` | 12 | Python `run` with arguments, `add_stream` and `stream` over functions, and `add_event`, all over hand-built trees |
+| `python` | 13 | Python compiler, lambdas, and `None` typed from its context |
+| `python` | 14 | Python compiler, functions with statements and parameters, and `nonlocal` state variables |
+| `csharp` | 15 | C# compiler including lambdas with parameters, `Run` with arguments, `AddEvent` and the `AddStream` overloads |
+| `java-cpp` | 16 | Java `run` with arguments, `addStream` and `addEvent` helpers, and a public `RemoteObject.id` |
+| `java-cpp` | 17 | C++ `run` with arguments, `add_stream` and `add_event` helpers |
+| `docs` | 18 | The tutorial, the events and run-once functions in five other tutorials, the client guide links, and the in-game tests |
 
 The golden tree tests for each compiler land with that compiler.
 
@@ -1549,7 +1759,7 @@ The golden tree tests for each compiler land with that compiler.
   measuring real tree sizes first.
 * `nonlocal` in a nested local function, meaning a local of the compiled function. It is
   ordinary scoping in the compiler, with no server change. `global` stays unsupported.
-* Declaring exception types. A function throws one from the KRPC service's fixed set.
+* Declaring exception types in a function. A function throws one a service declares.
 * Bounding the time a loop can run for, so that a runaway function cannot hang the game.
 * Deferred calls and resumable functions, designed in
   [`yielding-procedures.md`](yielding-procedures.md).

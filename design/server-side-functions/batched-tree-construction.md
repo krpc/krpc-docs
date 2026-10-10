@@ -61,8 +61,8 @@ Two things to get right:
   offending syntax. Each deferred handle has to carry its `ast` node so the flush can re-raise
   through the existing `self._error(node, ...)` path; otherwise the compiler's diagnostics regress
   to "something in this function was wrong".
-* **Not leaking deferred handles.** `compile_function`, `run_function`, `add_event` and
-  `add_function_stream` must flush and hand the real root handle onward.
+* **Not leaking deferred handles.** `compile`, `run`, `add_event` and `add_stream` must flush and
+  hand the real root handle onward.
 
 ## A cheaper win to take first
 

@@ -29,7 +29,7 @@ parses it.
 
 | | Source text at runtime | Source generator | IL decompilation |
 |---|---|---|---|
-| Mechanism | `[CallerArgumentExpression]` hands `RunFunction` the lambda's source; Roslyn parses it; captured values come from `f.Target` | A Roslyn generator or interceptor rewrites the call site at build time into tree-building code | Read the delegate's IL and rebuild its control flow, as DelegateDecompiler does |
+| Mechanism | `[CallerArgumentExpression]` hands `Run` the lambda's source; Roslyn parses it; captured values come from `f.Target` | A Roslyn generator or interceptor rewrites the call site at build time into tree-building code | Read the delegate's IL and rebuild its control flow, as DelegateDecompiler does |
 | Type information | none from the parse; resolve by reflection | full semantic model | from the IL |
 | Unsupported construct | runtime error | compile-time error | runtime error |
 | Cost | large Roslyn dependency in the client | users add the generator package; interceptors depend on the SDK version | fragile across compiler versions and optimization levels |

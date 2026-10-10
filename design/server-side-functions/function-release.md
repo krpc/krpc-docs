@@ -18,7 +18,7 @@ takes it out again until the last server stops.
 | A function's compiled delegate | its root `Expression`, which caches it | nothing |
 | A function stream's or event's delegate | the stream | the stream's lifetime |
 
-A client that builds a new function per call, such as `run_function(lambda)` in a loop, grows the
+A client that builds a new function per call, such as `run(lambda)` in a loop, grows the
 store and the heap without bound. Disconnecting does not help, since the nodes outlive the client.
 The tutorial says to compile once and reuse the function, which avoids the cost but does not remove
 it.
@@ -63,7 +63,7 @@ carries it.
 
 ### 4. Client caching
 
-The Python and C# compilers cache the compiled function for a lambda, so `run_function(lambda)` in
+The Python and C# compilers cache the compiled function for a lambda, so `run(lambda)` in
 a loop builds one function.
 
 | Client | Key |
@@ -85,7 +85,7 @@ a loop builds one function.
 | 1 | Client-owned nodes, released on disconnect | Growth bounded per session |
 | 2 | `RemoveFunction`, with node reference counts | A long session can release what it built |
 | 3 | Compilers release interior nodes after a build | One store entry per live function |
-| 4 | Client caching in Python and C# | `run_function(lambda)` in a loop is cheap |
+| 4 | Client caching in Python and C# | `run(lambda)` in a loop is cheap |
 
 ## Testing
 
