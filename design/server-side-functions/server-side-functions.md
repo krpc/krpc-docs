@@ -5,7 +5,7 @@
 [#679](https://github.com/krpc/krpc/issues/679).
 
 Builds on [`stream-and-event-improvements.md`](../protocol/stream-and-event-improvements.md), which lands first. That doc owns the behavior every stream and event shares:
-deduplication, removal, error results and the update loop. This doc covers what function streams
+one stream per add, removal, error results and the update loop. This doc covers what function streams
 and events add.
 
 Follow-ups, not built, each designed in its own doc:
@@ -404,10 +404,9 @@ evaluation and a captured value is a constant, so `StateVariable(name, initialVa
   error, as for any variable. A collection state variable is changed in place by the mutation
   statements.
 * The state belongs to the node. A built function keeps it across `RunFunction` calls, streams and
-  events. Each evaluation advances it once. For one client, two streams of one function are one
-  stream, and two events of one function are one event, so each advances it once per update. A
-  stream and an event of one function are two evaluations. Building the function again resets it,
-  and there is no reset RPC.
+  events. Each evaluation advances it once, and every stream or event of the function evaluates it
+  once per update, so two streams of one function advance it twice. Building the function again
+  gives a separate state, and there is no reset RPC.
 * The box needs no lock, since functions are evaluated on the main thread only.
 * A plain `AddStream` of `StateVariable` is rejected, as each update would evaluate the initial
   value again.
@@ -774,11 +773,10 @@ kind ([`stream-and-event-improvements.md`](../protocol/stream-and-event-improvem
 evaluate to a boolean value" when given anything else. It takes a `bool?` as its value, so a null
 becomes an error on the event's stream.
 
-**Function streams and events deduplicate like procedure call streams.** Two `FunctionStream`s
-are equal when they evaluate the same `Expression` object, so a second `AddFunctionStream` of the
-same function by the same client returns the existing stream's id, as `AddStream` does for an
-equal call. `AddEvent` does the same for an event over the same function. Each handle keeps its
-own reference and its own event cursor, per the deduplication rules in [`stream-and-event-improvements.md`](../protocol/stream-and-event-improvements.md).
+**Every `AddFunctionStream` and every `AddEvent` creates a new stream**, per the rules in
+[`stream-and-event-improvements.md`](../protocol/stream-and-event-improvements.md). Function streams are never shared, so two streams of one
+function are two evaluations per update. The stack deduplicates them by `Expression` object as
+written, and the rebase onto that work removes it.
 
 **Streams are not unified with procedure-call streams on the server, and are in the clients where
 the language allows.** `AddStream` takes an encoded `ProcedureCall` and `AddFunctionStream` takes an
@@ -1008,8 +1006,7 @@ decoding a value whose type the server reports rather than the stub declares.
   hands it back encoded bytes to decode itself. Events and function streams need streams, which
   the Lua client does not have. The tutorial says which clients support what.
 
-In every client, two events or streams over one function share one server stream, and behave as
-two handles to a deduplicated stream do in [`stream-and-event-improvements.md`](../protocol/stream-and-event-improvements.md).
+In every client, two events or streams over one function are two server streams.
 
 Each helper introspects the type once per function and keeps it, apart from the C# lambda case
 above. Walking `ReturnType` is a round trip per property of every type it is built from, and
@@ -1608,7 +1605,7 @@ since the object store holds the only references to them.
 *streams*: two equal `AddStream` requests deduplicate to one id, and a single `RemoveStream` then
 destroys it for both consumers. It concerns stream lifetime rather than the object store, and it is
 a correctness bug rather than a growth concern. Deduplicating types and constants does not affect
-it. Its fix in [`stream-and-event-improvements.md`](../protocol/stream-and-event-improvements.md) covers function streams too.
+it. [`stream-and-event-improvements.md`](../protocol/stream-and-event-improvements.md) fixes it by removing stream deduplication, for function streams too.
 
 **What deduplication does not bound.** Interior nodes, every operator, call, block and lambda, are
 not deduplicated, and they are the population that actually grows: one compile of a moderate
@@ -1621,8 +1618,8 @@ encoded is pinned the same way, which is what #771 and #1051 are about, and it i
 ## Interaction with planned protocol work ([#906](https://github.com/krpc/krpc/issues/906))
 
 * **#877 stream invalidation and #902 stream refcounting** are designed in [`stream-and-event-improvements.md`](../protocol/stream-and-event-improvements.md), which lands
-  before this work. Function streams and events follow its model: they deduplicate, end with a
-  final error result, and are held while the game is between states.
+  before this work. Function streams and events follow its model: each add is a new stream, they end with a
+  final error result, and they are held while the game is between states.
 * **#903 reverse streams and batched calls** is independent of the tree-construction round trips,
   per [`batched-tree-construction.md`](batched-tree-construction.md). The overlap is elsewhere: the
   expression registry, storing server-side state and evaluating it per tick, is the same machinery
