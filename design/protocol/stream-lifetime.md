@@ -6,8 +6,13 @@
 and [stream-refcounting.md](stream-refcounting.md), which were never implemented. Their decisions are
 folded in here, and changed where noted. The design changes no wire format.
 
-This doc audits the stream and event machinery as of the server side functions stack (the SSF PRs,
-not yet opened) and defines one model for three questions:
+This work lands before server side functions ([server-side-functions.md](../server-side-functions/server-side-functions.md)), which builds on it. Phase 0 moves the
+generic stream and event fixes out of the SSF stack onto `main`, and the later phases follow it as
+their own PRs. SSF then adds only function streams and function events, covered under
+"Function streams and events" below.
+
+This doc audits the stream and event machinery as of `main` with phase 0, and defines one model for
+three questions:
 
 1. What deduplication means: what two handles to one stream share, and what they do not.
 2. What a waiting event does when its stream goes away.
@@ -21,15 +26,13 @@ not yet opened) and defines one model for three questions:
 |---|---|---|
 | Ids | One counter per server, never reused | `Core.AddStream` |
 | Dedup, procedure streams | An equal `(procedure, decoded arguments)` from the same client returns the existing id | `ProcedureCallStream.Equals` |
-| Dedup, function streams | Same `Expression` object returns the existing id | `FunctionStream.Equals` (SSF) |
-| Dedup, `AddEvent` | Same `Expression` object returns the existing id | `EventStream.Equals` (SSF, new; on `main` every event was new) |
+| Dedup, `AddEvent` | Never: the v0.6.0 `AddEvent` on `main` creates a `Service.Event` per call | `KRPC.AddEvent` |
 | Dedup, service events | Never: `new Service.Event` passes `requireNew` | `Service.Event` |
 | Removal | `RemoveStream` marks the id. A mark from an RPC is flushed at the start of the next stream update. A mark made during the stream loop, by an error or `Service.Event.Remove`, is flushed at the end of the same update, after the write. No refcount, so one remove ends it for every handle | `Core.RemoveStream`, `Core.StreamServerUpdate` |
 | Re-add of a stream marked for removal | Cancels the removal, returns the same id | `Core.AddStream` |
 | Error | Sent once in the update, then the stream is removed | `Core.StreamServerUpdate` |
 | Server-side removal of an event | `Service.Event.Remove` removes the stream with **no message to the client**. The removal is made in `UpdateInternal`, so an event never started is never removed, and a rate limit delays it | `EventStream.UpdateInternal` |
 | Yield in a procedure stream | Update skipped, retried next update | `ProcedureCallStream.UpdateInternal` |
-| Yield in a function stream or event | Error, stream removed | SSF design, "A yield is an error" |
 | Event value | `true` on a firing; `Sent` resets it to `false` without sending. An `AddEvent` condition that stays true sends `true` every update | `EventStream` |
 | Firing before start | `Service.Event.Trigger` before `StartStream` is latched and sent on start. An `AddEvent` condition is only evaluated once started | `Stream.Start` |
 | Disconnect | All the client's streams removed | `Core.StreamClientDisconnected` |
@@ -37,11 +40,10 @@ not yet opened) and defines one model for three questions:
 Server defects:
 
 * **`stream.Update()` is unguarded in `Core.StreamServerUpdate`.** A stream class that throws stops
-  the update for every client, every update. The SSF stack fixes `EventStream` and `FunctionStream`,
-  but there is no catch around the call itself.
+  the update for every client, every update. Phase 0 makes `EventStream` catch its condition's
+  errors, but there is no catch around the call itself.
 * **Procedure streams encode in `StreamStream.Write`.** An encode failure, such as a null in a list of
   objects, is a `ServiceException`. It escapes the update loop, with the same effect as above.
-  `FunctionStream` already encodes in `UpdateInternal`.
 * **`StreamStream.protoResultCache` is never pruned.** It grows by one entry per stream id ever sent
   on the connection, so a `with conn.stream(...)` in a loop grows it without bound.
 * **Unknown ids are handled three ways.** `RemoveStream` does nothing. `StartStream` throws
@@ -64,9 +66,9 @@ Server defects:
 ### Clients
 
 Python, C#, Java and C++ share one structure. A manager maps a server id to one `StreamImpl`, and
-every handle with that id shares it: value, condition, callbacks and removed flag. The SSF stack added
-a removed flag, stale-handle guards and wake on removal, and stopped passing errors to callbacks. It
-introduced no regressions. What remains:
+every handle with that id shares it: value, condition, callbacks and removed flag. Phase 0 adds the
+removed flag, stale-handle guards and wake on removal, and stops passing errors to callbacks. What
+remains after it:
 
 | Defect | Py | C# | Java | C++ |
 |---|---|---|---|---|
@@ -79,9 +81,21 @@ introduced no regressions. What remains:
 | Close does not wake waiters | `Event.wait` re-waits | x | x | x |
 | Server-side disconnect wakes nobody | x | x | x | x |
 | Update thread dies on a decode or parse error | x (#198) | process ends | x | `std::terminate` |
-| Other | | `Start(wait)` checks removed outside the lock | `start()` skips the removed check | busy spin after server close; one `unique_lock` shared by all handles; `remove()` inside `acquire()` deadlocks |
+| Other | `Event.wait` resets the value without a removal guard | `Start(wait)` checks removed outside the lock; `Event.Wait` resets the value without a removal guard | `start()` skips the removed check | busy spin after server close; one `unique_lock` shared by all handles; `remove()` inside `acquire()` deadlocks |
 
 Error types are reconstructed correctly in all four clients, typed by service and name.
+
+## Phase 0: fixes moved out of SSF
+
+The SSF stack fixed generic stream and event defects alongside its own code. Phase 0 moves them
+onto `main` unchanged, so they ship before SSF and the later phases start from them.
+
+| Where | Fix |
+|---|---|
+| Server | `EventStream.UpdateInternal` turns an exception from its condition into an error result, so an event cannot stop the update loop. A firing resets the result, clearing an earlier error. `Services.HandleException` accepts an exception with no stack trace. Streaming `KRPC.AddEvent` is refused, as it would add an event per update |
+| Clients | A removed stream throws on a wait, a read or a start through any handle, and a removal wakes its waiters. Removing it again through another handle does nothing. A stream callback is not called for an update that is an error, and reading the stream throws it. Java and C++ guard the `Event.wait` reset against a removal |
+
+The phase is extraction only. It adds no model change, so the audit above describes `main` with it.
 
 ## Model
 
@@ -109,8 +123,9 @@ never reuses it.
 ### Final results
 
 **No wire format change.** The rule is: a `StreamResult` whose `ProcedureResult` has an `error` is
-final. The server already removes a stream after sending its error, so the rule documents current
-behavior. A server-side removal becomes one more error on that path.
+final. The server already removes a stream after sending its error, the rule
+[#269](https://github.com/krpc/krpc/issues/269) settled, so the rule documents current behavior. A
+client that wants to keep watching builds a new stream. A server-side removal becomes one more error on that path.
 
 ```csharp
 /// <summary>
@@ -134,8 +149,6 @@ public sealed class StreamRemovedException : System.Exception
   sends `true`, then the error in the next update.
 * A pending end is acted on only when the stream updates. Events start on creation, so every event
   updates. A rate limit delays the end by up to one period.
-* A function that raises `KRPC.StreamRemovedException` itself, if the SSF stack can express it, ends
-  its stream with that error. The outcome is the same final result, so no reservation is needed.
 
 ### Management calls on ended streams
 
@@ -162,14 +175,11 @@ independent streams that happen to share an evaluation.
 | Started | Monotonic. Started once any handle starts it. `start = false` on a hit leaves a started stream started |
 | Rate | Shared, last `SetStreamRate` wins. Documented. A per-handle rate would need a per-reference id on the wire, which the rate does not justify |
 | Event firings | Per handle, through a cursor (below) |
-| `StateVariable` state | Shared: one evaluation advances it once per update, as the SSF design states |
 | Error | Shared. Every handle sees the same error |
 
 What is equal:
 
 * A procedure stream: same procedure and equal decoded arguments, as now.
-* A function stream or a function event: the same `Expression` object, as the SSF stack does. Two
-  builds of the same tree are two streams.
 * A service event (`new Service.Event`): never equal to another. Each call to a procedure returning an
   event is a separate source of firings, such as two `OnTimer` calls.
 
@@ -248,7 +258,7 @@ The server starts an event's stream when it creates it: in `KRPC.AddEvent`, and 
 ### Callbacks
 
 * Stream callbacks receive values only. Errors and endings are not passed, so typed callback
-  signatures stay typed (the SSF behavior).
+  signatures stay typed (phase 0).
 * Each handle gets a per-stream `on end` callback taking the ending exception. It is called once,
   after the final result is applied and outside the manager's locks, so it can call RPCs. Without it,
   a program driven only by callbacks never learns that its stream ended.
@@ -263,8 +273,9 @@ The server starts an event's stream when it creates it: in `KRPC.AddEvent`, and 
   Python raises a copy, or re-raises with the traceback reset, so the traceback does not grow on
   each read.
 * **No stream can stop the update loop.** The server catches around each `stream.Update()` and turns
-  the exception into an error result. Every stream kind encodes its value inside `UpdateInternal`, so
-  an encode failure fails one stream.
+  the exception into an error result. Every stream kind encodes its value inside `UpdateInternal`,
+  because the encode in the write covers every stream of a client. An encode failure then fails
+  one stream.
 * **No client update thread can die.** A decode failure for one result becomes that stream's error.
   A failure reading the connection ends the connection: every stream ends with the closed-connection
   error and every waiter wakes. User callbacks that throw are reported and the thread continues, in
@@ -284,19 +295,6 @@ reason must not end a stream.
   itself.
 * Once the game settles, a stream over a vessel that survived carries on. A stream over an object that
   is gone gets `ObjectDestroyedException` and ends.
-
-#### Held function evaluations are rolled back
-
-A held function stream or function event evaluates again from the start in the next update.
-
-* The stream snapshots its function's `StateVariable` values before each evaluation and restores
-  them when the evaluation is held. A held update leaves the state as it found it. The snapshot is
-  only taken for functions that declare state.
-* Game writes the evaluation made before the throw are not undone, and repeat on the re-run.
-* A yield stays an error (SSF, "A yield is an error, and nothing retries"). A yielding procedure
-  continues through a continuation that a restart discards. Restarting re-runs it from scratch every
-  update, so it never completes. A transient error clears once the game settles, so a restart
-  succeeds.
 
 #### Settling covers every loaded game
 
@@ -342,19 +340,43 @@ public static uint GameStateLoads { get; }
 * No wire change, and no new client API beyond the generated property. A client helper can follow if
   the pattern proves common.
 
+## Function streams and events
+
+Server side functions ([server-side-functions.md](../server-side-functions/server-side-functions.md)) land after this work and add `KRPC.AddFunctionStream` and an
+`AddEvent` over a function. They follow the model above. What they add:
+
+* **Equality.** A function stream or a function event is equal to another of the same `Expression`
+  object. Two builds of the same tree are two streams. `AddEvent` deduplicates, which the per-handle
+  event cursors make safe.
+* **`StateVariable` state** is shared across deduplicated handles. One evaluation advances it once
+  per update.
+* **Errors.** An exception from a function, and a value that fails to encode, end only that stream.
+  A function raising `KRPC.StreamRemovedException` itself ends its stream with that error, the same
+  final result, so no reservation is needed.
+* **A yield stays an error** (SSF, "A yield is an error, and nothing retries"). A yielding procedure
+  continues through a continuation that a restart discards. Restarting re-runs it from scratch every
+  update, so it never completes. A transient error clears once the game settles, so a restart
+  succeeds.
+* **Held evaluations are rolled back.** A held function stream or function event evaluates again
+  from the start in the next update. The stream snapshots its function's `StateVariable` values
+  before each evaluation and restores them when the evaluation is held, so a held update leaves the
+  state as it found it. The snapshot is only taken for functions that declare state. Game writes
+  made before the throw are not undone, and repeat on the re-run.
+
 ## Phases
 
-Each phase can be merged on its own. None changes the SSF stack, which can land first. Until phase 3,
-SSF's event deduplication makes the shared-reset defect reachable through two `add_event` handles of
-one function. The SSF tests already pin that sharing.
+Each phase can be merged on its own, and all of them land before server side functions. Phase 0
+moves the fixes already written in the SSF stack. The SSF stack is then rebased onto the phases,
+and its function streams and events adopt the model as listed under "Function streams and events".
 
 | Phase | Scope | Notes |
 |---|---|---|
+| 0. Fixes moved out of SSF | the table under "Phase 0" | extraction only, no protocol change |
 | 1. Server hardening | catch around `stream.Update()`; encode procedure streams in `UpdateInternal`; prune `protoResultCache` on removal; high-water rule for `StartStream`, `SetStreamRate`, `RemoveStream`; document `Service.Event.Trigger` as main thread only and fix `OnTimer`; reproduce the stream over a procedure returning an event, and if confirmed have `AddStream` reject such a procedure | no protocol change |
 | 2. Final results | `KRPC.StreamRemovedException`; `Service.Event.Remove` records a pending end that `UpdateInternal` sends after any unsent firing; the server starts events on creation | protocol docs: states, an error result is final, dedup rules, `StartStream` resends the value |
 | 3. Client terminal states | in all four: an error result ends the impl; close and disconnect end every impl; waiters always wake; `on end` callback; event cursors; timed waits of streams and events return `bool`; update threads survive decode errors; the per-client bugs in the audit table | the bulk of the work. The C++ lock changes overlap [stream-freezing-removal.md](stream-freezing-removal.md) |
 | 4. Refcounting (#902) | server count; per-handle `remove` in clients; manager lock held across the add and remove RPCs | depends on 3 for per-handle state |
-| 5. Game state | dormant exception and skip; `StateVariable` rollback on a held evaluation; zero counts settle; `KRPC.GameStateLoads` | in-game tests: a stream over a surviving vessel across a quickload, one over a vessel removed by it, a held stream in an empty save |
+| 5. Game state | dormant exception and skip; zero counts settle; `KRPC.GameStateLoads` | in-game tests: a stream over a surviving vessel across a quickload, one over a vessel removed by it, a held stream in an empty save |
 
 ## Tests
 
@@ -370,9 +392,9 @@ one function. The SSF tests already pin that sharing.
   * close and server disconnect waking a stream `wait` and an event `wait`;
   * remove on one handle leaving the other live;
   * remove then re-add of an equal stream receiving a value.
-* Core: refcount, high-water rule, update loop surviving a throwing stream, a held function
-  evaluation restoring its state variables, `GameStateLoads` ignoring a part-death sweep, a zero
-  count settling.
+* Core: refcount, high-water rule, update loop surviving a throwing stream, `GameStateLoads`
+  ignoring a part-death sweep, a zero count settling.
+* SSF, once rebased: a held function evaluation restoring its state variables.
 
 ## Decisions
 
@@ -380,7 +402,7 @@ Decided 2026-10-10:
 
 * Timed waits of streams and events return `bool`, changed in place in every client. The binary
   break in the C#, Java and C++ libraries is accepted.
-* A held function evaluation restores its `StateVariable` values.
+* A held function evaluation restores its `StateVariable` values (SSF, after rebasing).
 * Holds are bounded by fixing the settle check for zero counts, not by a time limit.
 * The load counter is `KRPC.GameStateLoads`.
 

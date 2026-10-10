@@ -4,6 +4,10 @@
 "Phases"). None of the stack is opened yet. It closes umbrella issue
 [#679](https://github.com/krpc/krpc/issues/679).
 
+Builds on [`stream-lifetime.md`](../protocol/stream-lifetime.md), which lands first. That doc owns the behavior every stream and event shares:
+deduplication, removal, error results and the update loop. This doc covers what function streams
+and events add.
+
 Follow-ups, not built, each designed in its own doc:
 [`yielding-procedures.md`](yielding-procedures.md) (deferred calls and resumable functions),
 [`shared-nodes.md`](shared-nodes.md) (compiling shared nodes once),
@@ -740,9 +744,7 @@ does the same job with primitives the algebra already compiles. Named catches ar
 
 **Semantics per context** are documented rather than left to be discovered: an exception that
 escapes a function surfaces immediately as an RPC error from `RunFunction`, and from a stream or
-event it becomes an error result. The server then removes the stream, the rule
-[#269](https://github.com/krpc/krpc/issues/269) settled for every stream, so a client that wants
-to keep watching builds a new one.
+event it becomes an error result, which ends the stream as any error result does ([`stream-lifetime.md`](../protocol/stream-lifetime.md)).
 
 `ExceptionSignature` does not record the CLR type of the exception, unlike `ClassSignature`,
 `EnumerationSignature` and `StructSignature`, so resolving `(service, name)` to a type it can
@@ -766,22 +768,17 @@ collection changed in place is the same object with a new encoding, so it is sen
 built at creation time tells `Encoder.Encode` how to serialize the boxed result, so no per-update
 type routing is needed.
 
-A value that cannot be encoded, such as a null element in a list of objects, is turned into an
-error result by encoding it in `UpdateInternal`. The encode that sends an update
-covers every stream of a client, so an error there would fail all of them, every update.
-
-`EventStream.UpdateInternal` has the same handling, so a predicate error becomes a stream error
-result (surfaced by existing client stream machinery as a raised exception) instead of propagating
-out of the per-frame update loop and starving every stream. `AddEvent` reports "The function must
+`FunctionStream` encodes its value in `UpdateInternal`, so a value that cannot be encoded, such as
+a null element in a list of objects, fails only its own stream. That is the rule for every stream
+kind ([`stream-lifetime.md`](../protocol/stream-lifetime.md)), as is `EventStream` turning a predicate error into an error result. `AddEvent` reports "The function must
 evaluate to a boolean value" when given anything else. It takes a `bool?` as its value, so a null
 becomes an error on the event's stream.
 
 **Function streams and events deduplicate like procedure call streams.** Two `FunctionStream`s
 are equal when they evaluate the same `Expression` object, so a second `AddFunctionStream` of the
 same function by the same client returns the existing stream's id, as `AddStream` does for an
-equal call. `AddEvent` does the same for an event over the same function. The consequence is the
-one [#902](https://github.com/krpc/krpc/issues/902) describes: one `RemoveStream` removes it for
-both.
+equal call. `AddEvent` does the same for an event over the same function. Each handle keeps its
+own reference and its own event cursor, per the deduplication rules in [`stream-lifetime.md`](../protocol/stream-lifetime.md).
 
 **Streams are not unified with procedure-call streams on the server, and are in the clients where
 the language allows.** `AddStream` takes an encoded `ProcedureCall` and `AddFunctionStream` takes an
@@ -1011,10 +1008,8 @@ decoding a value whose type the server reports rather than the stub declares.
   hands it back encoded bytes to decode itself. Events and function streams need streams, which
   the Lua client does not have. The tutorial says which clients support what.
 
-In every client, two events or streams over one function share a stream. Once one is removed, the
-other throws on a wait, a read, or a start. Java's plain `start()` does not check. Removing it
-again through the other handle does nothing. A stream callback is not called for an update that
-is an error, and reading the stream throws it.
+In every client, two events or streams over one function share one server stream, and behave as
+two handles to a deduplicated stream do in [`stream-lifetime.md`](../protocol/stream-lifetime.md).
 
 Each helper introspects the type once per function and keeps it, apart from the C# lambda case
 above. Walking `ReturnType` is a round trip per property of every type it is built from, and
@@ -1104,6 +1099,11 @@ park, so there is nothing for the core's existing retry machinery to resume.
 next one would be merely wasteful for a pure function and destructive for one with side effects: a
 function that stages, then waits on the result of staging, re-stages on every update for as long as
 the call keeps yielding.
+
+The one re-run is for a lookup that fails while the game is between states.
+[`stream-lifetime.md`](../protocol/stream-lifetime.md) holds that error, restores the function's
+state variables, and evaluates again on the next update. The game settling ends the window, so an
+effect before the lookup repeats for the length of a load, not for as long as a call yields.
 
 **There is no side-effect-free exemption**, because the property is not decidable from the tree.
 Void calls, assignments and collection mutation are the *visible* effects, but a procedure that
@@ -1608,7 +1608,7 @@ since the object store holds the only references to them.
 *streams*: two equal `AddStream` requests deduplicate to one id, and a single `RemoveStream` then
 destroys it for both consumers. It concerns stream lifetime rather than the object store, and it is
 a correctness bug rather than a growth concern. Deduplicating types and constants does not affect
-it, but function streams are subject to it, per "Computed streams and events".
+it. Its fix in [`stream-lifetime.md`](../protocol/stream-lifetime.md) covers function streams too.
 
 **What deduplication does not bound.** Interior nodes, every operator, call, block and lambda, are
 not deduplicated, and they are the population that actually grows: one compile of a moderate
@@ -1620,16 +1620,15 @@ encoded is pinned the same way, which is what #771 and #1051 are about, and it i
 
 ## Interaction with planned protocol work ([#906](https://github.com/krpc/krpc/issues/906))
 
-* **#877 stream invalidation** builds on per-stream error results, which `FunctionStream` and
-  `EventStream` emit in the same shape as `ProcedureCallStream`, so the removal convention can layer
-  on unchanged.
+* **#877 stream invalidation and #902 stream refcounting** are designed in [`stream-lifetime.md`](../protocol/stream-lifetime.md), which lands
+  before this work. Function streams and events follow its model: they deduplicate, end with a
+  final error result, and are held while the game is between states.
 * **#903 reverse streams and batched calls** is independent of the tree-construction round trips,
   per [`batched-tree-construction.md`](batched-tree-construction.md). The overlap is elsewhere: the
   expression registry, storing server-side state and evaluating it per tick, is the same machinery
   reverse streams cite as prior art.
-* **#902 stream refcounting** applies to function streams as it does to procedure call streams,
-  since both deduplicate; see "Computed streams and events". It is unrelated to deduplicating types
-  and constants, despite the surface similarity; see "No refcounting for these".
+* **#902** is unrelated to deduplicating types and constants, despite the surface similarity; see
+  "No refcounting for these".
 * **#904 deprecation**: individual expression operators can be evolved or deprecated through the
   standard mechanism, since they are ordinary service members.
 
@@ -1719,7 +1718,8 @@ and `client/cpp/benchmark/benchmark.cpp` therefore include `krpc/services/krpc.h
 
 ## Phases
 
-The first phase removes the v0.6.0 `Expression`, `Type` and `AddEvent`, so each later phase is an
+The stream-lifetime phases in [`stream-lifetime.md`](../protocol/stream-lifetime.md) land first, so the stack starts from their stream and event
+machinery. The first phase removes the v0.6.0 `Expression`, `Type` and `AddEvent`, so each later phase is an
 addition reviewed on its own. The stack's net change against v0.6.0 is the design above, and the
 breaking changes it lists are relative to v0.6.0. The phases are grouped into 7 PRs. Each phase
 is a commit, and each PR that changes what a user sees ends with one commit holding its changelog
