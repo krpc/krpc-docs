@@ -24,10 +24,10 @@ not yet opened) and defines one model for three questions:
 | Dedup, function streams | Same `Expression` object returns the existing id | `FunctionStream.Equals` (SSF) |
 | Dedup, `AddEvent` | Same `Expression` object returns the existing id | `EventStream.Equals` (SSF, new; on `main` every event was new) |
 | Dedup, service events | Never: `new Service.Event` passes `requireNew` | `Service.Event` |
-| Removal | `RemoveStream` marks the id; the next update removes it. No refcount, so one remove ends it for every handle | `Core.RemoveStream` |
+| Removal | `RemoveStream` marks the id. A mark from an RPC is flushed at the start of the next stream update. A mark made during the stream loop, by an error or `Service.Event.Remove`, is flushed at the end of the same update, after the write. No refcount, so one remove ends it for every handle | `Core.RemoveStream`, `Core.StreamServerUpdate` |
 | Re-add of a stream marked for removal | Cancels the removal, returns the same id | `Core.AddStream` |
 | Error | Sent once in the update, then the stream is removed | `Core.StreamServerUpdate` |
-| Server-side removal of an event | `Service.Event.Remove` removes the stream with **no message to the client** | `EventStream.UpdateInternal` |
+| Server-side removal of an event | `Service.Event.Remove` removes the stream with **no message to the client**. The removal is made in `UpdateInternal`, so an event never started is never removed, and a rate limit delays it | `EventStream.UpdateInternal` |
 | Yield in a procedure stream | Update skipped, retried next update | `ProcedureCallStream.UpdateInternal` |
 | Yield in a function stream or event | Error, stream removed | SSF design, "A yield is an error" |
 | Event value | `true` on a firing; `Sent` resets it to `false` without sending. An `AddEvent` condition that stays true sends `true` every update | `EventStream` |
@@ -52,6 +52,14 @@ Server defects:
   in the loaded save is removed. This is the #877 symptom in its current form.
 * **`Service.Event.Trigger` is not thread safe.** TestServer's `OnTimer` calls it from a timer thread,
   racing with `Sent` on the update thread.
+* **A stream over a procedure returning an event adds a stream per update.** Suspected, not
+  reproduced. Each evaluation constructs a `Service.Event`, which calls `Core.AddStream` while
+  `StreamServerUpdate` enumerates the client's streams. The enumeration then throws "collection was
+  modified" outside `stream.Update()`, so a catch around that call does not cover it. Each update
+  also leaks one event stream.
+* **A failed write drops a final result.** An error result is marked for removal before
+  `Stream.Write`. A caught `ServerException` loses the error but the stream is still removed. The
+  connection is failing in that case, so the closed-connection ending covers it.
 
 ### Clients
 
@@ -84,7 +92,7 @@ A stream has one server-side state machine per client, and the client mirrors it
 | State | Entered by | Leaves to |
 |---|---|---|
 | added | `AddStream`, `AddFunctionStream`, `AddEvent`, a procedure returning an event | started, ended |
-| started | `StartStream`, or `start = true` | ended |
+| started | `StartStream`, `start = true`, or creation for an event | ended |
 | ended | the last reference released, an error, the server removing it, disconnect | (terminal) |
 
 Every transition to ended that the client did not ask for is **announced exactly once** with a
@@ -113,15 +121,19 @@ public sealed class StreamRemovedException : System.Exception
 ```
 
 * `Service.Event.Remove` sends `KRPC.StreamRemovedException` instead of removing silently. Its
-  description can carry the reason, e.g. "the event has finished".
+  description can carry the reason, e.g. "the event has finished". `Remove` records a pending end.
+  `UpdateInternal` sets the error in the first update with no unsent firing, and the existing error
+  path sends it and removes the stream. `EventStream` no longer calls `Core.RemoveStream`.
 * Clients need no knowledge of the type to end the stream: any error ends it. The type only names
   the cause for the caller.
 * Old clients surface it as they surface any stream error today: Python builds it from the service
   definitions, and the C#, Java and C++ stubs fall back to their generic RPC exception. A new
   `removed` flag would decode as `false` in an old client, and an event waiter would hang.
-* A firing is always delivered before the end. A service event that fires and removes itself in one
-  update sends `true`, then the error in the next update, because `RemoveStream` takes effect in the
-  next update.
+* A firing is always delivered before the end. A firing and an error cannot share one result, as
+  both reset the same `ProcedureResult`. A service event that fires and removes itself in one update
+  sends `true`, then the error in the next update.
+* A pending end is acted on only when the stream updates. Events start on creation, so every event
+  updates. A rate limit delays the end by up to one period.
 * A function that raises `KRPC.StreamRemovedException` itself, if the SSF stack can express it, ends
   its stream with that error. The outcome is the same final result, so no reservation is needed.
 
@@ -170,6 +182,15 @@ zero or the stream ends. Copies of one handle share its single reference. The C+
 explicitly rather than through `shared_ptr::use_count`, so copied `Stream<T>` objects keep today's
 semantics.
 
+* **The mirror never drifts.** Releasing the last reference sends no final result, so a client count
+  above the server's leaves a handle waiting forever. Each client holds its manager lock across the
+  `AddStream` or `RemoveStream` RPC and the count update. Python's `add_stream` makes its RPC outside
+  the lock today.
+* **`StartStream` resends the current value.** A re-add that un-marks a removal returns an id the
+  client has already dropped, so the new impl starts empty. Its `StartStream` resends the value,
+  as `Stream.Start` does today by setting `Changed`. This is a protocol rule, not an accident of the
+  implementation.
+
 ## Events
 
 ### Firings are counted per handle
@@ -193,11 +214,14 @@ Consequences:
 ### Events start when they are created
 
 Firings are latched from the moment the handle exists, which needs the server to be evaluating.
-Clients start an event's stream on creation: `AddEvent` and procedures returning events are followed
-by `StartStream`, and a new handle's `seen` is the impl's `fired` at that point.
+The server starts an event's stream when it creates it: in `KRPC.AddEvent`, and in the
+`Service.Event` constructor. A new handle's `seen` is the impl's `fired` when it is created.
 
-The cost is evaluation between creation and the first wait, which is the window the user asked to
-watch. The current lazy start in `wait` is what makes a firing before the first wait invisible.
+* No extra RPC per event, and no window between creation and a client's `StartStream`.
+* Old clients are unaffected. Their lazy `StartStream` in `wait` finds the stream started, and
+  `Stream.Start` resends the current value.
+* The cost is evaluation between creation and the first wait, which is the window the user asked to
+  watch. The current lazy start in `wait` is what makes a firing before the first wait invisible.
 
 ### Wait returns or raises, never hangs
 
@@ -212,12 +236,14 @@ watch. The current lazy start in `wait` is what makes a firing before the first 
 | Another handle removed | waits normally, the stream is still referenced | waits normally |
 | Connection closed | raises the closed-connection error | same |
 
-* A firing and an ending in one result, or a firing not yet seen when the ending arrives: the
-  firing wins. `wait` returns, and the next `wait` raises.
+* A firing not yet seen when the ending arrives wins. `wait` returns, and the next `wait` raises.
 * The timeout is a deadline. A wake before it with nothing new waits for the remaining time.
-* Returning `bool` from the timed form is an API change in every client. The C#, Java and C++ forms
-  return `void` today, and Python returns `None`. Python and C++ can change the return type without
-  breaking callers. C# and Java need a new overload or a deprecation, settled per client in phase 3.
+* `Stream.wait(timeout)` follows the same rule: `true` on an update, `false` on a timeout, and it
+  raises on an ending.
+* Returning `bool` from the timed forms changes the return type in place, in every client. The C#,
+  Java and C++ forms return `void` today, and Python returns `None`. The change is source compatible,
+  as a call used as a statement discards its result. It is a binary break in the C#, Java and C++
+  libraries, which ship with each release, so callers recompile.
 
 ### Callbacks
 
@@ -259,6 +285,30 @@ reason must not end a stream.
 * Once the game settles, a stream over a vessel that survived carries on. A stream over an object that
   is gone gets `ObjectDestroyedException` and ends.
 
+#### Held function evaluations are rolled back
+
+A held function stream or function event evaluates again from the start in the next update.
+
+* The stream snapshots its function's `StateVariable` values before each evaluation and restores
+  them when the evaluation is held. A held update leaves the state as it found it. The snapshot is
+  only taken for functions that declare state.
+* Game writes the evaluation made before the throw are not undone, and repeat on the re-run.
+* A yield stays an error (SSF, "A yield is an error, and nothing retries"). A yielding procedure
+  continues through a continuation that a restart discards. Restarting re-runs it from scratch every
+  update, so it never completes. A transient error clears once the game settles, so a restart
+  succeeds.
+
+#### Settling covers every loaded game
+
+A hold lasts until `GameState.Settled`. Today `SweepObjectStore` settles a state only when the vessel
+or editor part count is above zero and unchanged across two ticks. A save with no vessels, or an
+editor with no ship, therefore never settles, and a hold there would never end.
+
+* A count of zero settles too, once it has held for a longer window than a nonzero count. A load fills
+  the list from empty, so the longer window keeps an early empty list from settling. The window is
+  sized in phase 5.
+* An editor with no ship counts as zero parts.
+
 Open: in the main menu `HighLogic.CurrentGame` is null, the state never settles, and a held stream
 waits until a game is loaded. That outcome is defensible. The alternative is to classify everything
 as destroyed when no game is loaded.
@@ -272,19 +322,23 @@ addition is a signal that a load happened, which can be a stream:
 
 ```csharp
 /// <summary>
-/// The number of times the game has loaded a new state, counted once the state has finished loading.
+/// The number of game states that have finished loading.
 /// </summary>
 [KRPCProperty]
-public static uint GameStateGeneration { get; }
+public static uint GameStateLoads { get; }
 ```
 
-* It counts at `GameState.Sweep` rather than at `GameState.Changed`, so a change arrives when the new
-  state is usable. This is step 1 of the issue's sequence.
+* It counts when `GameState.Settled` goes from false to true, so a change arrives when the new state
+  is usable. This is step 1 of the issue's sequence.
+* `GameState.Sweep` also runs for sweeps that `RequestSweep` asks for after a part dies, with no
+  state change. Those leave `Settled` true and do not count.
+* The internal `GameState.Generation` counts at `GameState.Changed`, when a state starts to load.
+  The two counters differ by design, hence the distinct name.
 * Streams held while the game was between states resume in the same update as the sweep. Ordering
-  within the update is not guaranteed, so a client reacting to the generation can still see a value
+  within the update is not guaranteed, so a client reacting to the count can still see a value
   from a held stream in that update. The value is from the new state.
 * A client gets the issue's single callback with existing machinery: a stream of the property and a
-  callback, or `add_event` over `generation != g`.
+  callback, or `add_event` over `loads != n`.
 * No wire change, and no new client API beyond the generated property. A client helper can follow if
   the pattern proves common.
 
@@ -296,33 +350,46 @@ one function. The SSF tests already pin that sharing.
 
 | Phase | Scope | Notes |
 |---|---|---|
-| 1. Server hardening | catch around `stream.Update()`; encode procedure streams in `UpdateInternal`; prune `protoResultCache` on removal; high-water rule for `StartStream`, `SetStreamRate`, `RemoveStream`; document `Service.Event.Trigger` as main thread only and fix `OnTimer` | no protocol change |
-| 2. Final results | `KRPC.StreamRemovedException`; `Service.Event.Remove` sends it | protocol docs: states, an error result is final, dedup rules |
-| 3. Client terminal states | in all four: an error result ends the impl; close and disconnect end every impl; waiters always wake; `on end` callback; event cursors and start on creation; timed waits return `bool`; update threads survive decode errors; the per-client bugs in the audit table | the bulk of the work |
-| 4. Refcounting (#902) | server count; per-handle `remove` in clients | depends on 3 for per-handle state |
-| 5. Game state | dormant exception and skip; `KRPC.GameStateGeneration` | in-game tests: a stream over a surviving vessel across a quickload, one over a vessel removed by it |
+| 1. Server hardening | catch around `stream.Update()`; encode procedure streams in `UpdateInternal`; prune `protoResultCache` on removal; high-water rule for `StartStream`, `SetStreamRate`, `RemoveStream`; document `Service.Event.Trigger` as main thread only and fix `OnTimer`; reproduce the stream over a procedure returning an event, and if confirmed have `AddStream` reject such a procedure | no protocol change |
+| 2. Final results | `KRPC.StreamRemovedException`; `Service.Event.Remove` records a pending end that `UpdateInternal` sends after any unsent firing; the server starts events on creation | protocol docs: states, an error result is final, dedup rules, `StartStream` resends the value |
+| 3. Client terminal states | in all four: an error result ends the impl; close and disconnect end every impl; waiters always wake; `on end` callback; event cursors; timed waits of streams and events return `bool`; update threads survive decode errors; the per-client bugs in the audit table | the bulk of the work. The C++ lock changes overlap [stream-freezing-removal.md](stream-freezing-removal.md) |
+| 4. Refcounting (#902) | server count; per-handle `remove` in clients; manager lock held across the add and remove RPCs | depends on 3 for per-handle state |
+| 5. Game state | dormant exception and skip; `StateVariable` rollback on a held evaluation; zero counts settle; `KRPC.GameStateLoads` | in-game tests: a stream over a surviving vessel across a quickload, one over a vessel removed by it, a held stream in an empty save |
 
 ## Tests
 
 * TestServer: a service event that removes itself without firing; one that fires and removes itself
-  in one update; a procedure stream whose value fails to encode; a throwing event (from the superseded
-  design).
+  in one update, sending `true` then the error; a procedure stream whose value fails to encode; a
+  throwing event (from the superseded design); a stream over a procedure returning an event.
 * Per client, against TestServer:
   * error then `wait`, for a stream and an event;
-  * a firing before `wait`;
+  * a firing before `wait`, and one before the first `wait` of a new event;
   * two handles to one deduplicated event both see a firing;
-  * timed `wait` returning `false`;
+  * timed `wait` returning `false`, for a stream and an event;
   * a server-removed event;
   * close and server disconnect waking a stream `wait` and an event `wait`;
-  * remove on one handle leaving the other live.
-* Core: refcount, high-water rule, update loop surviving a throwing stream.
+  * remove on one handle leaving the other live;
+  * remove then re-add of an equal stream receiving a value.
+* Core: refcount, high-water rule, update loop surviving a throwing stream, a held function
+  evaluation restoring its state variables, `GameStateLoads` ignoring a part-death sweep, a zero
+  count settling.
 
-## Decisions to confirm
+## Decisions
+
+Decided 2026-10-10:
+
+* Timed waits of streams and events return `bool`, changed in place in every client. The binary
+  break in the C#, Java and C++ libraries is accepted.
+* A held function evaluation restores its `StateVariable` values.
+* Holds are bounded by fixing the settle check for zero counts, not by a time limit.
+* The load counter is `KRPC.GameStateLoads`.
+
+To confirm:
 
 1. A server-side removal is an error result, `KRPC.StreamRemovedException`, with no wire change. A
    `removed` field was the alternative. It would leave an old client's event waiter hanging.
-2. Events start on creation.
-3. Timed waits return `bool`, with a deprecation path in C# and Java.
-4. Transient errors are held, not sent. The alternative is to send them as non-final errors, which
+2. The server starts events on creation. Starting them from the client was the alternative, at one
+   RPC per event.
+3. Transient errors are held, not sent. The alternative is to send them as non-final errors, which
    would need a wire field and leaves every client to decide what a non-final error means.
-5. #877 is answered by per-stream endings plus `GameStateGeneration`, not by a global invalidation.
+4. #877 is answered by per-stream endings plus `GameStateLoads`, not by a global invalidation.
