@@ -86,22 +86,18 @@ streams. Each has its own lifetime, rate and event firings.
 Server:
 
 * `AddStream`, `AddFunctionStream` and `AddEvent` never return an existing id.
-* **Shared evaluation.** Within one update, the server evaluates the equal procedure call streams of
-  one client once, and gives the outcome to each. Equal means the same procedure and equal decoded
-  arguments, the existing `ProcedureCallStream.Equals`. A value, an error and a yield are all shared
-  this way.
-* Each stream still sends its own `StreamResult`, so an equal value is repeated in the
-  `StreamUpdate`.
-* Sharing is per client, as a procedure can depend on the calling client. A stream whose rate skips
-  the update takes no part.
-* Function streams and events are never shared. A function can hold state, and an event's firings
-  are its own.
+* **One evaluation per stream.** Each stream is evaluated once per update its rate allows, and the
+  server never compares calls. Equal streams read equal values, as they are evaluated in the same
+  update.
+* Each stream sends its own `StreamResult`, so an equal value is repeated in the `StreamUpdate`.
 
 Client:
 
 * The manager keeps one shared state per id. A handle owns its stream, and copies of a handle
   share it.
 * `remove()` ends the stream for every copy. Removing it again through any copy does nothing.
+* To read one value from several places, such as several threads, pass one handle between them.
+  Each add costs one more evaluation per update.
 
 ### Removal and Management Calls
 
@@ -321,7 +317,7 @@ Server side functions land after this work and add `KRPC.AddFunctionStream` and 
 function. They follow the model above. What they add:
 
 * **One stream per add.** Every `AddFunctionStream`, and every `AddEvent` over a function, creates a
-  new stream, and shared evaluation never applies to them. The SSF stack deduplicates them by
+  new stream. The SSF stack deduplicates them by
   `Expression` object today, and the rebase removes that.
 * **`StateVariable` state** belongs to the function, and every evaluation advances it. Two streams of
   one function advance it twice per update. A separate state needs a separate build.
@@ -420,7 +416,7 @@ extraction only, with no protocol change.
 | 2. Final results | `KRPC.StreamRemovedException`; `Service.Event.Remove` records a pending end that is sent after any unsent firing, and `EventStream` no longer calls `Core.RemoveStream` | protocol docs: states, an error result is final |
 | 3. Client terminal states | in all four: an error result ends the shared state; close and disconnect end every stream; waiters always wake; `on end` callback; event cursors; timed waits of streams and events return `bool`; update threads survive decode errors and throwing callbacks; the per-client bugs in the audit | the bulk of the work. The C++ lock changes overlap [stream-freezing-removal.md](stream-freezing-removal.md) |
 | 4. Start on add | server: `AddStream(call)` starts the stream, `StartStream` and the `start` flag go, and a first evaluation always sends; clients: results for unknown ids buffered, `start()` and the `start` argument go, a callback added to a stream with a value is called with it; the protocol docs and client guides | depends on 3. **Breaking:** old clients fail on `AddStream` |
-| 5. One stream per add (#902) | `AddStream` always creates a stream, and the re-add path in `Core.AddStream` goes; shared evaluation of equal procedure call streams per client and update; a benchmark of many equal streams before and after; the protocol docs, and the C#, Java and C++ guides on stream equality | clients need no code change. **Breaking:** repeated equal adds without a remove now accumulate streams |
+| 5. One stream per add (#902) | `AddStream` always creates a stream; the re-add path in `Core.AddStream` and the server's comparison of calls go; the protocol docs, and the C#, Java and C++ guides on stream equality | clients need no code change. **Breaking:** repeated equal adds without a remove now accumulate streams |
 | 6. Game state | dormant exception and skip; zero counts settle; `KRPC.GameStateLoads` | in-game tests: a stream over a surviving vessel across a quickload, one over a vessel removed by it, a held stream in an empty save |
 
 ## Tests
@@ -439,7 +435,7 @@ extraction only, with no protocol change.
   * close and server disconnect waking a stream `wait` and an event `wait`;
   * two equal adds giving two ids, and removing one leaving the other live;
   * remove then add of an equal stream receiving a value.
-* Core: equal streams evaluated once per update with a result sent for each, the high-water rule,
+* Core: two equal streams each evaluated and each sent a result, the high-water rule,
   the update loop surviving a throwing stream, `GameStateLoads` ignoring a part-death sweep, a zero
   count settling.
 * SSF, once rebased: a held function evaluation restoring its state variables.
@@ -455,8 +451,13 @@ Decided 2026-10-10:
 * The load counter is `KRPC.GameStateLoads`.
 * Stream deduplication is removed, and every add is a new stream. It was added to save results on
   the wire for streams such as altitude. Over events and function streams it needs reference counts,
-  per-handle cursors and shared function state. Equal procedure call streams keep one evaluation per
-  update, and their values are repeated in the update message.
+  per-handle cursors and shared function state. Values of equal streams are repeated in the update
+  message.
+* Equal streams are evaluated separately, once each per update. A procedure with side effects then
+  runs once per stream, and the server never compares calls. Equal adds in one client are rare, as
+  telemetry, control loops and dashboards add each stream once. A client reading one value in
+  several places shares one handle. If a measurement calls for it, property getters alone could be
+  shared later, where sharing is not observable.
 * Streams start on add. `StartStream` and the `start` flag are removed, which breaks old clients.
   Until the single connection lands, clients buffer results for unknown ids.
 
