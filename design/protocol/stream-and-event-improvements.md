@@ -163,9 +163,7 @@ Client:
 
 Old clients surface `StreamRemovedException` as they surface any stream error today. Python builds
 it from the service definitions, and the C#, Java and C++ stubs fall back to their generic RPC
-exception. A new `removed` field was the alternative. Any error already ends a stream, so the field
-adds nothing. Until start on add breaks old clients, it would also decode as `false` in one, and an
-event waiter would hang.
+exception.
 
 ### Waiting and Callbacks
 
@@ -463,8 +461,7 @@ Decided 2026-10-10:
 
 To confirm:
 
-1. A server-side removal is an error result, `KRPC.StreamRemovedException`, with no wire change. A
-   `removed` field was the alternative. Any error already ends a stream, so the field adds nothing.
+1. A server-side removal is an error result, `KRPC.StreamRemovedException`, with no wire change.
 2. Transient errors are held, not sent. The alternative is to send them as non-final errors, which
    would need a wire field and leaves every client to decide what a non-final error means.
 3. #877 is answered by per-stream endings plus `GameStateLoads`, not by a global invalidation.
