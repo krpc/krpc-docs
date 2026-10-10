@@ -218,8 +218,8 @@ Client:
 * A hold sends no result. A program that needs to know streams `GameStateLoads`, or the vessel's
   loaded state.
 
-Settling covers every loaded game. Today `SweepObjectStore` settles a state only when the vessel or
-editor part count is above zero and unchanged across two ticks, so an empty save never settles.
+Settling covers every loaded game. A state settles once its vessel or editor part count is
+unchanged across two ticks.
 
 * A count of zero settles too, once it has held for a longer window than a nonzero count. A load
   fills the list from empty, so the longer window keeps an early empty list from settling. The
@@ -388,7 +388,8 @@ stack, and changes no part of the model. Each defect names the phase that fixes 
 | **A server-side removal is silent**, and an event never started is never removed | 2 |
 | **Events start lazily**, so a firing of an `AddEvent` condition before the first `wait` is never seen | 4 |
 | **Equal adds share one stream.** One `RemoveStream` ends it for every handle (#902). A re-add of a stream marked for removal returns an id the client has dropped, which works only because `Stream.Start` resends the value | 5 |
-| **The game being between states ends streams that would have survived.** During a quickload, `GetVesselById` throws `InvalidOperationException` ("the game is between states") for a vessel the game has not rebuilt yet. A stream is terminal on any error, so a stream over a vessel that exists in the loaded save is removed. This is the #877 symptom in its current form | 6 |
+| **A dormant object raises the same error as a failure.** A dormant lookup throws `InvalidOperationException`, the type of many real errors, so a stream, a function or client code cannot tell "not loaded" from a failure. A stream is terminal on any error. During a quickload, a stream over a vessel the game has not rebuilt yet is removed, though the vessel exists in the loaded save. This is the #877 symptom in its current form. A stream over a part also ends when its vessel unloads | 6 |
+| **An empty save never settles.** `SweepObjectStore` settles a state only when the vessel or editor part count is above zero. In a save with no vessels, a vessel that is gone is reported as between states, never as destroyed. Under the design, a stream over it would be held forever | 6 |
 | **A failed write drops a final result.** An error result is marked for removal before `Stream.Write`. A caught `ServerException` loses the error but the stream is still removed. The connection is failing in that case, so the closed-connection ending covers it | none |
 
 ## Clients
@@ -405,11 +406,14 @@ types are reconstructed correctly in all four clients, typed by service and name
 | `Event.wait` resets the shared value to `false`, overwriting a stored error, then blocks forever | x | x | x | x | 3 |
 | `Event.wait` reset discards a firing that arrived before the wait, or one a second waiter was about to read | x | x | x | x | 3 |
 | `Event.wait(timeout)` cannot tell a timeout from a firing, and returns early on any wake | x | x | x | x | 3 |
+| `Stream.wait(timeout)` returns nothing, so a timeout cannot be told from an update | x | x | x | x | 3 |
 | Close does not wake waiters | `Event.wait` re-waits | x | x | x | 3 |
 | Server-side disconnect wakes nobody | x | x | x | x | 3 |
+| No ending reaches a callback. Phase 0 stops passing errors to callbacks, and there is no `on end` callback, so a program driven by callbacks never learns that its stream ended | x | x | x | x | 3 |
 | Update thread dies on a decode or parse error | x (#198) | process ends | x | `std::terminate` | 3 |
 | Other | `Event.wait` resets the value without a removal guard | `Start(wait)` checks removed outside the lock; `Event.Wait` resets the value without a removal guard | `start()` skips the removed check | busy spin after server close; one `unique_lock` shared by all handles; `remove()` inside `acquire()` deadlocks | 3 |
 | `remove()` on one handle ends the stream for all handles from equal adds (#902). Fixed by the server change alone | x | x | x | x | 5 |
+| A callback added to a stream that has a value is not called until the value changes | x | x | x | x | 4 |
 | A result for an unknown id is dropped. Clients avoid losing the first value by adding with `start = false` and then calling `StartStream`, one extra RPC per stream | x | x | x | x | 4 |
 
 # Part 3. Phases
