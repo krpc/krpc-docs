@@ -670,6 +670,7 @@ whose meaning goes in the message:
 | `TimeoutException` | `System.TimeoutException` | `TimeoutError` | `TimeoutException` | generated |
 | `OverflowException` | `System.OverflowException` | `OverflowError` | `OverflowException` | `ArithmeticException` |
 | `ObjectDestroyedException` | none | generated | generated | generated |
+| `ObjectNotLoadedException` | none | generated | generated | generated |
 | `Error` | none | generated | generated | generated |
 
 The Python, C# and Java clients raise the built-in type in the table itself. "generated" is the
@@ -701,7 +702,7 @@ assigns `.Message` from it as the first statement of the handler.
 that has to be right, and the obvious implementation gets it wrong.
 `[KRPCException(MappedException = ...)]` maps a CLR exception type onto a kRPC one, and
 `HandleException` applies that mapping on the way out, for every exception in the table above
-apart from `ObjectDestroyedException` and `Error`.
+apart from `ObjectDestroyedException`, `ObjectNotLoadedException` and `Error`.
 Services throw the CLR types, not the kRPC ones: `service/SpaceCenter/src` has 145
 `throw new InvalidOperationException`, 73 `ArgumentException`, 46 `ArgumentNullException` and 22
 `ArgumentOutOfRangeException`, and no service file imports the kRPC exception namespace, so every
@@ -1028,9 +1029,10 @@ compiles it once with `compile` and passes the result, as the docstrings say.
 * A conceptual and tutorial page, `doc/src/tutorials/server-side-functions.rst`, covering what
   server side functions are and when to use them, custom events, computed streams, run-once
   functions and side effects, `Parameter`/`Lambda`/`Invoke` and how named parameters bind, `Select`
-  versus `Where`, per-element RPC calls, object constants, type promotion and `Cast`, and errors and
-  the yield limitation. The expression API examples cover Python, C#, Java and C++, the
-  clients with streams; the compiled examples cover Python and C#, the clients with compilers.
+  versus `Where`, per-element RPC calls, object constants, type promotion and `Cast`, errors and
+  the yield limitation, and catching `ObjectNotLoadedException` to keep a stream across a load. The
+  expression API examples cover Python, C#, Java and C++, the clients with streams; the compiled
+  examples cover Python and C#, the clients with compilers.
   C, Lua and cnano build functions with the generated stubs, without examples of their own.
 * The launch into orbit tutorial waits with events in place of busy loops, and the sub-orbital
   flight tutorial builds its events with each client's event helper. The control loops and
@@ -1097,10 +1099,10 @@ next one would be merely wasteful for a pure function and destructive for one wi
 function that stages, then waits on the result of staging, re-stages on every update for as long as
 the call keeps yielding.
 
-The one re-run is for a lookup that fails while the game is between states.
-[`stream-and-event-improvements.md`](../protocol/stream-and-event-improvements.md) holds that error, restores the function's
-state variables, and evaluates again on the next update. The game settling ends the window, so an
-effect before the lookup repeats for the length of a load, not for as long as a call yields.
+This covers a lookup of an object that is not loaded, during a load or on an unloaded vessel. It
+throws `ObjectNotLoadedException`
+([`stream-and-event-improvements.md`](../protocol/stream-and-event-improvements.md)), which ends the
+stream. A function that should survive it catches the exception and chooses its own result.
 
 **There is no side-effect-free exemption**, because the property is not decidable from the tree.
 Void calls, assignments and collection mutation are the *visible* effects, but a procedure that
@@ -1619,7 +1621,8 @@ encoded is pinned the same way, which is what #771 and #1051 are about, and it i
 
 * **#877 stream invalidation and #902 stream refcounting** are designed in [`stream-and-event-improvements.md`](../protocol/stream-and-event-improvements.md), which lands
   before this work. Function streams and events follow its model: each add is a new stream, they end with a
-  final error result, and they are held while the game is between states.
+  final error result, and they are never held. A function catches `ObjectNotLoadedException` to
+  survive a load.
 * **#903 reverse streams and batched calls** is independent of the tree-construction round trips,
   per [`batched-tree-construction.md`](batched-tree-construction.md). The overlap is elsewhere: the
   expression registry, storing server-side state and evaluating it per tick, is the same machinery

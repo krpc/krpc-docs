@@ -186,30 +186,47 @@ exception.
 
 ### Game State Changes
 
-During a load, the game has not yet rebuilt objects that will exist again. An error raised for that
-reason does not end a stream.
+A game object the game can build again is dormant (`GameObjectState.Dormant`). Examples are a
+vessel during a load, a part of an unloaded vessel, and the ship of an editor that has not opened it
+yet. A lookup of a dormant object throws its own exception, the counterpart of
+`ObjectDestroyedException`:
+
+```csharp
+/// <summary>
+/// The game object that a service object refers to exists, but is not loaded.
+/// For example, the game is loading, or the vessel carrying the part is unloaded.
+/// </summary>
+[KRPCException (Service = "KRPC")]
+public sealed class ObjectNotLoadedException : System.Exception
+```
 
 Server:
 
-* Lookups that fail because the game is between states throw a distinct internal exception, the
-  dormant case of `FlightGlobalsExtensions.NotResolvable` and its counterparts for parts and other
-  objects. `Services.HandleException` reports it to a direct RPC as the same
-  `InvalidOperationException` as now.
-* Every stream kind treats it as a procedure stream treats a yield. The update is skipped and the
-  stream keeps its last sent value.
-* The hold lasts until `GameState.Settled`. Then a stream over a surviving object carries on, and
-  one over an object that is gone gets `ObjectDestroyedException` and ends.
+* The dormant case of `NotResolvable`, in `FlightGlobalsExtensions`, `PartId` and the other service
+  objects, throws `ObjectNotLoadedException` in place of `InvalidOperationException`. A direct RPC
+  receives it too.
+* A procedure stream or a service event treats it as a yield. The update is skipped and the stream
+  keeps its last sent value.
+* The hold has no limit, and lasts while the object is dormant. A stream over a part of an unloaded
+  vessel resumes when the vessel loads. After a load, a stream over a surviving object carries on,
+  and one over an object that is gone gets `ObjectDestroyedException` and ends.
+* Function streams and function events are never held. They end on the error, as "Function Streams
+  and Events" describes.
+
+Client:
+
+* A hold sends no result. A program that needs to know streams `GameStateLoads`, or the vessel's
+  loaded state.
 
 Settling covers every loaded game. Today `SweepObjectStore` settles a state only when the vessel or
 editor part count is above zero and unchanged across two ticks, so an empty save never settles.
 
 * A count of zero settles too, once it has held for a longer window than a nonzero count. A load
   fills the list from empty, so the longer window keeps an early empty list from settling. The
-  window is sized in phase 5.
+  window is sized in phase 6.
 * An editor with no ship counts as zero parts.
-* Open: in the main menu `HighLogic.CurrentGame` is null, the state never settles, and a held stream
-  waits until a game is loaded. That outcome is defensible. The alternative is to classify everything
-  as destroyed when no game is loaded.
+* In the main menu `HighLogic.CurrentGame` is null and the state never settles, so a held stream
+  waits until a game is loaded.
 
 A load is signaled by a property, which a client can stream:
 
@@ -324,13 +341,19 @@ function. They follow the model above. What they add:
   final result, so no reservation is needed.
 * **A yield stays an error** (SSF, "A yield is an error, and nothing retries"). A yielding procedure
   continues through a continuation that a restart discards. Restarting re-runs it from scratch every
-  update, so it never completes. A transient error clears once the game settles, so a restart
-  succeeds.
-* **Held evaluations are rolled back.** A held function stream or function event evaluates again
-  from the start in the next update. The stream snapshots its function's `StateVariable` values
-  before each evaluation and restores them when the evaluation is held, so a held update leaves the
-  state as it found it. The snapshot is only taken for functions that declare state. Game writes
-  made before the throw are not undone, and repeat on the re-run.
+  update, so it never completes.
+* **Never held.** An `ObjectNotLoadedException` ends a function stream or function event like any
+  other error. A held re-run would repeat the state changes and game writes made before the throw.
+  A function that should survive a load or an unloaded vessel catches the exception, and its
+  handler chooses the result and the state:
+
+  ```
+  TryCatch(body, "KRPC", "ObjectNotLoadedException", message, handler)
+  ```
+
+  An event's handler returns `false`, so the event does not fire. A stream's handler can return a
+  last good value kept in a `StateVariable`. Without a handler, the stream ends at the first load or
+  vessel unload it meets, and the client sees the error.
 
 # Part 2. Current Implementation
 
@@ -415,7 +438,7 @@ extraction only, with no protocol change.
 | 3. Client terminal states | in all four: an error result ends the shared state; close and disconnect end every stream; waiters always wake; `on end` callback; event cursors; timed waits of streams and events return `bool`; update threads survive decode errors and throwing callbacks; the per-client bugs in the audit | the bulk of the work. The C++ lock changes overlap [stream-freezing-removal.md](stream-freezing-removal.md) |
 | 4. Start on add | server: `AddStream(call)` starts the stream, `StartStream` and the `start` flag go, and a first evaluation always sends; clients: results for unknown ids buffered, `start()` and the `start` argument go, a callback added to a stream with a value is called with it; the protocol docs and client guides | depends on 3. **Breaking:** old clients fail on `AddStream` |
 | 5. One stream per add (#902) | `AddStream` always creates a stream; the re-add path in `Core.AddStream` and the server's comparison of calls go; the protocol docs, and the C#, Java and C++ guides on stream equality | clients need no code change. **Breaking:** repeated equal adds without a remove now accumulate streams |
-| 6. Game state | dormant exception and skip; zero counts settle; `KRPC.GameStateLoads` | in-game tests: a stream over a surviving vessel across a quickload, one over a vessel removed by it, a held stream in an empty save |
+| 6. Game state | `KRPC.ObjectNotLoadedException` for dormant lookups; procedure streams and service events skip on it; zero counts settle; `KRPC.GameStateLoads` | in-game tests: a stream over a surviving vessel across a quickload, one over a vessel removed by it, a held stream in an empty save, a stream over a part held while its vessel is unloaded. **Breaking:** C#, Java and C++ code catching `InvalidOperationException` for a dormant object now sees the new type. Python code catching `RuntimeError` is unaffected |
 
 ## Tests
 
@@ -436,7 +459,8 @@ extraction only, with no protocol change.
 * Core: two equal streams each evaluated and each sent a result, the high-water rule,
   the update loop surviving a throwing stream, `GameStateLoads` ignoring a part-death sweep, a zero
   count settling.
-* SSF, once rebased: a held function evaluation restoring its state variables.
+* SSF, once rebased: a function stream that catches `ObjectNotLoadedException` surviving a
+  quickload, and one that does not ending with it.
 
 ## Decisions
 
@@ -444,8 +468,11 @@ Decided 2026-10-10:
 
 * Timed waits of streams and events return `bool`, changed in place in every client. The binary
   break in the C# and Java libraries is accepted.
-* A held function evaluation restores its `StateVariable` values (SSF, after rebasing).
-* Holds are bounded by fixing the settle check for zero counts, not by a time limit.
+* A dormant lookup throws `KRPC.ObjectNotLoadedException`, for direct RPCs and streams alike.
+* Function streams and function events are never held. The function catches
+  `ObjectNotLoadedException` to survive a load. A held re-run would need a deep copy of
+  collection state, and would still repeat game writes.
+* A hold has no time limit. Fixing the settle check for zero counts makes every load settle.
 * The load counter is `KRPC.GameStateLoads`.
 * Stream deduplication is removed, and every add is a new stream. It was added to save results on
   the wire for streams such as altitude. Over events and function streams it needs reference counts,
@@ -462,6 +489,8 @@ Decided 2026-10-10:
 To confirm:
 
 1. A server-side removal is an error result, `KRPC.StreamRemovedException`, with no wire change.
-2. Transient errors are held, not sent. The alternative is to send them as non-final errors, which
-   would need a wire field and leaves every client to decide what a non-final error means.
+2. A procedure stream or service event over a dormant object is held for as long as the object is
+   dormant, e.g. a part until its vessel loads. The alternative is to never hold, so that
+   `ObjectNotLoadedException` ends the stream. Sending a non-final error is rejected, as it needs a
+   wire field and leaves every client to decide what a non-final error means.
 3. #877 is answered by per-stream endings plus `GameStateLoads`, not by a global invalidation.
