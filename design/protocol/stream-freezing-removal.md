@@ -1,6 +1,9 @@
 # Removing C++ stream freezing in favor of expression streams (issue #357 follow-up)
 
-**Status:** proposal — direction agreed, no action in v0.6.0 (2026-07-21); supersedes the earlier [#901](https://github.com/krpc/krpc/issues/901) freezing design, which #901 is to be repurposed for.
+**Status:** superseded (2026-10-11). Freezing is removed outright in #1118, with no deprecation
+release, ahead of the stream and event work ([stream-and-event-improvements.md](stream-and-event-improvements.md)),
+whose changes would break it further. Holding the tick and expression streams, both in 0.7.0, give
+values from one physics tick. The analysis below is kept as the record.
 
 Supersedes the earlier design for issue #901 ("stream freezing in all clients", agreed 2026-07-03),
 which proposed porting freezing to Python, C# and Java and redesigning the C++ implementation. That

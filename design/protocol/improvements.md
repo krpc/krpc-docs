@@ -214,7 +214,7 @@ C++). Not yet implemented.
 
 ### 8. Stream freezing — [#901](https://github.com/krpc/krpc/issues/901) — **out of scope**
 
-**Status: superseded** — see [stream-freezing-removal.md](stream-freezing-removal.md).
+**Status: superseded** — see [stream-freezing-removal.md](stream-freezing-removal.md). Freezing was removed by #1118, as part of [stream-and-event-improvements.md](stream-and-event-improvements.md).
 
 **Problem.** Stream values update asynchronously, so two reads (e.g. `ut` and a vessel's
 orbital anomaly, or position and velocity) can come from different physics frames —
