@@ -776,8 +776,7 @@ becomes an error on the event's stream.
 
 **Every `AddFunctionStream` and every `AddEvent` creates a new stream**, per the rules in
 [`stream-and-event-improvements.md`](../protocol/stream-and-event-improvements.md). Function streams are never shared, so two streams of one
-function are two evaluations per update. The stack deduplicates them by `Expression` object as
-written, and the rebase onto that work removes it.
+function are two evaluations per update.
 
 **Streams are not unified with procedure-call streams on the server, and are in the clients where
 the language allows.** `AddStream` takes an encoded `ProcedureCall` and `AddFunctionStream` takes an
@@ -1032,7 +1031,8 @@ compiles it once with `compile` and passes the result, as the docstrings say.
   versus `Where`, per-element RPC calls, object constants, type promotion and `Cast`, errors and
   the yield limitation, and catching `ObjectNotLoadedException` to keep a stream across a load. The
   expression API examples cover Python, C#, Java and C++, the clients with streams; the compiled
-  examples cover Python and C#, the clients with compilers.
+  examples cover Python and C#, the clients with compilers. The `ObjectNotLoadedException` example
+  covers all four, with the expression API in C#, Java and C++.
   C, Lua and cnano build functions with the generated stubs, without examples of their own.
 * The launch into orbit tutorial waits with events in place of busy loops, and the sub-orbital
   flight tutorial builds its events with each client's event helper. The control loops and
