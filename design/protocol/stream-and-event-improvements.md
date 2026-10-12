@@ -1,8 +1,8 @@
 # Stream and Event Improvements and Fixes
 
-**Status:** in progress (2026-10-12). All phases are implemented and reviewed three times. The
-stream and event PR is not yet open. See "Implementation". The SSF stack is rebased onto an earlier
-version of the phases.
+**Status:** in progress (2026-10-12). All phases are implemented and reviewed, in PR #1122. The
+Python client is the reference, see "Client Reference". Divergences are under "Implementation".
+The SSF stack is rebased onto an earlier version of the phases.
 
 Four parts shipped first as their own PRs, all merged:
 
@@ -582,6 +582,93 @@ Fixed 2026-10-12, after a third review:
 * All clients: an id noted but never registered is dropped on `RemoveStream`.
 * C#: old stubs note ids from a `GetServices` listing, as Java does.
 
+Fixed 2026-10-12, after a fourth review:
+
+* Python and Java: a callback's first call deadlocked with the update thread, which waited for the
+  callback's lock. The update thread now queues its values for the adding thread, as C# did.
+* C#: a close could replace a server ending with the closed error. All clients now keep it in
+  `to_end`.
+* Late event callbacks: C# and Java counted value callbacks on the event's stream. All clients now
+  count only event callbacks, when they are called.
+* All clients: a removed callback could be called once more, and take a firing. Update callbacks
+  ran after close. C# and Java kept results after close.
+* Python: a `KeyboardInterrupt` during a first call or an end callback on a user thread was
+  swallowed.
+* C++: `close()` hung after a raw `get_condition_lock().lock()`. The hold counts are replaced by
+  a re-entrant mutex that knows its owner.
+
+# Client Reference
+
+Decided 2026-10-12, after a fourth review found the clients diverging again: the Python client is
+the reference implementation. C#, Java and C++ follow its structure and names, and differ only where
+the language forces it. A behavior change lands in Python first, then is ported.
+
+## State
+
+| Object | State | Guarded by |
+|---|---|---|
+| Manager | registry `id -> stream`; `issued` (highest id noted); `unregistered` ids; kept results per id (latest value, then an ending); `to_end` (streams out of the registry and not yet ended, with each ending); `closed`; `close_requested` | update lock (re-entrant), except `close_requested`, a flag |
+| Stream | value, `updated`, `version` (values received), `fired` (true values received), `callbacks_fired` (highest firing passed to an event callback), `replaying` (the firing a replay in flight will pass), ending, callbacks, end callbacks | its condition, then the update lock |
+| Callback | function, kind (value or event), `version` passed, `adding`, `missed` queue | its own re-entrant lock, held while it runs; `adding` and `missed` under the update lock |
+| Event handle | `seen`, the firing count when a `wait` on it last returned | the stream's condition |
+
+## Locks
+
+* Order: a stream condition, then the update lock. The RPC lock, then the update lock. A callback
+  lock, then the update lock. No thread waits on another thread while it holds the update lock.
+* Stream conditions and callback locks are re-entrant, and can say whether the current thread holds
+  them. C++ wraps its mutex to provide this.
+* The update thread never blocks on a lock a user thread can hold. It takes a stream condition in
+  50 ms timed tries, and gives up once `close_requested` is set. It takes a callback lock in 10 ms
+  timed tries, and gives up when `close_requested` or the callback's `adding` is set.
+
+## Thread Roles
+
+| Thread | Does |
+|---|---|
+| RPC caller | notes ids from replies in reply order (`note_issued`), and removals on success only (`note_removed`), under the RPC lock |
+| Update thread | decodes results under the update lock; then per stream, under its condition, stores the value or ends it and notifies; then calls the callbacks with no lock held; then the update callbacks, unless `closed` |
+| Adding thread | registers a callback, then makes its first call after a non-blocking try of the callback lock. While the first call runs, `adding` is set and the update thread queues its values in `missed`. The adding thread passes them on, and clears `adding` in the same update-lock hold that finds `missed` empty |
+| Closing thread | sets `close_requested`; moves every registered stream to `to_end` with the closed error; ends `to_end` in passes of 10 ms tries until it is empty; joins the update thread unless it is that thread or holds a stream condition or the update condition |
+
+## Rules
+
+* A final result moves its stream from the registry to `to_end` as it is decoded. The update thread
+  or the closing thread then ends it with that result, so a close never replaces a server ending.
+* A callback is passed a version only if it is still added, the version is newer than its last, and
+  the stream has not ended. A value queued in `missed` before the end is still passed.
+* An event callback that is passed a firing raises `callbacks_fired`. A late event callback replays
+  only if `fired > max(seen, callbacks_fired, replaying)`. Value callbacks on the event's stream do
+  not count. A replay reserves its firing in `replaying`, and clears it if the callback is not called.
+* A remove of a stream in `to_end` ends it with that ending, and sends no `RemoveStream`.
+* An exception from a callback is reported on the update thread. On another thread, Python lets a
+  `BaseException` that is not an `Exception` propagate, and Java an `Error`. One from a first call
+  removes the callback first, so a failed add adds nothing. One from an end callback during a close
+  or a remove is raised once every stream has ended and the `RemoveStream` call is sent.
+* A result for an id above `issued`, or in `unregistered`, is kept, unless `closed`.
+
+## Conformance Tests
+
+Each client has a test of each behavior, named after it in the client's style. With the per-client
+list under "Tests", these make the conformance set.
+
+| Behavior | Test |
+|---|---|
+| Values during a first call reach the callback on the adding thread, and the update thread does not wait | values during a first call are queued |
+| A first call can wait for later values of its stream | the first call of a callback waits for updates |
+| The update thread gives up on a callback lock once close is requested | close while an update waits for a first call |
+| Close from a first call, and from a callback on the update thread | close from the first call of a callback; close from a callback |
+| A removed callback is not called, and takes no firing | a removed callback is not called; a removed callback does not take a firing |
+| A firing passed to a value callback is still replayed to a late event callback | a firing passed to a value callback is replayed |
+| Update callbacks stop once closed | update callbacks are not called once closed |
+| A closing thread holding a stream's condition ends it with its server ending | a closer holding the condition keeps a server ending |
+| End callbacks | end callback on remove, on error, on close, on connection failure, added after the end; remove end callback |
+| A fatal exception from a first call propagates (Python, Java) | a first call propagates keyboard interrupt / an error |
+| A value queued as a first call ends is passed | a value queued as a first call ends is passed |
+| A replay that does not call its callback leaves the firing | a callback removed before its replay takes no firing |
+| A remove after a decoded final result keeps the server ending | remove keeps a server ending |
+| A fatal exception from an end callback does not stop a close or a remove (Python, Java) | close / remove with an end callback that exits (or throws an error) |
+
 # Implementation
 
 All phases are built as one change, with in-game tests for phase 6. Where it departs from the
@@ -591,13 +678,14 @@ design:
 |---|---|
 | Buffering | The C# and C++ stubs mark the calls that return a stream or event id. Java finds them from the stubs' return types |
 | C# API | `IConnection.Invoke` gains an overload taking the return type. A class implementing `IConnection` must add it |
-| C++ | Each `Stream` and `Event` object has its own condition lock, so threads share an event through copies. A stream counts each thread's holds through `acquire()`, so one thread can hold the condition through several handles. Values are decoded by the handle, so a value that fails to decode is thrown to the reader and does not end the stream. A callback is skipped for such a value, and the failure is logged once per stream |
+| C++ | Each stream has one `krpc::RecursiveMutex` and `krpc::Condition`, shared by its handles, which give the re-entrancy and owner query of Python's `Condition` over an `RLock`. Each handle has its own `std::unique_lock` over the mutex. Values are decoded by the handle, so a value that fails to decode is thrown to the reader and does not end the stream. A callback is skipped for such a value, and the failure is logged once per stream |
 | Java | A closed connection ends streams with `StreamException`, caused by `ConnectionException`, as `get` and the waits cannot throw an `IOException`. The untimed waits stay `void` |
-| Close | Java's close never joins the update thread. `getCondition()` is public API used with `synchronized`, which rules out a timed lock, so close and disconnect end each stream under the update lock and notify its condition from short-lived threads. Storing a value, and ending one stream, still wait on a condition another thread holds |
+| Close | Java's close never joins the update thread. `getCondition()` is public API used with `synchronized`, which rules out a timed lock. Close and disconnect move every stream to `to_end`, end them under the update lock, and notify their conditions from short-lived threads. Storing a value still waits on a condition another thread holds |
 | Waits across streams | A thread holding one stream's lock while it waits for another stream's next value stalls the update thread when the first stream updates, in every client. Only close and disconnect are fixed for this pattern |
-| Late callbacks | The adding thread tries the callback's lock without blocking, and skips the first call if the update thread holds it, as that delivery carries a newer value. An event that has ended replays no firing to a late callback, though `wait` still returns for it |
-| Close join | Python, C# and C++ skip the join only when the closing thread holds the lock of a stream still registered. C++ counts a raw `get_condition_lock().lock()` as a hold from the next call on that handle |
-| C++ | The update thread takes a stream's lock with `try_lock` and a short sleep, as `std::condition_variable` needs a plain mutex. The stream manager owns a copy of the client, so streams outlive the copy that added them |
+| Late callbacks | An event that has ended replays no firing to a late callback, though `wait` still returns for it |
+| Close join | Python, C# and C++ skip the join when the closing thread holds a stream condition or the update condition |
+| Update callbacks | Only Python and C++ have connection-wide update callbacks |
+| C++ | The stream manager owns a copy of the client, so streams outlive the copy that added them. The registry holds weak pointers, and drops an expired one when a result arrives for it |
 | Java, C# | A stub lookup that fails falls back to the server's `GetServices`, fetched once, so a stream id is still noted with old or missing stubs |
 
 Parts of the design shipped in the earlier PRs, which made these choices:
