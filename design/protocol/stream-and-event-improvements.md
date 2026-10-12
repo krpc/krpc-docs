@@ -1,12 +1,30 @@
 # Stream and Event Improvements and Fixes
 
-**Status:** proposal (2026-10-10). Covers [#877](https://github.com/krpc/krpc/issues/877),
+**Status:** in progress (2026-10-12). All phases are implemented and reviewed three times. The
+stream and event PR is not yet open. See "Implementation". The SSF stack is rebased onto an earlier
+version of the phases.
+
+Four parts shipped first as their own PRs, all merged:
+
+| PR | Part |
+|---|---|
+| #1118 | C++ stream freezing removal |
+| #1119 | `KRPC.UnsupportedSceneException` for the game scene check |
+| #1120 | `KRPC.ObjectNotLoadedException` for dormant lookups |
+| #1121 | game state settling with no vessels and across scene changes, and `KRPC.GameStateLoads` |
+
+The stream and event PR builds on them. Its phase 6 holds streams over the two exceptions, sends an
+event's firing before an error from the same update, and adds TestServer tests of an event that
+ends without firing.
+
+Covers [#877](https://github.com/krpc/krpc/issues/877),
 [#902](https://github.com/krpc/krpc/issues/902), [#198](https://github.com/krpc/krpc/issues/198) and
 [#315](https://github.com/krpc/krpc/issues/315). Supersedes [stream-invalidation.md](stream-invalidation.md)
 and [stream-refcounting.md](stream-refcounting.md), which were never implemented. Their decisions are
 folded in here, and changed where noted. #902 is fixed by removing stream deduplication, in place of
 the reference count. The message formats are unchanged. The `KRPC` service drops `StartStream` and
-the `start` flag of `AddStream`, which breaks old clients.
+the `start` flag of `AddStream`, which breaks old clients. The C++ client's stream freezing was
+removed outright by #1118, in place of the deprecation plan in [stream-freezing-removal.md](stream-freezing-removal.md).
 
 This work lands before server side functions ([server-side-functions.md](../server-side-functions/server-side-functions.md)),
 which builds on it. SSF then adds only function streams and function events.
@@ -16,7 +34,7 @@ The doc has three parts:
 1. **Design**: what streams and events mean, split into what the server does and what a client
    does. It builds up from a single stream to events.
 2. **Current implementation**: an audit of `main`, and where it departs from the design.
-3. **Phases**: the PRs that bring the implementation in line with the design.
+3. **Phases**: the steps that bring the implementation in line with the design.
 
 # Part 1. Design
 
@@ -67,14 +85,15 @@ Server:
 
 Client:
 
-* **Results for unknown ids are buffered.** The add reply arrives on the RPC connection and the
-  first result on the stream connection, so the result can arrive first. The client keeps every
-  result for an id above the highest id it has registered, in order. The add reply registers the id
-  and applies them.
-* A result for an id at or below that mark, and absent, belongs to an ended stream and is dropped.
-  RPC replies are ordered on one connection, so the client's ids are registered in increasing order.
+* **Results for unknown ids are kept.** The add reply arrives on the RPC connection and the first
+  result on the stream connection, so the result can arrive first. The client notes each id from
+  the add reply while it holds the RPC lock, in reply order. Several threads can add at once, so
+  ids are noted in increasing order but registered in any order.
+* For an id above the highest noted id, or noted but not registered yet, the client keeps the
+  latest value and any ending. Registering the id applies them under the new stream's lock.
+* A result for any other absent id belongs to an ended stream and is dropped.
 * A callback added to a stream that has a value is called once with it, so it sees the first value
-  however the add and the first result race.
+  however the add and the first result race. An event callback follows "Callbacks" under "Events".
 * The buffer is a stopgap. A single connection ([single-connection.md](single-connection.md))
   orders the add reply before the first result, and removes it.
 
@@ -124,7 +143,7 @@ carrying an error.
 |---|---|---|
 | Error in evaluation or encoding | the error | the typed exception |
 | Server removed it, e.g. a service event that has finished | `KRPC.StreamRemovedException` | the typed exception |
-| Removed by the client | none | `StreamError` "removed" |
+| Removed by the client | none | the client's removed-stream error: `StreamError` in Python and C++, `InvalidOperationException` in C#, `StreamException` in Java |
 | Connection closed, either side | none: the connection is gone | the client's closed-connection error |
 
 **A `StreamResult` whose `ProcedureResult` has an `error` is final.** The server already removes a
@@ -145,8 +164,9 @@ Server:
 * Sends the error once, in a final result, then removes the stream.
 * **No stream can stop the update loop.** The server catches around each stream's update and turns
   the exception into an error result.
-* Every stream kind encodes its value inside its own update, because the encode in the write covers
-  every stream of a client. An encode failure then fails one stream.
+* A procedure stream encodes its value inside its own update, because the encode in the write
+  covers every stream of a client. An encode failure then fails one stream. An event's `bool`
+  cannot fail to encode, and is encoded in the write.
 
 Client:
 
@@ -156,6 +176,8 @@ Client:
   `on end` callbacks and drops the map entry.
 * Every later read and `wait` on every handle raises the stored error. Re-raising does not
   grow the error's traceback.
+* A value that fails to decode ends the stream, and the client sends `RemoveStream` for it from a
+  thread other than the update thread. The C++ client decodes in the handle, see "Implementation".
 * **The update thread never dies.** A decode failure for one result becomes that stream's error. A
   failure reading the connection ends the connection: every stream ends with the closed-connection
   error and every waiter wakes. A user callback that throws is reported and the thread continues,
@@ -180,6 +202,9 @@ exception.
   Java library must be recompiled, as the return type is part of the compiled method reference there.
 * Stream callbacks receive values only. Errors and endings are not passed, so typed callback
   signatures stay typed.
+* No stream or manager lock is held while a callback runs. Each callback has its own lock, held
+  while it runs, so one callback never runs on two threads at once. It records the version of the
+  last value it was given, and an older value, or a value after the stream ended, is skipped.
 * Each handle can take an `on end` callback, which receives the ending exception. It is called once,
   after the final result is applied and outside the manager's locks, so it can call RPCs. Without it,
   a program driven only by callbacks never learns that its stream ended.
@@ -187,8 +212,8 @@ exception.
 ### Game State Changes
 
 A game object the game can build again is dormant (`GameObjectState.Dormant`). Examples are a
-vessel during a load, a part of an unloaded vessel, and the ship of an editor that has not opened it
-yet. A lookup of a dormant object throws its own exception, the counterpart of
+vessel during a load, a part of an unloaded vessel, a contract before the contract system has parsed
+it, and the ship of an editor that has not opened it yet. A lookup of a dormant object throws its own exception, the counterpart of
 `ObjectDestroyedException`:
 
 ```csharp
@@ -210,6 +235,12 @@ Server:
 * The hold has no limit, and lasts while the object is dormant. A stream over a part of an unloaded
   vessel resumes when the vessel loads. After a load, a stream over a surviving object carries on,
   and one over an object that is gone gets `ObjectDestroyedException` and ends.
+* A procedure called outside its game scenes throws `KRPC.UnsupportedSceneException`, in place of
+  `RPCException`. A procedure stream or a service event holds on it as on `ObjectNotLoadedException`,
+  from its first evaluation, so a stream of a flight-only property survives a visit to the space
+  center. A stream added in the wrong scene waits for a scene where the procedure is available.
+* A procedure stream held from its first evaluation sends nothing, so a read waits for the object to
+  load. A held event still sends its first result, `false`.
 * Function streams and function events are never held. They end on the error, as "Function Streams
   and Events" describes.
 
@@ -221,12 +252,12 @@ Client:
 Settling covers every loaded game. A state settles once its vessel or editor part count is
 unchanged across two ticks.
 
-* A count of zero settles too, once it has held for a longer window than a nonzero count. A load
-  fills the list from empty, so the longer window keeps an early empty list from settling. The
-  window is sized in phase 6.
+* A count of zero settles too, once it has held for 1 s and 10 updates. No load was measured to
+  list zero vessels before its first one, so the window is a margin.
 * An editor with no ship counts as zero parts.
-* In the main menu `HighLogic.CurrentGame` is null and the state never settles, so a held stream
-  waits until a game is loaded.
+* After a scene load request, nothing settles until the next scene starts, as the old scene can run
+  more physics ticks first.
+* The server stops in the main menu, so a held stream ends with the closed connection there.
 
 A load is signaled by a property, which a client can stream:
 
@@ -320,11 +351,18 @@ Server:
 | Timeout elapses | n/a | returns `false` |
 | Stream ended by an error | raises the typed error | raises the typed error |
 | Stream removed by the server | raises `KRPC.StreamRemovedException` | raises `KRPC.StreamRemovedException` |
-| Removed by the client, through any copy of the handle | raises `StreamError` | raises `StreamError` |
+| Removed by the client, through any copy of the handle | raises the client's removed-stream error | same |
 | Connection closed | raises the closed-connection error | same |
 
 * A firing not yet seen when the ending arrives wins. `wait` returns, and the next `wait` raises.
-* An event callback is called once per firing.
+
+### Callbacks
+
+* An event callback is called once per firing that arrives after it is added.
+* The server sends no `false` after a firing, so an event's latest value stays `true`. A callback
+  added later is called straight away, once, only if the event has a firing not yet passed to a `wait` on
+  that handle, or to any of the event's callbacks. A handle that never waited and had no callbacks
+  therefore replays its last firing.
 
 ## Function Streams and Events
 
@@ -332,8 +370,7 @@ Server side functions land after this work and add `KRPC.AddFunctionStream` and 
 function. They follow the model above. What they add:
 
 * **One stream per add.** Every `AddFunctionStream`, and every `AddEvent` over a function, creates a
-  new stream. The SSF stack deduplicates them by
-  `Expression` object today, and the rebase removes that.
+  new stream.
 * **`StateVariable` state** belongs to the function, and every evaluation advances it. Two streams of
   one function advance it twice per update. A separate state needs a separate build.
 * **Errors.** An exception from a function, and a value that fails to encode, end only that stream.
@@ -353,12 +390,14 @@ function. They follow the model above. What they add:
 
   An event's handler returns `false`, so the event does not fire. A stream's handler can return a
   last good value kept in a `StateVariable`. Without a handler, the stream ends at the first load or
-  vessel unload it meets, and the client sees the error.
+  vessel unload it meets, and the client sees the error. `KRPC.UnsupportedSceneException` is caught
+  the same way, for a function that calls a procedure outside its game scenes.
 
 # Part 2. Current Implementation
 
-The audit describes `main` with phase 0 applied. Phase 0 moves fixes already written in the SSF
-stack, and changes no part of the model. Each defect names the phase that fixes it.
+The audit dates from 2026-10-10, before the split into #1118 to #1121. It describes `main` with
+phase 0 applied. Phase 0 moves fixes already written in the SSF stack, and changes no part of the
+model. Each defect names the phase or PR that fixes it.
 
 ## Server
 
@@ -388,8 +427,8 @@ stack, and changes no part of the model. Each defect names the phase that fixes 
 | **A server-side removal is silent**, and an event never started is never removed | 2 |
 | **Events start lazily**, so a firing of an `AddEvent` condition before the first `wait` is never seen | 4 |
 | **Equal adds share one stream.** One `RemoveStream` ends it for every handle (#902). A re-add of a stream marked for removal returns an id the client has dropped, which works only because `Stream.Start` resends the value | 5 |
-| **A dormant object raises the same error as a failure.** A dormant lookup throws `InvalidOperationException`, the type of many real errors, so a stream, a function or client code cannot tell "not loaded" from a failure. A stream is terminal on any error. During a quickload, a stream over a vessel the game has not rebuilt yet is removed, though the vessel exists in the loaded save. This is the #877 symptom in its current form. A stream over a part also ends when its vessel unloads | 6 |
-| **An empty save never settles.** `SweepObjectStore` settles a state only when the vessel or editor part count is above zero. In a save with no vessels, a vessel that is gone is reported as between states, never as destroyed. Under the design, a stream over it would be held forever | 6 |
+| **A dormant object raises the same error as a failure.** A dormant lookup throws `InvalidOperationException`, the type of many real errors, so a stream, a function or client code cannot tell "not loaded" from a failure. A stream is terminal on any error. During a quickload, a stream over a vessel the game has not rebuilt yet is removed, though the vessel exists in the loaded save. This is the #877 symptom in its current form. A stream over a part also ends when its vessel unloads | #1120 gives the dormant lookup its own exception; phase 6 holds the stream on it in place of ending it |
+| **An empty save never settles.** `SweepObjectStore` settles a state only when the vessel or editor part count is above zero. In a save with no vessels, a vessel that is gone is reported as between states, never as destroyed. Under the design, a stream over it would be held forever | #1121 |
 | **A failed write drops a final result.** An error result is marked for removal before `Stream.Write`. A caught `ServerException` loses the error but the stream is still removed. The connection is failing in that case, so the closed-connection ending covers it | none |
 
 ## Clients
@@ -418,8 +457,8 @@ types are reconstructed correctly in all four clients, typed by service and name
 
 # Part 3. Phases
 
-Each phase can be merged on its own, and all of them land before server side functions. The SSF
-stack is then rebased onto the phases, and its function streams and events adopt the model as
+The phases land together as one PR, before server side functions. Each phase is a self-contained
+step within it, built and tested in order. The SSF stack is then rebased onto the phases, and its function streams and events adopt the model as
 listed under "Function Streams and Events".
 
 ## Phase 0: Fixes Moved Out of SSF
@@ -439,10 +478,10 @@ extraction only, with no protocol change.
 |---|---|---|
 | 1. Server hardening | catch around `stream.Update()`; encode procedure streams in `UpdateInternal`; prune `protoResultCache` on removal; the high-water rule for management calls; document `Service.Event.Trigger` as main thread only and fix `OnTimer`; reproduce the stream over a procedure returning an event, and if confirmed have `AddStream` reject such a procedure | no protocol change |
 | 2. Final results | `KRPC.StreamRemovedException`; `Service.Event.Remove` records a pending end that is sent after any unsent firing, and `EventStream` no longer calls `Core.RemoveStream` | protocol docs: states, an error result is final |
-| 3. Client terminal states | in all four: an error result ends the shared state; close and disconnect end every stream; waiters always wake; `on end` callback; event cursors; timed waits of streams and events return `bool`; update threads survive decode errors and throwing callbacks; the per-client bugs in the audit | the bulk of the work. The C++ lock changes overlap [stream-freezing-removal.md](stream-freezing-removal.md) |
-| 4. Start on add | server: `AddStream(call)` starts the stream, `StartStream` and the `start` flag go, and a first evaluation always sends; clients: results for unknown ids buffered, `start()` and the `start` argument go, a callback added to a stream with a value is called with it; the protocol docs and client guides | depends on 3. **Breaking:** old clients fail on `AddStream` |
+| 3. Client terminal states | in all four: an error result ends the shared state; close and disconnect end every stream; waiters always wake; `on end` callback; event cursors; timed waits of streams and events return `bool`; update threads survive decode errors and throwing callbacks; the per-client bugs in the audit | the bulk of the work. Builds on the C++ freezing removal in #1118 |
+| 4. Start on add | server: `AddStream(call)` starts the stream, `StartStream` and the `start` flag go, and a first evaluation always sends; clients: results for unknown ids buffered, `start()` and the `start` argument go, a callback added to a stream with a value is called with it; the protocol docs and client guides | depends on 3. **Breaking:** an old client's `AddStream(call, false)` succeeds, as the server drops the extra argument, and starts the stream. The client then fails on `StartStream` at its first read, wait or start, and leaves a server stream it never registered |
 | 5. One stream per add (#902) | `AddStream` always creates a stream; the re-add path in `Core.AddStream` and the server's comparison of calls go; the protocol docs, and the C#, Java and C++ guides on stream equality | clients need no code change. **Breaking:** repeated equal adds without a remove now accumulate streams |
-| 6. Game state | `KRPC.ObjectNotLoadedException` for dormant lookups; procedure streams and service events skip on it; zero counts settle; `KRPC.GameStateLoads` | in-game tests: a stream over a surviving vessel across a quickload, one over a vessel removed by it, a held stream in an empty save, a stream over a part held while its vessel is unloaded. **Breaking:** C#, Java and C++ code catching `InvalidOperationException` for a dormant object now sees the new type. Python code catching `RuntimeError` is unaffected |
+| 6. Game state | procedure streams and service events hold on `KRPC.ObjectNotLoadedException` and `KRPC.UnsupportedSceneException`; an event's firing is sent before an error from the same update; TestServer tests of an event that ends without firing. The exceptions, zero count settling and `KRPC.GameStateLoads` shipped in #1119, #1120 and #1121 | in-game tests: a stream over a surviving vessel across a quickload, one over a vessel removed by it, a stream in an empty save, a stream over a part held while its vessel is unloaded, a flight-only stream across a visit to the editor |
 
 ## Tests
 
@@ -461,8 +500,9 @@ extraction only, with no protocol change.
   * two equal adds giving two ids, and removing one leaving the other live;
   * remove then add of an equal stream receiving a value.
 * Core: two equal streams each evaluated and each sent a result, the high-water rule,
-  the update loop surviving a throwing stream, `GameStateLoads` ignoring a part-death sweep, a zero
-  count settling.
+  the update loop surviving a throwing stream, a rate set before the first update, a stream held on
+  the game scene check. `GameStateLoads` ignoring a part-death sweep, and the zero count settling,
+  shipped with #1121. A contract across a load is partly covered by #1120.
 * SSF, once rebased: a function stream that catches `ObjectNotLoadedException` surviving a
   quickload, and one that does not ending with it.
 
@@ -489,12 +529,89 @@ Decided 2026-10-10:
   shared later, where sharing is not observable.
 * Streams start on add. `StartStream` and the `start` flag are removed, which breaks old clients.
   Until the single connection lands, clients buffer results for unknown ids.
+* A server-side removal is an error result, `KRPC.StreamRemovedException`, with no wire change.
+* A procedure stream or service event over a dormant object is held for as long as the object is
+  dormant, e.g. a part until its vessel loads. Sending a non-final error was rejected, as it needs
+  a wire field and leaves every client to decide what a non-final error means.
+* #877 is answered by per-stream endings plus `GameStateLoads`, not by a global invalidation.
+* The phases land as one PR.
 
-To confirm:
+Decided 2026-10-11, after a review of the implementation:
 
-1. A server-side removal is an error result, `KRPC.StreamRemovedException`, with no wire change.
-2. A procedure stream or service event over a dormant object is held for as long as the object is
-   dormant, e.g. a part until its vessel loads. The alternative is to never hold, so that
-   `ObjectNotLoadedException` ends the stream. Sending a non-final error is rejected, as it needs a
-   wire field and leaves every client to decide what a non-final error means.
-3. #877 is answered by per-stream endings plus `GameStateLoads`, not by a global invalidation.
+* C++ stream freezing is removed, with no deprecation release. The stream changes
+  broke it further: the server sends a final result and a first value once, and freezing kept only
+  the last skipped message. Holding the tick (`KRPC.HoldTick`) and expression streams, both in
+  0.7.0, give values from one physics tick. The removal shipped first, as #1118.
+* A client keeps at most the latest value and an ending for an id not registered yet. A new stream
+  has no callbacks, and an event's firings coalesce per handle, so nothing else is observable. A
+  noted id that is never wrapped, e.g. a raw `KRPC.AddStream` call, then costs one entry.
+* The kept results are stored under the new stream's lock, so a later update lands after them.
+* A value that fails to decode ends the client stream and sends `RemoveStream` for it. The C++
+  client is the exception, see "Implementation".
+* No lock is held while a callback runs. Each callback records the version of the last value it
+  was given, and a delivery of an older value is skipped. This covers the first call that
+  `add_callback` makes with the current value.
+* Closing a connection never waits on a lock its caller holds. The closing thread ends every
+  stream before it joins the update thread, and the update thread gives up on a held stream lock
+  once a close is requested.
+* An expression cannot call a procedure that returns an event, as `AddStream` cannot stream one.
+
+Decided 2026-10-11, after a second review:
+
+* `AddStream` and expressions refuse a procedure returning a stream as well as an event. A stream
+  over `KRPC.AddStream` added a stream per update while the update loop enumerated them.
+* A late event callback is called only for a firing not yet passed to a `wait` on its handle or to a
+  callback. The server still sends no `false` after a firing.
+* A procedure outside its game scenes throws `KRPC.UnsupportedSceneException`, and streams hold on
+  it from the start. Functions can catch it.
+* Deliveries to one callback are serialized by a lock of its own, and recheck the version and the
+  ending under it.
+* Ending every stream on close or disconnect takes stream locks in repeated non-blocking passes, so
+  a thread holding one stream's lock while it waits on another is woken. Close does not join the
+  update thread while the closing thread holds a stream lock.
+* An error from an event's update waits for an unsent firing, as a server-side removal does.
+
+Fixed 2026-10-12, after a third review:
+
+* Python: `close()` hung while its caller held `stream_update_condition`.
+* C#: `Dispose` from a callback's first call deadlocked with the update thread.
+* C++: a late event callback replayed a firing after the end, and its replay was lost to a
+  concurrent `false`. Event callbacks are now gated on the firing count. The first call of a late
+  callback blocked on the callback lock, and `remove()` after `get_condition_lock().lock()`
+  deadlocked.
+* All clients: an id noted but never registered is dropped on `RemoveStream`.
+* C#: old stubs note ids from a `GetServices` listing, as Java does.
+
+# Implementation
+
+All phases are built as one change, with in-game tests for phase 6. Where it departs from the
+design:
+
+| Area | Divergence |
+|---|---|
+| Buffering | The C# and C++ stubs mark the calls that return a stream or event id. Java finds them from the stubs' return types |
+| C# API | `IConnection.Invoke` gains an overload taking the return type. A class implementing `IConnection` must add it |
+| C++ | Each `Stream` and `Event` object has its own condition lock, so threads share an event through copies. A stream counts each thread's holds through `acquire()`, so one thread can hold the condition through several handles. Values are decoded by the handle, so a value that fails to decode is thrown to the reader and does not end the stream. A callback is skipped for such a value, and the failure is logged once per stream |
+| Java | A closed connection ends streams with `StreamException`, caused by `ConnectionException`, as `get` and the waits cannot throw an `IOException`. The untimed waits stay `void` |
+| Close | Java's close never joins the update thread. `getCondition()` is public API used with `synchronized`, which rules out a timed lock, so close and disconnect end each stream under the update lock and notify its condition from short-lived threads. Storing a value, and ending one stream, still wait on a condition another thread holds |
+| Waits across streams | A thread holding one stream's lock while it waits for another stream's next value stalls the update thread when the first stream updates, in every client. Only close and disconnect are fixed for this pattern |
+| Late callbacks | The adding thread tries the callback's lock without blocking, and skips the first call if the update thread holds it, as that delivery carries a newer value. An event that has ended replays no firing to a late callback, though `wait` still returns for it |
+| Close join | Python, C# and C++ skip the join only when the closing thread holds the lock of a stream still registered. C++ counts a raw `get_condition_lock().lock()` as a hold from the next call on that handle |
+| C++ | The update thread takes a stream's lock with `try_lock` and a short sleep, as `std::condition_variable` needs a plain mutex. The stream manager owns a copy of the client, so streams outlive the copy that added them |
+| Java, C# | A stub lookup that fails falls back to the server's `GetServices`, fetched once, so a stream id is still noted with old or missing stubs |
+
+Parts of the design shipped in the earlier PRs, which made these choices:
+
+| PR | Choice |
+|---|---|
+| #1120 | A contract, a waypoint or an alarm missing while the game is between states is dormant. A contract or waypoint is also dormant until `ContractSystem.loaded`, as the contract system parses its contracts a frame after the scene loads it. An Infernal Robotics servo group of an unloaded vessel is dormant, as groups are found from the vessel's parts |
+| #1121 | Vessels are known only in a scene with a planetarium, as an editor lists none. A scene load request starts a change of state, as the game fills in the next scene while it loads. Measured in quickloads, scene changes and editor visits, a load's vessel list goes from absent straight to a nonzero count, so the zero-count window is a margin |
+
+## SSF Rebase
+
+* `EventStream` holds on every held error and has no option to not hold. SSF function events must
+  never be held (see "Function Streams and Events" and [server-side-functions.md](../server-side-functions/server-side-functions.md)),
+  so the rebase adds the option back.
+* The v0.6.0 LINQ `KRPC.AddEvent` is built on `Service.Event`, so it is held like a service event
+  until SSF replaces it.
+
