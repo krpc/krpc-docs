@@ -1,7 +1,7 @@
 # Compiling C# functions with statements
 
-**Status:** proposal, postponed. A follow-up to server side functions, to be built once that stack
-merges. No GitHub issue filed yet.
+**Status:** proposal, postponed. A follow-up to server side functions, which merged in #1124 to
+#1130. No GitHub issue filed yet.
 
 The C# client compiles only single-expression lambdas. Python compiles whole functions, with
 statements, loops and exception handlers. This doc records the options for closing that gap. It is a

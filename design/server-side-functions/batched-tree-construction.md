@@ -1,7 +1,7 @@
 # Batched tree construction
 
-**Status:** proposal, not started. A follow-up to server side functions, client-side only, and gated
-on measuring real tree sizes first. No GitHub issue filed yet.
+**Status:** proposal, not started. A follow-up to server side functions (merged in #1124 to #1130),
+client-side only, and gated on measuring real tree sizes first. No GitHub issue filed yet.
 
 [`server-side-functions.md`](server-side-functions.md) builds a function one factory RPC per node.
 This doc is the plan to send those calls in batches.

@@ -1,7 +1,7 @@
 # Client conformance: design sketch
 
-**Status:** deferred sketch (2026-10-12). Revisit once the stream-event and server-side-functions
-stacks have merged and a release is out. Single connection and request ids also come first; see
+**Status:** deferred sketch (2026-10-12). Revisit once a release is out. The stream and event
+work (#1122) and server side functions (#1124 to #1130) have merged. Single connection and request ids also come first; see
 "Sequencing against #906". Main churns too much until then. The facts below were
 surveyed on main at #1121, with #1122 (stream and event improvements) and the server-side
 functions stack checked on top. Re-check them before detailing this plan.

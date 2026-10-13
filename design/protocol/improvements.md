@@ -164,6 +164,10 @@ updates applied at most once per tick, with errors delivered via the #877 stream
 invalidation convention. Pushes ride `Request` on the RPC connection (zero transport
 changes; the stream connection is one-way and absent on SerialIO).
 
+Server side functions (#1124 to #1130) cover part of the batching rung: `KRPC.RunFunction` runs
+several calls, setters included, in one request and one physics tick. Fire-and-forget and
+reverse streams are still open.
+
 **Problem.** Streams only exist server→client. Every control write (e.g.
 `control.pitch = x; control.yaw = y`) is a blocking RPC round-trip — ~40ms for two
 setters in the reporting user's measurement — which makes closed-loop control from a
@@ -183,7 +187,7 @@ frame-coherent, low-latency exchange.
 
 ### 6. Reference-count duplicate streams — [#902](https://github.com/krpc/krpc/issues/902)
 
-**Status: design agreed** — see [stream-refcounting.md](stream-refcounting.md).
+**Status: completed** in #1122, see [stream-and-event-improvements.md](stream-and-event-improvements.md), which removed stream deduplication in place of the refcount below. Previously: design agreed, see [stream-refcounting.md](stream-refcounting.md).
 Server-side refcount per (client, stream) with forced teardown bypassing it (error
 invalidation, events, disconnect), plus wrapper-level removal in the bundled clients
 (the shared-`StreamImpl` poisoning made this a client-side bug too). No wire change.
@@ -203,7 +207,7 @@ refcount, and all consumers must be notified.
 
 ### 7. Stream invalidation on error — [#877](https://github.com/krpc/krpc/issues/877)
 
-**Status: design already agreed** — see [stream-invalidation.md](stream-invalidation.md).
+**Status: completed** in #1122, see [stream-and-event-improvements.md](stream-and-event-improvements.md). Previously: design agreed, see [stream-invalidation.md](stream-invalidation.md).
 
 **Summary.** When a stream's underlying RPC throws (e.g. after a quickload destroys the
 object), the server sends the error to the client once and removes the stream; clients

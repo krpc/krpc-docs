@@ -1,8 +1,7 @@
 # Stream and Event Improvements and Fixes
 
-**Status:** in progress (2026-10-12). All phases are implemented and reviewed, in PR #1122. The
-Python client is the reference, see "Client Reference". Divergences are under "Implementation".
-The SSF stack is rebased onto an earlier version of the phases.
+**Status:** done (2026-10-12), merged in PR #1122. The Python client is the reference, see
+"Client Reference". Divergences are under "Implementation".
 
 Four parts shipped first as their own PRs, all merged:
 
@@ -26,8 +25,8 @@ the reference count. The message formats are unchanged. The `KRPC` service drops
 the `start` flag of `AddStream`, which breaks old clients. The C++ client's stream freezing was
 removed outright by #1118, in place of the deprecation plan in [stream-freezing-removal.md](stream-freezing-removal.md).
 
-This work lands before server side functions ([server-side-functions.md](../server-side-functions/server-side-functions.md)),
-which builds on it. SSF then adds only function streams and function events.
+This work landed before server side functions ([server-side-functions.md](../server-side-functions/server-side-functions.md)),
+merged in #1124 to #1130, which builds on it. SSF then adds only function streams and function events.
 
 The doc has three parts:
 

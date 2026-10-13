@@ -1,10 +1,11 @@
 # Server-side functions
 
-**Status:** done, in review. The work ships as a stack of 7 PRs grouping its 19 phases (see
-"Phases"). None of the stack is opened yet. It closes umbrella issue
-[#679](https://github.com/krpc/krpc/issues/679).
+**Status:** done (2026-10-13). Merged as 7 PRs grouping its 19 phases, #1124 to #1130 (see
+"Phases"). #1130 closes umbrella issue [#679](https://github.com/krpc/krpc/issues/679) and
+[#608](https://github.com/krpc/krpc/issues/608). This doc is now a record of the design; the kRPC
+docs describe the feature as built.
 
-Builds on [`stream-and-event-improvements.md`](../protocol/stream-and-event-improvements.md), which lands first. That doc owns the behavior every stream and event shares:
+Builds on [`stream-and-event-improvements.md`](../protocol/stream-and-event-improvements.md), which landed first in #1122. That doc owns the behavior every stream and event shares:
 one stream per add, removal, error results and the update loop. This doc covers what function streams
 and events add.
 
@@ -1718,34 +1719,34 @@ and `client/cpp/benchmark/benchmark.cpp` therefore include `krpc/services/krpc.h
 
 ## Phases
 
-The phases in [`stream-and-event-improvements.md`](../protocol/stream-and-event-improvements.md) land first, so the stack starts from their stream and event
+The phases in [`stream-and-event-improvements.md`](../protocol/stream-and-event-improvements.md) landed first, so the stack starts from their stream and event
 machinery. The first phase removes the v0.6.0 `Expression`, `Type` and `AddEvent`, so each later phase is an
 addition reviewed on its own. The stack's net change against v0.6.0 is the design above, and the
-breaking changes it lists are relative to v0.6.0. The phases are grouped into 7 PRs. Each phase
+breaking changes it lists are relative to v0.6.0. The phases were merged as 7 PRs, #1124 to #1130. Each phase
 is a commit, and each PR that changes what a user sees ends with one commit holding its changelog
 entries. Each phase builds and passes `//:test` on its own.
 
 | PR | Phase | Content |
 | --- | --- | --- |
-| `core` | 0 | Remove the v0.6.0 server side expression API. The sub-orbital tutorial polls until phase 2 restores events |
-| `core` | 1 | `KRPC.Type`: class, enumeration, structure, collection and nullable types of any kind, the `Long`, `UInt`, `ULong` and `Bytes` types, `KRPC.TypeCode`, and the `Code`, `Service`, `Name`, `Types` and `Nullable` properties |
-| `core` | 2 | `KRPC.Expression` core: the spec each node carries and the null check where a nullable value meets a position that is not, `KRPC.NullReferenceException` and its client mappings, constants including `ConstantNull`, numeric promotion, comparisons, content equality, logic, casts, conditionals, `IsNull`, lambdas and `Invoke`, calls compiled to direct method calls and `CallWithArguments`, `ReturnType` and `HasReturnType`, the node limit, and `AddEvent`, with which the client guides' event sections return |
-| `core` | 3 | `KRPC.RunFunction` with arguments, `KRPC.AddFunctionStream`, `KRPC.CompileFunction` and `Expression.ParameterTypes` |
-| `core` | 4 | Building tuples, structures and collections, and `GetField` |
-| `core` | 5 | Collection and dictionary operations, `KRPC.KeyNotFoundException` and `KRPC.IndexOutOfRangeException` with their client mappings |
-| `core` | 6 | Statements and control flow: variables, blocks, loops, `Break`, `Continue`, `Return`, `StateVariable` |
-| `core` | 7 | Collection mutation: `Append`, `Set`, `Remove`, `RemoveAt`, `Clear` |
-| `core` | 8 | String operations |
-| `core` | 9 | Exceptions: `Throw`, `TryCatch`, `TryCatchAll`, `TryFinally`, and `KRPC.DivideByZeroException`, `NotSupportedException`, `TimeoutException`, `OverflowException` and `Error` with their client mappings |
-| `stdlib` | 10 | The `StdLib` service |
-| `tree-printer` | 11 | `ExpressionTreePrinter` and the TestServer `DumpExpressionTree` RPC |
-| `python` | 12 | Python `run` with arguments, `add_stream` and `stream` over functions, and `add_event`, all over hand-built trees |
-| `python` | 13 | Python compiler, lambdas, and `None` typed from its context |
-| `python` | 14 | Python compiler, functions with statements and parameters, and `nonlocal` state variables |
-| `csharp` | 15 | C# compiler including lambdas with parameters, `Run` with arguments, `AddEvent` and the `AddStream` overloads |
-| `java-cpp` | 16 | Java `run` with arguments, `addStream` and `addEvent` helpers, and a public `RemoteObject.id` |
-| `java-cpp` | 17 | C++ `run` with arguments, `add_stream` and `add_event` helpers |
-| `docs` | 18 | The tutorial, the events and run-once functions in five other tutorials, the client guide links, and the in-game tests |
+| #1124 | 0 | Remove the v0.6.0 server side expression API. The sub-orbital tutorial polls until phase 2 restores events |
+| #1124 | 1 | `KRPC.Type`: class, enumeration, structure, collection and nullable types of any kind, the `Long`, `UInt`, `ULong` and `Bytes` types, `KRPC.TypeCode`, and the `Code`, `Service`, `Name`, `Types` and `Nullable` properties |
+| #1124 | 2 | `KRPC.Expression` core: the spec each node carries and the null check where a nullable value meets a position that is not, `KRPC.NullReferenceException` and its client mappings, constants including `ConstantNull`, numeric promotion, comparisons, content equality, logic, casts, conditionals, `IsNull`, lambdas and `Invoke`, calls compiled to direct method calls and `CallWithArguments`, `ReturnType` and `HasReturnType`, the node limit, and `AddEvent`, with which the client guides' event sections return |
+| #1124 | 3 | `KRPC.RunFunction` with arguments, `KRPC.AddFunctionStream`, `KRPC.CompileFunction` and `Expression.ParameterTypes` |
+| #1124 | 4 | Building tuples, structures and collections, and `GetField` |
+| #1124 | 5 | Collection and dictionary operations, `KRPC.KeyNotFoundException` and `KRPC.IndexOutOfRangeException` with their client mappings |
+| #1124 | 6 | Statements and control flow: variables, blocks, loops, `Break`, `Continue`, `Return`, `StateVariable` |
+| #1124 | 7 | Collection mutation: `Append`, `Set`, `Remove`, `RemoveAt`, `Clear` |
+| #1124 | 8 | String operations |
+| #1124 | 9 | Exceptions: `Throw`, `TryCatch`, `TryCatchAll`, `TryFinally`, and `KRPC.DivideByZeroException`, `NotSupportedException`, `TimeoutException`, `OverflowException` and `Error` with their client mappings |
+| #1125 | 10 | The `StdLib` service |
+| #1126 | 11 | `ExpressionTreePrinter` and the TestServer `DumpExpressionTree` RPC |
+| #1127 | 12 | Python `run` with arguments, `add_stream` and `stream` over functions, and `add_event`, all over hand-built trees |
+| #1127 | 13 | Python compiler, lambdas, and `None` typed from its context |
+| #1127 | 14 | Python compiler, functions with statements and parameters, and `nonlocal` state variables |
+| #1128 | 15 | C# compiler including lambdas with parameters, `Run` with arguments, `AddEvent` and the `AddStream` overloads |
+| #1129 | 16 | Java `run` with arguments, `addStream` and `addEvent` helpers, and a public `RemoteObject.id` |
+| #1129 | 17 | C++ `run` with arguments, `add_stream` and `add_event` helpers |
+| #1130 | 18 | The tutorial, the events and run-once functions in five other tutorials, the client guide links, and the in-game tests |
 
 The golden tree tests for each compiler land with that compiler.
 

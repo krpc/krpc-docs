@@ -1,7 +1,6 @@
 # Holding a physics tick for a control loop
 
-**Status:** in progress (2026-08-22) — raised as
-[#1070](https://github.com/krpc/krpc/pull/1070), together with
+**Status:** done, merged in [#1070](https://github.com/krpc/krpc/pull/1070), together with
 [the auto-pilot's update timing](../autopilot/update-timing.md). A deliberate stopgap for
 [#251](https://github.com/krpc/krpc/issues/251), to be retired once real tick synchronization
 lands in the protocol rewrite.
@@ -163,6 +162,10 @@ feature, listed as tick control in [single-connection.md](../protocol/single-con
 dedicated design. It suggests batching RPCs into transactions that execute in one frame, which is
 #903's batching, and which as noted above does not serve a loop that computes between its calls.
 This holds the tick instead, which is the part no other design covers.
+
+Server side functions (#1124 to #1130) give the transaction half: `KRPC.RunFunction` runs a
+function, computation included, within one tick. A loop whose computation can move to the server
+can use that in place of a hold.
 
 It composes with, rather than competes with, batching (#903) and request ids
 ([request-ids.md](../protocol/request-ids.md)): a batch inside a hold is fine, and pipelining does

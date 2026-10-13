@@ -1,7 +1,7 @@
 # Releasing server side functions
 
-**Status:** proposal, postponed. A follow-up to server side functions, to be built once that stack
-merges. No GitHub issue filed yet.
+**Status:** proposal, postponed. A follow-up to server side functions, which merged in #1124 to
+#1130. No GitHub issue filed yet.
 
 [`server-side-functions.md`](server-side-functions.md) keeps every function until the server
 stops. This doc is the plan to let a client release the functions it no longer needs.

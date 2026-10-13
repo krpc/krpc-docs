@@ -40,11 +40,11 @@ components land together because they share the wire format.
 | Single bidirectional connection | none yet | this doc |
 | Message ids / async messages | none yet | [request-ids.md](request-ids.md) |
 | Client-to-server streams | [#903](https://github.com/krpc/krpc/issues/903) | [reverse-streams.md](reverse-streams.md) |
-| Batching / transactions | [#903](https://github.com/krpc/krpc/issues/903) | [reverse-streams.md](reverse-streams.md) |
+| Batching / transactions | [#903](https://github.com/krpc/krpc/issues/903) | [reverse-streams.md](reverse-streams.md); `KRPC.RunFunction` (#1124) runs a batch in one tick |
 | Tick control — one RPC/batch per physics update | [#251](https://github.com/krpc/krpc/issues/251) | [tick-hold.md](../server/tick-hold.md) ships an RPC-level stopgap; the protocol design is still open |
 | Stream freezing removal | [#901](https://github.com/krpc/krpc/issues/901) | [stream-freezing-removal.md](stream-freezing-removal.md) |
-| Stream refcounting | [#902](https://github.com/krpc/krpc/issues/902) | [stream-refcounting.md](stream-refcounting.md) |
-| Stream invalidation | [#877](https://github.com/krpc/krpc/issues/877) | [stream-invalidation.md](stream-invalidation.md) |
+| Stream refcounting | [#902](https://github.com/krpc/krpc/issues/902) | done in #1122, [stream-and-event-improvements.md](stream-and-event-improvements.md) |
+| Stream invalidation | [#877](https://github.com/krpc/krpc/issues/877) | done in #1122, [stream-and-event-improvements.md](stream-and-event-improvements.md) |
 
 Every issue in that table is still open.
 

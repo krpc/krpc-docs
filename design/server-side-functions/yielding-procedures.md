@@ -1,7 +1,7 @@
 # Yielding procedures in server side functions
 
 **Status:** proposal — not started. Two follow-ups to server side functions, deferred calls and
-resumable functions, to be built once the server side functions stack merges. No GitHub issue
+resumable functions. Server side functions merged in #1124 to #1130. No GitHub issue
 filed yet.
 
 [`server-side-functions.md`](server-side-functions.md) describes the problem under "Yielding
