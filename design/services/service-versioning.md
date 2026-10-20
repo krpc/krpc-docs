@@ -1,7 +1,24 @@
 # Per-service version strings
 
-**Status:** in progress — implemented but not merged; no GitHub issue or PR yet. Server side
-and all six clients done and green; no changelog entries yet. The work is three commits:
+**Status:** negative result (2026-10-20). Implemented but never merged, and not to be merged.
+
+## Outcome
+
+Per-service versions do not identify a service's surface, so clients cannot rely on them:
+
+* **Extension members** ([PR #1077](https://github.com/krpc/krpc/pull/1077)) graft into the target
+  service's definition. A service's surface is its own DLL plus every installed mod's extensions,
+  so two servers reporting the same version can differ in procedures.
+* **The extending service's version** describes members that appear under a different service.
+* **First-party services** report the server version, as noted below, so the field adds nothing.
+
+Clients detect a procedure by its presence instead. `GetServices` lists every procedure, extensions
+included, and a missing one fails with "procedure not found". A member never changes meaning under
+the same name: a new member replaces it and the old one is deprecated
+([deprecation.md](../protocol/deprecation.md)). Compatibility rests on one protocol version in the
+handshake, with release versions for servers and clients kept informational.
+
+The rest of this doc records the design as implemented. The work is three commits:
 
 * **"Add versioning for services"** — the original, incomplete work rebased from an old commit;
   carried a placeholder version and a broken protobuf field number.
@@ -138,7 +155,7 @@ Green: `//core:test`, `//tools/krpctools:krpctoolstest` (clientgen + docgen gold
 client builds plus the C nano build, and all six client test suites (`//client/{python,csharp,java,
 cpp,lua}`).
 
-## Remaining
+## Remaining When Dropped
 
 * **File a GitHub issue** for the feature (none exists) and link it here.
 * **Changelog entries** in the final pre-merge commit: `server` + protobuf for the new field, and one
