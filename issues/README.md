@@ -1,34 +1,38 @@
 # issues/
 
-Notes too small to warrant a design doc — a chore, a version bump, or a thin pointer to an
-existing PR. Each should be a GitHub issue on [`krpc/krpc`](https://github.com/krpc/krpc/issues)
-rather than a doc here. They live here as a holding pen: file the issue upstream, then delete the
-stub (or, if a note grows real design, promote it into [`../design/`](../design)).
+Drafts of GitHub issues for [`krpc/krpc`](https://github.com/krpc/krpc/issues), one file per
+issue. Each holds the title, the proposed milestone and labels, and the body to paste. File the
+issue, link its number from the design doc that names the draft, then delete the draft.
 
-None of these has a GitHub issue yet, except [name-tag-cpm.md](name-tag-cpm.md), which tracks #829.
+A placeholder such as `#<single-connection>` names another draft. Replace it with that draft's
+issue number when filing.
 
-## 0.7.0
+[github-changes.md](github-changes.md) lists edits to issues already on GitHub.
 
-Due before the 0.7.0 tag:
+## 0.8.0
 
-| Note | Kind |
+| Draft | Kind |
 | --- | --- |
-| [changelogs.md](changelogs.md) | Changelog cleanup |
-| [name-tag-cpm.md](name-tag-cpm.md) | Mod compatibility, #829. Implemented on the `name-tag-cpm` branch, PR not yet opened |
-
-## After 0.7.0
-
-| Note | Kind |
-| --- | --- |
+| [single-connection.md](single-connection.md) | Protocol, breaking |
+| [request-ids.md](request-ids.md) | Protocol, breaking |
+| [remove-stream-takes-stream.md](remove-stream-takes-stream.md) | Protocol, breaking |
 | [kac-alarm-play-sound.md](kac-alarm-play-sound.md) | Bug, shipped in 0.6.0 |
-| [dockingcam-lidar-cleanups.md](dockingcam-lidar-cleanups.md) | Docstrings and logging |
+| [dockingcam-lidar-cleanups.md](dockingcam-lidar-cleanups.md) | Bug, docstrings and logging |
 | [recv-timeout-default.md](recv-timeout-default.md) | Server default |
+| [python-traceback-trim.md](python-traceback-trim.md) | Python client |
+| [client-public-object-id.md](client-public-object-id.md) | Clients, additive |
+
+## No milestone
+
+| Draft | Kind |
+| --- | --- |
+| [recv-patience.md](recv-patience.md) | Server, additive |
+| [remotetech-kac-api.md](remotetech-kac-api.md) | Services |
 | [infernal-robotics-input-linking.md](infernal-robotics-input-linking.md) | Service |
+| [mod-compat-tests.md](mod-compat-tests.md) | Tests |
+| [autopilot-test-gaps.md](autopilot-test-gaps.md) | Tests |
+| [doc-crefs-to-exceptions.md](doc-crefs-to-exceptions.md) | Docs tooling |
 | [nunit-5-migration.md](nunit-5-migration.md) | Tests |
 | [buildenv-linux-sandbox.md](buildenv-linux-sandbox.md) | Build |
-| [client-public-object-id.md](client-public-object-id.md) | Clients, additive |
-| [doc-crefs-to-exceptions.md](doc-crefs-to-exceptions.md) | Docs tooling |
 | [lua-sphinx-domain.md](lua-sphinx-domain.md) | Docs tooling |
 | [luasocket-release-pin.md](luasocket-release-pin.md) | Chore, blocked upstream |
-| [nullable-keys-and-set-elements.md](nullable-keys-and-set-elements.md) | Protocol, deferred and likely dropped. Implemented on the `nullable-keys-and-set-elements` branch, which is not on origin |
-| [post-0.7-backlog.md](post-0.7-backlog.md) | Summary of 12 larger items |
