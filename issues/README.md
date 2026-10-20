@@ -20,5 +20,15 @@ Due before the 0.7.0 tag:
 
 | Note | Kind |
 | --- | --- |
+| [kac-alarm-play-sound.md](kac-alarm-play-sound.md) | Bug, shipped in 0.6.0 |
+| [dockingcam-lidar-cleanups.md](dockingcam-lidar-cleanups.md) | Docstrings and logging |
+| [recv-timeout-default.md](recv-timeout-default.md) | Server default |
 | [infernal-robotics-input-linking.md](infernal-robotics-input-linking.md) | Service |
 | [nunit-5-migration.md](nunit-5-migration.md) | Tests |
+| [buildenv-linux-sandbox.md](buildenv-linux-sandbox.md) | Build |
+| [client-public-object-id.md](client-public-object-id.md) | Clients, additive |
+| [doc-crefs-to-exceptions.md](doc-crefs-to-exceptions.md) | Docs tooling |
+| [lua-sphinx-domain.md](lua-sphinx-domain.md) | Docs tooling |
+| [luasocket-release-pin.md](luasocket-release-pin.md) | Chore, blocked upstream |
+| [nullable-keys-and-set-elements.md](nullable-keys-and-set-elements.md) | Protocol, deferred and likely dropped. Implemented on the `nullable-keys-and-set-elements` branch, which is not on origin |
+| [post-0.7-backlog.md](post-0.7-backlog.md) | Summary of 12 larger items |
