@@ -2,9 +2,10 @@
 
 **Status:** in progress (2026-07-17) — Action Groups Extended done and merged as
 [PR #968 "AGExt tests"](https://github.com/krpc/krpc/pull/968) (2026-07-18, section 2);
-the rest not yet implemented. kOS name-tag (was phase 2) is **blocked on issue #829** and demoted — see
-section 4. No GitHub issue for the overall test effort yet — one should be filed (#829 covers only the
-kOS module-duplication problem).
+the rest not yet implemented. The kOS name tag (was phase 2) is covered: #829 was fixed by
+[PR #1155](https://github.com/krpc/krpc/pull/1155), whose `test_parts_tag.py` runs over five mod
+sets. The remaining tests are drafted as an issue in
+[issues/mod-compat-tests.md](../../issues/mod-compat-tests.md).
 
 kRPC integrates with a number of third-party KSP mods, and several of those integrations have **no
 integration-test coverage**. This doc catalogs every mod integration in the repo, cross-references
@@ -112,7 +113,10 @@ ProceduralFairings mod explicitly). Only stock fairings are currently tested.
 mod-part craft plus a `Fairing` jettison/state test class, following the RealChute pattern. Detected
 via `_MOD_PARTS` (a ProceduralFairings part in the catalog).
 
-### 4. kOS — name-tag part field — blocked on #829, demoted
+### 4. kOS — name-tag part field — done in PR #1155
+
+The analysis below predates the fix. [PR #1155](https://github.com/krpc/krpc/pull/1155) resolved
+#829 and added `test_parts_tag.py`, which runs over five mod sets.
 
 `service/SpaceCenter/src/Services/Parts/Part.cs` (lines ~100–113): the `Part.Tag`
 getter/setter reads and writes the `nameTag` field of the `"KOSNameTag"` module via reflection.
@@ -231,7 +235,7 @@ changelog** unless a compat bug is fixed along the way, in which case that fix g
 4. **FAR** — most valuable, most involved: pin the mod, establish a controlled flight condition, and
    assert FAR-sourced aero values (start with invariants/directional response, tighten to magnitudes
    only if a stable condition can be reproduced headless).
-5. **kOS name-tag** — **blocked on #829** (see section 4); the AGExt `_MOD_MODULES` shim does not apply
+5. **kOS name-tag** — done in PR #1155 (see section 4). Originally blocked on #829: the AGExt `_MOD_MODULES` shim does not apply
    because kRPC ships its own `KOSNameTag` module. Revisit once #829's shared-module fix lands. The
    no-mod `Part.Tag` round-trip is a separable quick win that need not wait.
 

@@ -1,6 +1,10 @@
 # Autopilot test plan
 
-**Status:** in progress (2026-06-26) — infrastructure and most of the corner-case catalog are implemented
+**Status:** in progress. The tests below merged with the autopilot rework
+([PR #882](https://github.com/krpc/krpc/pull/882)) and run in the in-game suite. The §11 gaps are
+drafted as an issue in [issues/autopilot-test-gaps.md](../../issues/autopilot-test-gaps.md).
+
+As of 2026-06-26, infrastructure and most of the corner-case catalog are implemented
 (but see **§11 for what is NOT yet implemented**, and the §10 caveat that these are
 regression guards, not improvement proofs) — the `apply_angular_velocity` testing tool, the
 `krpctest.diagnostics` parser + metrics, and the dynamic tests in `test_autopilot.py`, all
@@ -15,9 +19,8 @@ running across the five craft (§1) as separate, individually-tunable methods:
 
 Per-craft thresholds are factory kwargs (`winding_limit`, `path_deviation_limit`, `rebound_limit`,
 `cross_axis_limit`, `roll_isolation_limit`, `ff_spike_limit`, `saturation_limit`, `nudge_rate`,
-`recover_timeout`), loosened for the Slow/Flexible craft. Lint/build green; **none run in-game
-yet**, so every numeric threshold is an initial estimate pending calibration against a live
-game. The thresholds are isolated per test so they can be tuned independently.
+`recover_timeout`), loosened for the Slow/Flexible craft. The thresholds were first estimates,
+calibrated in game from 2026-06-27 (see §11.9 and §11.10). The thresholds are isolated per test so they can be tuned independently.
 
 **Scope:** `service/SpaceCenter/src/AutoPilot/AttitudeController.cs` (+ `PIDController.cs`),
 exercised through `service/SpaceCenter/test/test_autopilot.py`. KSP-in-the-loop integration

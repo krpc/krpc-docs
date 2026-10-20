@@ -4,7 +4,9 @@
 [PR #982 "KerbalAlarmClock test coverage and Alarm API completion"](https://github.com/krpc/krpc/pull/982)
 and [PR #981 "Add RemoteTech availability and antenna negative-path tests"](https://github.com/krpc/krpc/pull/981)
 (2026-07-19, in-game validated: KAC 16/16, RemoteTech 12/12); the RemoteTech API bindings remain.
-No GitHub issue yet — one should be filed. Two implementation notes that supersede the text below:
+The remaining API work is drafted in
+[issues/remotetech-kac-api.md](../../issues/remotetech-kac-api.md), and the `PlaySound` bug in
+[issues/kac-alarm-play-sound.md](../../issues/kac-alarm-play-sound.md). Two implementation notes that supersede the text below:
 the mod *does* have a per-alarm fired flag — `KACAlarm.Triggered`, internal, which this doc missed
 because it only surveyed the public surface — so the alarm-fired "event" shipped as a reflected
 pollable `Alarm.Triggered` getter (clients observe firing via the existing expression-event/stream

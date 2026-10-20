@@ -1,13 +1,14 @@
 # Audit: RPCs that should return a structure
 
-**Status:** in progress. No issue yet. Follows
-[structure types](../protocol/struct-types.md) (issue
-[#866](https://github.com/krpc/krpc/issues/866)), which landed in the unreleased 0.7.0 cycle and
-named two first-adoption candidates without surveying the rest. This audit does that survey.
+**Status:** done for 0.7.0. `CommNode` and `ActionGroupAction` merged as
+[PR #1132](https://github.com/krpc/krpc/pull/1132). `LaunchSite`, `ScienceSubject`, `ScienceData`,
+the three tuple families and the RCS override (as `RCS.OverrideWrench`) merged as
+[PR #1148](https://github.com/krpc/krpc/pull/1148). `Propellant` stayed a class, for its live tank
+fields. The classes under *Blocked on other rules* and *Leave as classes* are not planned.
 
-The three conversions that nullable fields blocked are done, as step 5 of Phase 2 of
-[nested nullable values](../protocol/nested-nullable-values.md). Everything else here is
-outstanding.
+Follows [structure types](../protocol/struct-types.md) (issue
+[#866](https://github.com/krpc/krpc/issues/866)), which named two first-adoption candidates
+without surveying the rest. This audit does that survey.
 
 Each conversion below is its own issue and its own PR. All of them are breaking, except the
 `RCS.Override` merge in the last section.

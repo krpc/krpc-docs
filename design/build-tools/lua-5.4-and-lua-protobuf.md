@@ -1,7 +1,6 @@
 # Lua 5.4 and lua-protobuf for the Lua client
 
-**Status:** in progress. Implemented on a local branch, stacked on [PR #1140](https://github.com/krpc/krpc/pull/1140)
-and the doc scripts and luacheck work; no PR yet. Left after release: archive the
+**Status:** done, merged as [PR #1142](https://github.com/krpc/krpc/pull/1142). Left after release: archive the
 `djungelorm/protobuf-lua` fork and its LuaRocks entry.
 
 ## Problem

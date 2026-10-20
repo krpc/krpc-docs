@@ -1,6 +1,6 @@
 # Unrestricted server side functions: calling arbitrary CLR members
 
-**Status:** proposal — design sketch; no GitHub issue filed yet.
+**Status:** proposal — design sketch. Not scheduled, no issue.
 
 Follow-on to [server side functions](server-side-functions.md). That work lets a client build and run a function on
 the server, but the function can only call *RPCs* — the curated surface kRPC chose to expose. This

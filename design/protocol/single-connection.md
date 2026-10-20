@@ -1,7 +1,8 @@
 # A single bidirectional connection
 
 **Status:** proposal — sketch (2026-07-21), revised 2026-08-27 against `main` at version 0.7.0.
-No issue filed yet.
+Planned for 0.8, with [request ids](request-ids.md). Issue drafted in
+[issues/single-connection.md](../../issues/single-connection.md).
 
 Related: [request-ids.md](request-ids.md) (the same client refactor — read
 these two together), [improvements.md](improvements.md) (meta-issue
@@ -37,16 +38,17 @@ components land together because they share the wire format.
 
 | Component | Issue | Design |
 | --- | --- | --- |
-| Single bidirectional connection | none yet | this doc |
-| Message ids / async messages | none yet | [request-ids.md](request-ids.md) |
+| Single bidirectional connection | drafted, 0.8 | this doc |
+| Message ids / async messages | drafted, 0.8 | [request-ids.md](request-ids.md) |
 | Client-to-server streams | [#903](https://github.com/krpc/krpc/issues/903) | [reverse-streams.md](reverse-streams.md) |
 | Batching / transactions | [#903](https://github.com/krpc/krpc/issues/903) | [reverse-streams.md](reverse-streams.md); `KRPC.RunFunction` (#1124) runs a batch in one tick |
 | Tick control — one RPC/batch per physics update | [#251](https://github.com/krpc/krpc/issues/251) | [tick-hold.md](../server/tick-hold.md) ships an RPC-level stopgap; the protocol design is still open |
-| Stream freezing removal | [#901](https://github.com/krpc/krpc/issues/901) | [stream-freezing-removal.md](stream-freezing-removal.md) |
+| Stream freezing removal | [#901](https://github.com/krpc/krpc/issues/901) | done in #1118, [stream-freezing-removal.md](stream-freezing-removal.md) |
 | Stream refcounting | [#902](https://github.com/krpc/krpc/issues/902) | done in #1122, [stream-and-event-improvements.md](stream-and-event-improvements.md) |
 | Stream invalidation | [#877](https://github.com/krpc/krpc/issues/877) | done in #1122, [stream-and-event-improvements.md](stream-and-event-improvements.md) |
 
-Every issue in that table is still open.
+#877, #901 and #902 are closed. The release plan splits the rest: the single connection and
+request ids in 0.8, the others in 1.0.
 
 Two questions to settle before any of it starts:
 

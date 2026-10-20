@@ -1,7 +1,11 @@
 # Move the NameTag PartModule into KSPCommunityPartModules
 
-**Status:** in progress — implemented across all three repos and verified in-game; three PRs open,
-awaiting the KSPCommunityPartModules 0.5.0 release before the two dependents can merge.
+**Status:** superseded. [#829](https://github.com/krpc/krpc/issues/829) was fixed by
+[PR #1155](https://github.com/krpc/krpc/pull/1155) with a different kRPC side: kRPC ships no tag
+module and has no hard dependency on KSPCommunityPartModules. A ModuleManager patch adds CPM's
+`ModuleNameTag` when kOS is absent, and `Part.Tag` uses whichever module is on the part. The CPM
+module from KSPCPM#23 shipped in CPM 0.5.0. PR #965 was closed. KSP-KOS/KOS#3197 is still open.
+The rest of this doc is the original design.
 
 **Issue:** [krpc/krpc#829](https://github.com/krpc/krpc/issues/829) — "KOSNameTag PartModule should
 probably not be duplicated to avoid issues with KOS". This work also subsumes the previously-planned

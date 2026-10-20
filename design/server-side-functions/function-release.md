@@ -1,7 +1,8 @@
 # Releasing server side functions
 
 **Status:** proposal, postponed. A follow-up to server side functions, which merged in #1124 to
-#1130. No GitHub issue filed yet.
+#1130. Not scheduled. [#1107](https://github.com/krpc/krpc/issues/1107) was closed as premature, to be
+reopened when this starts.
 
 [`server-side-functions.md`](server-side-functions.md) keeps every function until the server
 stops. This doc is the plan to let a client release the functions it no longer needs.

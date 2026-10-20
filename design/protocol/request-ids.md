@@ -1,7 +1,8 @@
 # Request ids and asynchronous RPCs
 
-**Status:** proposal — sketch (2026-07-21), no issue filed yet; every section below needs
-a real design pass before implementation.
+**Status:** proposal — sketch (2026-07-21); every section below needs a real design pass before
+implementation. Planned for 0.8, with the [single connection](single-connection.md). Issue drafted
+in [issues/request-ids.md](../../issues/request-ids.md).
 
 Related: [improvements.md](improvements.md) (meta-issue
 [#906](https://github.com/krpc/krpc/issues/906)),

@@ -1,6 +1,6 @@
 # KSPTrajectories service for kRPC
 
-**Status:** proposal — no integration exists yet; no issue filed yet, one should be filed.
+**Status:** proposal, not scheduled. No integration exists yet, and no issue.
 
 ## Context
 

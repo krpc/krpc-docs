@@ -1,6 +1,7 @@
 # Nullable set elements and dictionary keys
 
-**Status:** proposal. No issue yet. Follow-up to
+**Status:** parked (2026-10-14), likely dropped. Implemented on an unpushed branch; review raised
+open points on key semantics, and it is not planned for a release. No issue. Follow-up to
 [nested-nullable-values.md](nested-nullable-values.md) ([PR #1091](https://github.com/krpc/krpc/pull/1091)),
 which made every nested position nullable except a set element and a dictionary key.
 

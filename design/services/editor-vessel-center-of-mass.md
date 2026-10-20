@@ -1,7 +1,6 @@
 # Add `EditorVessel.ReferenceFrame` and match the editor API to `Vessel` and `Flight`
 
-**Status:** in progress, on a local branch, no PR yet. Due before the 0.7.0 tag, since changing
-these signatures after release is breaking. Labels: `enhancement`, `service:space-center`.
+**Status:** done, merged as [PR #1153](https://github.com/krpc/krpc/pull/1153) for 0.7.0.
 
 Every `EditorVessel` member is new in 0.7.0, so all of the changes below are free until the tag.
 The members came in with #1038, #1059 and #1103, and #1064 made the part frames work in the editor.

@@ -238,10 +238,11 @@ meta-issue.
 
 ## Connection semantics
 
-### 9. Request ids and asynchronous RPCs — *no issue yet*
+### 9. Request ids and asynchronous RPCs — *issue drafted*
 
 **Status: sketch** — see [request-ids.md](request-ids.md). Not part of the
-#906 issue list; raised separately (2026-07-21) and needs an issue filing.
+#906 issue list; raised separately (2026-07-21). Planned for 0.8; issue drafted in
+[issues/request-ids.md](../../issues/request-ids.md).
 
 **Problem.** Nothing on the wire correlates a `Response` with its `Request` — the association
 is positional, and the server refuses to read a second request from a client while one is in
@@ -264,10 +265,11 @@ Complementary to the `no_response` flag in
 the clients, and hence an asyncio-based Python client, though that is a separate (and larger)
 clientgen question.
 
-### 10. A single bidirectional connection — *no issue yet*
+### 10. A single bidirectional connection — *issue drafted*
 
 **Status: sketch** — see [single-connection.md](single-connection.md). Raised
-separately (2026-07-21) alongside section 9 and needs an issue filing.
+separately (2026-07-21) alongside section 9. Planned for 0.8; issue drafted in
+[issues/single-connection.md](../../issues/single-connection.md).
 
 **Problem.** Clients open two TCP connections, one per port, for RPCs and for stream updates.
 The split is a consequence of the same missing correlation described in section 9: with no id on

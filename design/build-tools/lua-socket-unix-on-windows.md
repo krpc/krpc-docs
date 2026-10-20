@@ -1,11 +1,10 @@
 # Lua client: socket.unix on Windows without our own rock
 
-**Status:** in progress. Implemented on the same local branch as
-[Lua 5.4 and lua-protobuf](lua-5.4-and-lua-protobuf.md); no PR yet. The test luasocket is pinned to
-the head of [lunarmodules/luasocket#469](https://github.com/lunarmodules/luasocket/pull/469), which
-is open and unmerged. Once a luasocket release includes it, pin the release tag and drop the Windows
-note in `doc/src/lua/client.rst`. Independent of [Lua 5.4 and lua-protobuf](lua-5.4-and-lua-protobuf.md), but both
-edit `MODULE.bazel` and `tools/build/lua/`, so land one after the other.
+**Status:** done, merged in [PR #1142](https://github.com/krpc/krpc/pull/1142) with
+[Lua 5.4 and lua-protobuf](lua-5.4-and-lua-protobuf.md). The test luasocket is pinned to the head of
+[lunarmodules/luasocket#469](https://github.com/lunarmodules/luasocket/pull/469), which is open and
+unmerged. Moving to a release is drafted in
+[issues/luasocket-release-pin.md](../../issues/luasocket-release-pin.md).
 
 ## Problem
 
