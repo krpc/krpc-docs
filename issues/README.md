@@ -8,4 +8,4 @@ stub (or, if a note grows real design, promote it into [`../design/`](../design)
 | Note | Maps to |
 | --- | --- |
 | [infernal-robotics-input-linking.md](infernal-robotics-input-linking.md) | No issue yet |
-| [nunit-4-migration.md](nunit-4-migration.md) | No issue yet |
+| [nunit-5-migration.md](nunit-5-migration.md) | No issue yet |
