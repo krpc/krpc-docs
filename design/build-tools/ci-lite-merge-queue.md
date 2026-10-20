@@ -1,280 +1,261 @@
-# CI: lite path-filtered PR runs, full CI via the merge queue
+# CI: lite PR runs, full CI via the merge queue
 
-**Status:** proposal — design agreed 2026-07-16, no implementation. Build-infrastructure follow-on to
-the completed build-system migration ([`build-system-migration.md`](build-system-migration.md)).
-**Issue:** _none yet — needs filing (`krpc/krpc`)._
-**Scope:** CI only — `.github/workflows/ci.yml` (plus one-time maintainer-side settings: enable the
-merge queue, require `all-checks-passed` on `main`, and create a `full-ci` label). No change to
-`MODULE.bazel`, the build rules, `BUILD.bazel` files, the buildenv image, or local developer
-workflow.
+**Status:** negative result, 2026-10-14. Not built. A full run takes 11-16 minutes, and nearly every
+PR comes from one maintainer who runs `//:test` and `build //...` locally first. Lite runs would
+add a run of about 9 minutes before the queue's full run, which slows each merge. The slowest Linux
+job is nearly as long as the slowest Windows one. Revisit if the project gains regular
+contributors. Follow-on to the [build system migration](build-system-migration.md).
+**Scope:** `.github/workflows/ci.yml` and one new composite action, plus one-time repository
+settings: the merge queue and the required check. No change to the Bazel build.
 
 ## Problem
 
-`ci.yml` runs the **same ~26-job matrix on every PR push and every push to `main`.** There is no
-distinction between "iterating on a PR" and "ready to merge":
+`ci.yml` runs the same 44 jobs, plus the `all-checks-passed` gate, on every PR push and every push to
+`main`. Every job builds cold, with no shared Bazel cache.
 
-* Every job runs a **cold** Bazel build/test — there is no shared Bazel action/output cache, so each
-  job recompiles from scratch.
-* Several jobs run on `windows-latest`. The native Windows Bazel job (`build-windows`, ~15 min,
-  `continue-on-error`, deliberately excluded from the `all-checks-passed` gate) is the single worst
-  per-push drag.
-* Most PRs touch **one sub-component** — a single service DLL, or one client language. Running the
-  full client-language matrix, docs builds, and the Windows jobs on those iteration pushes is wasted
-  work.
+| Group | Jobs |
+|---|---|
+| `lint` | 1 |
+| `linux` matrix | 15 |
+| Linux standalone: `build-krpc`, `build-genfiles`, `build-csharp-sln`, cpp and cnano test plus cmake and vcpkg | 9 |
+| `windows` matrix | 14 |
+| Windows standalone: `build-csharp-sln`, cpp and cnano cmake and vcpkg | 5 |
 
-The goal: run a **lite** subset while iterating on a PR (only the jobs whose component's files
-changed, plus a cheap always-on lint), and run the **full** suite as the hard pre-merge gate.
+The 19 Windows jobs are slower than their Linux twins and add little signal while iterating. Most
+PRs touch one client or the docs, yet every push runs every job.
 
-## Goals / constraints
+## Goals
 
-Agreed with the maintainer:
-
-1. PR pushes run a reduced, path-filtered set — skip jobs for components whose files did not change.
-2. The full suite runs before anything lands on `main`, as an enforced gate (not
-   discipline-dependent).
-3. The slow native Windows job runs **only** in full CI, never on lite PR iteration.
-4. Keep a single required status check for branch protection (`all-checks-passed`) — skipped jobs
-   must not turn it red.
-5. No correctness regression at merge time: lite mode may skip jobs that a change could actually
-   affect (see the tradeoff below); the full pre-merge run is the backstop.
+1. Full CI runs before every commit lands on `main`, enforced by the merge queue.
+2. Windows jobs run in full CI only.
+3. PR pushes run only the Linux jobs whose Bazel targets depend on a changed file.
+4. Job selection follows the build graph, with no hand-maintained dependency table.
+5. `all-checks-passed` stays the single required check. Skipped jobs keep it green.
 
 ## Design
 
-### Mode: `full` = not a PR, **or** the PR carries the `full-ci` label
+### Modes
 
-`full` is true for every non-`pull_request` event (`merge_group`, `push`, `workflow_dispatch`), and
-also for a `pull_request` that carries the **`full-ci`** label. So a plain PR runs lite; applying the
-`full-ci` label opts that PR into the full suite on demand (see below); the merge queue always runs
-full regardless of labels.
+| Event | Mode |
+|---|---|
+| `pull_request` | lite |
+| `merge_group` | full, the pre-merge gate |
+| `push` to `main` | full |
 
 ```yaml
 on:
   pull_request:
     branches: [main]
-    # 'labeled' so applying the 'full-ci' label immediately re-triggers CI (no push needed).
-    types: [opened, synchronize, reopened, labeled]   # -> LITE, unless labelled 'full-ci'
-  merge_group:           # -> FULL (the real pre-merge gate)
+  merge_group:
   push:
-    branches: [main]     # -> FULL
-  workflow_dispatch:     # -> FULL (manual "run full now" escape hatch)
+    branches: [main]
 ```
 
-**Full CI is enforced by GitHub's merge queue.** A PR push runs lite, `all-checks-passed` goes green
-fast, and the PR becomes mergeable *into the queue*. Adding it to the queue fires a `merge_group`
-event that runs the complete suite against the prospective merge commit; only if that passes does the
-commit land on `main`. Nothing merges without a green full run.
+* **Merge queue.** A lite run turns `all-checks-passed` green and makes the PR eligible for the queue.
+  The queue runs full CI on the prospective merge commit, and the commit lands only if that passes.
+* **No manual full run.** The `workflow_dispatch` trigger is removed. Before queueing, a local
+  `bazel test //:test` and `bazel build //...` cover most of what full CI adds on Linux.
+* **`push` to `main` stays full.** It duplicates the queue run on the same tree. It is kept as the
+  record on `main` and to cover a maintainer bypassing the queue.
 
-### The `setup` job — compute mode + per-component change flags
+### `setup` job
 
-A fast first job (plain `ubuntu-latest`, **no** buildenv container) emits job outputs consumed by
-every other job's `if:`.
-
-* `full` — a shell step: `false` on `pull_request`, else `true`.
-* One boolean per component, via **`dorny/paths-filter`** (pinned by commit SHA), run only
-  `if: github.event_name == 'pull_request'`. On full events the outputs are unused because
-  `full == 'true'` short-circuits every condition.
+A plain `ubuntu-latest` job with no container. It decides the mode and lists the changed files.
 
 ```yaml
 setup:
   runs-on: ubuntu-latest
   outputs:
-    full:         ${{ steps.mode.outputs.full }}
-    foundational: ${{ steps.filter.outputs.foundational }}
-    service:      ${{ steps.filter.outputs.service }}
-    docs:         ${{ steps.filter.outputs.docs }}
-    tools:        ${{ steps.filter.outputs.tools }}
-    python:       ${{ steps.filter.outputs.python }}
-    csharp:       ${{ steps.filter.outputs.csharp }}
-    java:         ${{ steps.filter.outputs.java }}
-    lua:          ${{ steps.filter.outputs.lua }}
-    cpp:          ${{ steps.filter.outputs.cpp }}
-    cnano:        ${{ steps.filter.outputs.cnano }}
-    serialio:     ${{ steps.filter.outputs.serialio }}
-    websockets:   ${{ steps.filter.outputs.websockets }}
-    anyclient:    ${{ steps.filter.outputs.anyclient }}
+    full: ${{ steps.mode.outputs.full }}
+    changed: ${{ steps.mode.outputs.changed }}
   steps:
-    - id: mode
-      # A non-PR event is always full; a PR is full only when it carries the 'full-ci'
-      # label. `labels` is absent off pull_request events, where `contains(...)` over a
-      # null is false — harmless, since the event-name test already sets full=true there.
-      env:
-        HAS_FULL_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'full-ci') }}
-      run: |
-        if [[ "${{ github.event_name }}" != "pull_request" || "$HAS_FULL_LABEL" == "true" ]]; then
-          echo "full=true"  >> "$GITHUB_OUTPUT"
-        else
-          echo "full=false" >> "$GITHUB_OUTPUT"
-        fi
+    # The PR checkout is the merge commit, so HEAD^1..HEAD is the PR's diff against the current base
     - if: github.event_name == 'pull_request'
-      uses: actions/checkout@v6
-    - id: filter
-      if: github.event_name == 'pull_request'
-      uses: dorny/paths-filter@<pinned-sha>   # v3.x
+      uses: actions/checkout@v7
       with:
-        filters: |
-          foundational:
-            - 'protobuf/**'
-            - 'core/**'
-            - 'server/**'
-            - 'tools/build/**'
-            - 'tools/buildenv/**'
-            - 'MODULE.bazel'
-            - '.bazelrc'
-            - '.bazelversion'
-            - 'config.bzl'
-            - 'maven_install.json'
-            - '.github/**'
-          service:    ['service/**']
-          docs:       ['doc/**']
-          tools:      ['tools/krpctest/**','tools/krpctools/**','tools/TestServer/**','tools/ServiceDefinitions/**']
-          python:     ['client/python/**']
-          csharp:     ['client/csharp/**']
-          java:       ['client/java/**']
-          lua:        ['client/lua/**']
-          cpp:        ['client/cpp/**']
-          cnano:      ['client/cnano/**']
-          serialio:   ['client/serialio/**']
-          websockets: ['client/websockets/**']
-          anyclient:  ['client/**']
+        fetch-depth: 2
+    - id: mode
+      env:
+        EVENT: ${{ github.event_name }}
+      run: |
+        if [[ "$EVENT" != pull_request ]]; then
+          echo "full=true" >> "$GITHUB_OUTPUT"; exit 0
+        fi
+        changed=$(git diff --name-only --no-renames HEAD^1 HEAD)
+        # CI and Bazel configuration that every job depends on outside the target graph
+        if grep -qE '^(\.github/|tools/build/|tools/buildenv/|MODULE\.bazel|\.bazelrc$|\.bazelversion$|maven_install\.json$)' <<< "$changed"; then
+          echo "full=true" >> "$GITHUB_OUTPUT"; exit 0
+        fi
+        echo "full=false" >> "$GITHUB_OUTPUT"
+        echo "changed=$(jq -cRn '[inputs]' <<< "$changed")" >> "$GITHUB_OUTPUT"
 ```
 
-**The `foundational` group forces every job even on a PR.** Those paths invalidate essentially the
-whole Bazel graph: everything depends on `protobuf` and `core`; services layer on `core`+`server`;
-`tools/build`, `.bazelrc`, `MODULE.bazel`, `config.bzl`, the buildenv image, and the CI workflow
-itself affect all builds. A change touching any of them behaves like full even on a `pull_request`.
+The forced-full list is short and stable: the workflow and its actions, the Bazel module and
+toolchain config, and the build image. Every other path is judged by the target graph.
 
-**Alternative to the third-party action:** replace `dorny/paths-filter` with a small
-`git diff --name-only <merge-base>...HEAD` bash step that sets the same `$GITHUB_OUTPUT` booleans.
-Recommended primary is `dorny/paths-filter` pinned by SHA — it handles the PR merge-base robustly and
-matches the repo's existing use of pinned third-party actions (`actions/checkout`, `actions/cache`).
+### `scope` action: each job decides from its own targets
 
-### Per-job gating
+`.github/actions/scope` takes the setup outputs and the job's Bazel targets, and outputs `run`. It
+runs in the buildenv container after `build-setup`.
 
-Every gated job adds `setup` to its `needs:` and an `if:` of the form
-`needs.setup.outputs.full == 'true' || needs.setup.outputs.foundational == 'true' || <component>`.
+1. Full mode → `run=true`, no query.
+2. Query `kind('source file', deps(T)) + buildfiles(deps(T))` and keep the `//` labels.
+3. Convert each label to a path (`//client/cpp:src/x.cpp` → `client/cpp/src/x.cpp`).
+4. `run=true` if a changed file is one of those paths, or sits in the same directory as one of them.
+   At the repository root, only exact files match.
+5. A failed query → `run=true`.
 
-| Job | Runs when (in addition to `full` / `foundational`) |
+**Directory matching** covers three cases that exact matching misses:
+
+* a file deleted from a glob, which the head graph no longer contains
+* non-Bazel inputs next to the sources, e.g. `client/cpp/test-cmake-linux.sh` and the CMake files
+* a new file in a directory with existing dependencies
+
+`query` resolves every `select()` branch, so the dependency set is a superset of any one
+configuration. The query errs toward running a job, never toward skipping one.
+
+**Matrix entries** scope themselves from their own `build` and `test` fields. Nothing new is
+declared per entry:
+
+```yaml
+linux:
+  needs: setup
+  steps:
+    - uses: actions/checkout@v7
+    - uses: ./.github/actions/build-setup
+    - id: scope
+      uses: ./.github/actions/scope
+      with:
+        full: ${{ needs.setup.outputs.full }}
+        changed: ${{ needs.setup.outputs.changed }}
+        targets: ${{ matrix.build }} ${{ matrix.test }}
+    - if: matrix.build && steps.scope.outputs.run == 'true'
+      run: bazel build ${{ matrix.build }}
+    # test and upload-artifact gain the same condition
+```
+
+A job-level `if:` cannot read `matrix`, so the matrix entries skip at the step level. A skipped
+entry still starts a runner and runs `build-setup`, in parallel with the others.
+
+**Standalone jobs** pass their targets explicitly and export `run`, so a downstream job can follow:
+
+```yaml
+linux-test-client-cpp:
+  needs: setup
+  outputs:
+    run: ${{ steps.scope.outputs.run }}
+  steps:
+    # checkout, build-setup
+    - id: scope
+      uses: ./.github/actions/scope
+      with:
+        full: ${{ needs.setup.outputs.full }}
+        changed: ${{ needs.setup.outputs.changed }}
+        targets: //client/cpp:cpp //client/cpp:test
+    # build, test and upload gated on steps.scope.outputs.run
+
+linux-build-client-cpp-cmake:
+  needs: linux-test-client-cpp
+  if: needs.linux-test-client-cpp.outputs.run == 'true'
+```
+
+| Job | Scope |
 |---|---|
-| `lint` | **always** — no `if`; buildifier over the repo is seconds, keep a fast signal every push |
-| `test-core` | *(foundational only — a `core` change already forces everything)* |
-| `build-krpc`, `build-genfiles`, `test-service` | `service` |
-| `build-csharp-sln` | *(no `if`; `needs: build-genfiles`, auto-skips when genfiles skips)* |
-| `test-tools` | `tools` \|\| `python` |
-| `test-client-python` | `python` |
-| `test-client-csharp` | `csharp` |
-| `test-client-java` | `java` |
-| `test-client-lua` | `lua` |
-| `test-client-cpp` | `cpp` |
-| `test-client-cnano` | `cnano` |
-| `test-client-serialio` | `serialio` |
-| `test-client-websockets` | `websockets` |
-| `build-client-{cpp,cnano}-{cmake,vcpkg}-{linux,windows}` | *(no `if`; each `needs:` its parent `test-client-*`, auto-skips when the parent skips)* |
-| `build-docs-html/pdf/examples`, `test-docs` | `docs` \|\| `service` \|\| `anyclient` (docs cross-reference all services/clients — e.g. `check-documented`) |
-| `build-windows` | `full` **only** (`needs.setup.outputs.full == 'true'`); keep `continue-on-error`, stays out of the gate |
+| `lint` | always runs, no scope step |
+| `linux` matrix | `matrix.build matrix.test` |
+| `linux-build-krpc` | the targets it builds |
+| `linux-build-genfiles` | `//:csproj //:csproj-test`, plus the paths `tools/release/genfiles.py`, `KRPC.sln`, `Directory.Build.props` |
+| `linux-build-csharp-sln` | follows `linux-build-genfiles` via its `run` output |
+| `linux-test-client-{cpp,cnano}` | their build and test targets |
+| `linux-build-client-{cpp,cnano}-{cmake,vcpkg}` | follow their parent via its `run` output |
+| `windows` matrix, all `windows-*` jobs | `if: needs.setup.outputs.full == 'true'` |
 
-Two GitHub-Actions mechanics keep the diff minimal:
+`scope` takes an optional `paths` input for the few non-Bazel inputs outside their targets'
+directories. The `genfiles` row is the only current use.
 
-* **`needs`-skip propagation.** A job whose `needs:` dependency was skipped is itself skipped. So the
-  eight downstream cmake/vcpkg jobs and `build-csharp-sln` need **no** `if` — they inherit their
-  parent's decision for free. Only jobs that reference `needs.setup.outputs.*` add `setup` to
-  `needs`.
-* **`test-tools`** gains `|| python` because `//tools/krpctest` and `//tools/krpctools` depend on
-  `//client/python:krpc_lib`.
+**Fail-safes.** A job without a scope step always runs, so a new job runs on every PR until someone
+scopes it. A failed query also runs the job. The residual risk is a non-Bazel input that is missing
+from `paths` and does not sit next to a dependency. The merge queue catches that case.
 
-### Gate (`all-checks-passed`) — unchanged in spirit
+### Gate
 
-Add `setup` to its `needs:` list. Keep `if: always()` and the existing
-`contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')` check. Skipped jobs
-report `skipped` (neither `failure` nor `cancelled`), so a lite run with most jobs skipped **passes**
-the gate. Because `all-checks-passed` always runs, it always reports a status in both the
-`pull_request` and `merge_group` contexts, so it remains the single required status check. As today,
-`build-windows` stays out of the gate.
+`all-checks-passed` adds `setup` to its `needs` and keeps `if: always()` plus the failure or
+cancelled check. Skipped jobs report `skipped`, so a lite run passes. The gate runs on every event,
+including `merge_group`, so it remains the single required check.
 
-### On-demand full CI on a PR (`full-ci` label)
+### Repository settings
 
-Sometimes a PR wants the whole matrix before it is ready to merge — a risky refactor, a change to
-something lite mode would skip (e.g. a service change that could affect client codegen), or a final
-pre-merge sanity check. Applying the **`full-ci`** label to the PR sets `full = true` for that PR, so
-every job runs. Because `on.pull_request.types` includes `labeled`, adding the label **immediately
-re-triggers CI** with no new push needed; removing it does not downgrade an in-flight run — the next
-push runs lite again. `workflow_dispatch` remains an alternative one-off full run from the Actions
-tab.
+A one-time step, outside the workflow:
 
-The label is **additive convenience, not the gate.** The merge queue (`merge_group`) still runs full
-regardless of labels and is the only thing that enforces full CI before a commit lands — a PR cannot
-be labeled into or out of the merge requirement. The only setup the label needs is creating a
-`full-ci` label once (repo → Issues → Labels); no branch-protection change.
+Branch protection on `main`: require `all-checks-passed`, enable "Require merge queue".
 
-### Maintainer-side settings (one-time; cannot live in the workflow)
+## What lite saves
 
-The merge queue is what turns "full CI before merge" into a hard guarantee:
+`bazel query` over each Linux job's targets on 2026-10-14 gives the Linux jobs below for each change.
+`lint` always runs, and Windows jobs never run in lite mode. "Docs" is the four docs jobs: html,
+pdf, examples and test.
 
-1. **Settings → Branches → branch protection for `main`:** require the status check
-   **`all-checks-passed`**, and enable **"Require merge queue."**
-2. Merge-queue defaults are fine. On `merge_group`, `full == 'true'`, so the complete suite
-   (including `build-windows`) runs before the commit lands.
+| Change under | Linux jobs that run |
+|---|---|
+| `client/serialio`, `client/websockets` | own test |
+| `doc` | docs |
+| `client/lua` | own test, docs except examples, benchmarks |
+| `client/{cpp,cnano,java}` | own test and cmake and vcpkg, docs, benchmarks |
+| `client/csharp` | own test, docs, benchmarks, `build-krpc`, genfiles and sln |
+| `tools/krpctest` | `test-service`, `test-tools`, benchmarks |
+| `service/*`, `client/python`, `tools/krpctools` | all except `test-core`, lua, build scripts |
+| `core`, `protobuf`, `tools/ServiceDefinitions` | all except build scripts |
 
-## Changes
+Path filtering pays off for client and doc PRs. A service or Python client PR runs nearly every
+Linux job, because clientgen is Python and every client embeds the service stubs. For those PRs, the
+gain comes from skipping Windows.
 
-Single file: **`.github/workflows/ci.yml`.**
+## Phases
 
-* Add `merge_group:` to `on:`.
-* Add the `setup` job (mode step + `dorny/paths-filter`).
-* Add `needs: setup` + an `if:` to each gated job per the table.
-* Change `build-windows` to `if: needs.setup.outputs.full == 'true'`.
-* Add `setup` to `all-checks-passed`'s `needs:`.
+1. **Merge queue and Windows in full only.** Add `setup` with the mode only, `merge_group`, the
+   Windows `if:` conditions and the repository settings. No path filtering. This alone removes 19
+   jobs from every PR push.
+2. **Scope action.** Add `changed` to `setup`, the `scope` action, and the scope steps and
+   conditions on the Linux jobs.
 
-No `BUILD.bazel`, `.bazelrc`, composite-action, or `docs.yml` changes. (`docs.yml` is a separate
-`docs`-branch Pages deploy — untouched.)
+## Validation
 
-## Validation plan
+Before requiring the merge queue:
 
-Exercise the path selection on real PRs before requiring the merge queue in branch protection:
+* Push the phase 1 branch to `main` of a fork → every job runs and the gate passes.
+* Phase 1 PR → no Windows job runs, and every Linux job runs.
+* Phase 2 PRs, compared against the table above:
+  * `client/lua` only
+  * `doc` only
+  * `service/SpaceCenter` only
+  * `core` only
+  * a file deleted from a glob
+* Measure the scope step on a skipped entry: a cold `build-setup` plus the query. If the query
+  fetches external repositories beyond the repository cache, record it here.
 
-* PR touching only `client/lua/**` → the run shows **only** `setup`, `lint`, `test-client-lua`
-  executed; all other test jobs `skipped`; `all-checks-passed` green.
-* PR touching only `service/SpaceCenter/**` → `build-krpc`/`build-genfiles`/`build-csharp-sln`/
-  `test-service`/docs run; **client test jobs skip**; `build-windows` skips.
-* PR touching `core/**` (foundational) → essentially **everything** runs (lite behaves like full).
-* PR touching only `doc/**` → only docs jobs + `lint` run.
-* **`full-ci` label on a lite PR** → applying the label re-triggers CI and every job now runs
-  (including `build-windows`); a subsequent lite-scoped push (label removed) returns to the reduced
-  set.
-* **`workflow_dispatch`** on the branch → every job runs, including `build-windows`, and the gate
-  passes — exercises the `full == 'true'` path without needing the queue enabled yet.
-* After the maintainer enables the merge queue → a `merge_group` run executes the full suite, a PR
-  cannot merge until it is green, and `build-windows` runs but (being `continue-on-error`) does not
-  block the merge.
+After enabling the queue, a `merge_group` run executes the full suite, and a red Windows job blocks
+the merge.
 
-## Trade-offs and notes
+## Trade-offs
 
-* **Lite mode is best-effort, not a correctness guarantee.** Client stubs are generated from each
-  `service/*:ServiceDefinitions` (via `clientgen_*`), so a service-only change *can* break client
-  codegen that lite mode skips. Docs (`check-documented`) similarly reference every service/client.
-  The `merge_group` full run is the backstop that catches these before merge — this is the
-  explicitly accepted tradeoff, and the reason the pre-merge gate must be enforced (constraint 2/5).
-* **Green-on-PR ≠ fully tested.** During iteration, `all-checks-passed` going green means "the
-  affected components passed," not "the whole matrix passed." That is the intended behavior; the
-  queue is where the whole matrix is enforced.
-* **Two ways to force full on a PR without waiting for the queue:** apply the **`full-ci`** label (it
-  re-triggers CI immediately), or run **`workflow_dispatch`** from the Actions tab. Neither changes
-  the merge gate — the queue always runs full.
-* **Orthogonal to the cold-build cost.** This change reduces *how many* jobs run per push; it does
-  not make an individual job faster. The complementary lever — a shared Bazel `--disk_cache` / remote
-  cache so jobs stop building cold — is out of scope here and worth a separate item.
+* **Lite is best effort.** It follows the target graph, and so it misses effects outside the graph,
+  e.g. a Windows-only failure. The merge queue is the backstop.
+* **A green PR means only that the affected jobs passed.** The full matrix is proven in the queue.
+* **A skipped matrix entry is not free.** It costs a runner and `build-setup`. That cost is parallel
+  and small next to a build.
+* **This does not make an individual job faster.** A shared Bazel disk or remote cache is the
+  separate lever for cold builds.
 
-## Rejected alternatives (for the full-CI trigger)
+## Rejected alternatives
 
-1. **Draft-PR signal** — draft PRs run lite, marking "Ready for review" runs full. Zero repo-settings
-   change, but relies on maintainer discipline to ensure a full run happened before merging, and does
-   not *enforce* it. Rejected in favor of the merge queue's hard gate. (Still compatible as an
-   add-on if wanted later.)
-2. **A label as the *gate*** — merge only once a `full-ci` label is applied and its run is green.
-   Rejected: a label is manual and unenforced, so it cannot guarantee a full run happened before
-   merge the way the queue does. (The `full-ci` label *is* adopted, but as an **on-demand** full-run
-   supplement — see "On-demand full CI on a PR" above — not as the merge gate.)
-3. **Per-target affected-test selection** (`bazel query 'rdeps(//..., set(<changed>))'`) instead of
-   coarse per-component job gating. More precise, but adds a change-detection/`bazel query`
-   orchestration layer the repo does not have today, and the win over job-level path filtering is
-   marginal for this component layout. Rejected as disproportionate; job-level gating is the right
-   altitude for the maintainer's stated goal.
+1. **Hand-maintained path filters** (`dorny/paths-filter` with one boolean per component). The
+   previous revision of this doc. Checking it against `bazel query` showed the hand-drawn edges were
+   wrong in six places, e.g. every client depends on `service/*` and `client/python` through
+   clientgen. A hand-drawn table drifts with every BUILD change.
+2. **A scope table computed centrally in `setup`.** Accurate, but `setup` would need a second copy
+   of every job's targets. The per-job action reads the targets where they are already written.
+3. **A dynamic matrix** built by `setup` with `fromJSON`. The matrix definition would move into a
+   script, and an empty matrix fails the job. Step-level skips keep the matrix as written.
+4. **Draft PRs or a label as the full CI trigger.** Depends on discipline and enforces nothing.
+5. **A manual full run on a PR**, by label or `workflow_dispatch`. The queue runs full CI before
+   every merge, and a failure there only sends the PR back.
