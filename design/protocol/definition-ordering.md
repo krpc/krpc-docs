@@ -1,9 +1,8 @@
 # Service definition ordering
 
-**Status:** implemented (2026-08-09), all six phases. Prerequisite for
-[struct-types.md](struct-types.md), which cannot be implemented cleanly until this
-lands. See *What was built* below for where the implementation differs from this
-design.
+**Status:** done — all six phases merged as [PR #1044](https://github.com/krpc/krpc/pull/1044). Prerequisite for
+[struct-types.md](struct-types.md). See *What was built* below for where the implementation
+differs from this design.
 
 ## Context
 

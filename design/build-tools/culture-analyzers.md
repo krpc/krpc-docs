@@ -1,8 +1,10 @@
 # Re-enable the culture analyzers for the C# projects
 
-**Status:** in progress. Split out of the [locale hardening](../locale-hardening.md) work
-([PR #993](https://github.com/krpc/krpc/pull/993)); the config itself is not yet merged, sitting on
-top of that work. No issue or PR filed yet.
+**Status:** done, merged as [PR #1133](https://github.com/krpc/krpc/pull/1133). Split out of the
+[locale hardening](../locale-hardening.md) work ([PR #993](https://github.com/krpc/krpc/pull/993)).
+As built: one shared global config (`tools/build/dotnet/analyzers.globalconfig`) for the Bazel and
+`KRPC.sln` builds, with CA1304, CA1305, CA1310 and CA1311 as errors. CA1307 was left off; CA1310
+covers the culture-sensitive comparisons, and CA1307 only asks for an explicit ordinal.
 
 ## Rationale
 
@@ -50,7 +52,7 @@ The local dotnet SDK 10 analyzers flag ~30 pre-existing `CA1305`/`CA1307` sites 
 `AnalysisLevel=latest` resolves to a different rule set per SDK. `dotnet build -warnaserror` therefore
 fails locally on files CI accepts. Pinning `AnalysisLevel` to a fixed version would make the two
 agree; a Bazel-driven check would pin the toolchain anyway. Moving to
-[.NET 10](../../issues/dotnet-10-migration.md) first removes the skew entirely, so the analyzer triage is done
+.NET 10 (done in [PR #1139](https://github.com/krpc/krpc/pull/1139)) first removes the skew entirely, so the analyzer triage is done
 against the rule set CI will actually run.
 
 ## Changelog impact

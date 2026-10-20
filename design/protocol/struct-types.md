@@ -1,9 +1,9 @@
 # Structure types (issue #866)
 
-**Status:** implemented, see *What was built* below. Written 2026-07-03, revised
+**Status:** done — merged as [PR #1066](https://github.com/krpc/krpc/pull/1066), closing [#866](https://github.com/krpc/krpc/issues/866), with value ordering
+and hashing in [PR #1067](https://github.com/krpc/krpc/pull/1067); see *What was built* below. Written 2026-07-03, revised
 2026-08-09 against `main` after the v0.6.0 release and
-[PR #1017](https://github.com/krpc/krpc/pull/1017) (nullable values). Issue
-[#866](https://github.com/krpc/krpc/issues/866) is milestoned 0.7.0.
+[PR #1017](https://github.com/krpc/krpc/pull/1017) (nullable values).
 
 ## Context
 

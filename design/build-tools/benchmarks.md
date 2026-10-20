@@ -1,10 +1,9 @@
 # Benchmarks
 
-**Status:** in progress (2026-08-16) - built, restructured, PR not yet raised. The first build was
-shaped by [object-lifetime.md](../object-lifetime.md), which is where it came from; it has since
-been reorganized around what it is actually for, and given client-side suites. See
+**Status:** done — merged as [PR #1052](https://github.com/krpc/krpc/pull/1052) "Benchmark suite". The first build was
+shaped by [object-lifetime.md](../object-lifetime.md), which is where it came from; it was then
+reorganized around what it is actually for, and given client-side suites. See
 [As built](#as-built).
-**Issue:** _none yet - needs filing (`krpc/krpc`)._
 
 ## Problem
 
@@ -176,7 +175,7 @@ A run warms up for a second before measuring anything. Without it the first case
 
 **Status:** built, 2026-08-17. `TestServer` takes `--no-frame-pacing`; the client runners measure
 the round trips against a server started with it and the streams against a paced one, and the
-report says which ran against which. PR not yet raised.
+report says which ran against which. Merged with [PR #1052](https://github.com/krpc/krpc/pull/1052).
 
 `TestServer`'s 60 Hz loop is the subject of the in-game suite and a confound for the client one.
 A client round trip is served repeatedly inside one update for as long as the client answers

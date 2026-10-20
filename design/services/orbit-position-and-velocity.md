@@ -1,7 +1,6 @@
 # Orbit position and velocity, and the gaps around them
 
-**Status:** in progress. Implemented and building; no PR opened and no issue filed yet, one should
-be filed.
+**Status:** done — merged as [PR #1087](https://github.com/krpc/krpc/pull/1087) "Expand orbit API".
 
 `Orbit` pairs `Radius` with `RadiusAt` and `Speed` with `SpeedAt`. The vector members have no such
 pair: `PositionAt (ut, frame)` and `VelocityAt (ut, frame)` exist, and there is no `Position` and no

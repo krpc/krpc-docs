@@ -1,8 +1,7 @@
 # Orbits from state vectors, and reference frames that coast
 
-**Status:** in progress. Phases 1 to 3 are implemented and verified in game; no PR opened and no
-issue filed yet, one should be filed. Where the implementation departed from what is proposed
-below, the section says so and
+**Status:** done — phases 1 to 3 merged as [PR #1046](https://github.com/krpc/krpc/pull/1046). Where the implementation departed
+from what is proposed below, the section says so and
 [Departures from the design](#departures-from-the-design) collects them.
 
 Let a script construct an orbit, from an initial position and velocity or from orbital elements, and

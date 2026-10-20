@@ -1,8 +1,8 @@
 # Locale hardening
 
 **Status:** done — merged to `main` as [PR #993](https://github.com/krpc/krpc/pull/993). One piece
-was split out and did **not** ship in #993: the .NET culture-analyzer config (`Directory.Build.props`
-+ `.editorconfig`; *Structural immunity* #2 / item 4 below), which is not yet merged and is tracked in
+was split out and shipped separately: the .NET culture analyzers (*Structural immunity* #2 / item 4
+below), merged as [PR #1133](https://github.com/krpc/krpc/pull/1133), see
 [`design/build-tools/culture-analyzers.md`](build-tools/culture-analyzers.md). This doc is a
 historical record of the design.
 

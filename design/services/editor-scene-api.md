@@ -1,10 +1,11 @@
 # Editor scene API: part tree and stage delta-v
 
-**Status:** done, all six phases built, phase 6 added after the first five as a deliberate
-reversal of this document's scope. One follow-up is left open: what a part proxy taken in the
-editor should do when the craft is reloaded or launched, described under
-[Testing](#testing). Covers
-[issue #263](https://github.com/krpc/krpc/issues/263) and supersedes the draft
+**Status:** done — merged as [PR #1038](https://github.com/krpc/krpc/pull/1038), closing [#263](https://github.com/krpc/krpc/issues/263), all six phases built, phase 6
+added after the first five as a deliberate reversal of this document's scope. Follow-ups
+[PR #1059](https://github.com/krpc/krpc/pull/1059) (center of mass and inertia) and [PR #1064](https://github.com/krpc/krpc/pull/1064) (part positions) also merged. The
+lifetime of a part proxy across a reload or launch, left open under [Testing](#testing), was settled
+by the [object lifetime work](../object-lifetime.md) ([PR #1051](https://github.com/krpc/krpc/pull/1051)):
+the part raises `ObjectDestroyedException`. Supersedes the draft
 [PR #788](https://github.com/krpc/krpc/pull/788), whose entry-point shape is kept and whose
 implementation approach is not (see [Why not PR #788 as it stands](#why-not-pr-788-as-it-stands)).
 Where the build diverged from this design, see [As built](#as-built).
@@ -375,7 +376,9 @@ between throwing and following the part, and test whichever is chosen. Reloading
 the sharp case, since `craftID` makes the proxy keep resolving, to a part that is a different Unity
 object than the one the client asked about.
 
-**Not done.** The lifetime question above is unanswered and untested. As built the behaviour falls
+**Settled later by [PR #1051](https://github.com/krpc/krpc/pull/1051):** a part raises
+`ObjectDestroyedException` once it leaves the vessel, and once the editor loads any vessel over it.
+The rest of this paragraph records the behavior before that. As built the behaviour falls
 out of the lookup rather than being chosen: a proxy whose `craftID` is still in the editor's craft
 keeps resolving, so it follows the part across a reload of the same craft and silently refers to a
 different Unity object; one whose `craftID` has gone raises. Worth settling on its own, alongside

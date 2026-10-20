@@ -1,11 +1,7 @@
 # A public `Debug` service
 
-**Status:** in progress — meta issue
-[#955](https://github.com/krpc/krpc/issues/955), children
-[#145](https://github.com/krpc/krpc/issues/145),
-[#466](https://github.com/krpc/krpc/issues/466),
-[#799](https://github.com/krpc/krpc/issues/799),
-[#826](https://github.com/krpc/krpc/issues/826).
+**Status:** done — merged as [PR #1033](https://github.com/krpc/krpc/pull/1033) "Add a Debug service", closing meta issue
+[#955](https://github.com/krpc/krpc/issues/955) and its children [#145](https://github.com/krpc/krpc/issues/145), [#466](https://github.com/krpc/krpc/issues/466), [#799](https://github.com/krpc/krpc/issues/799); it supersedes the draft [PR #826](https://github.com/krpc/krpc/pull/826).
 
 ## Context
 

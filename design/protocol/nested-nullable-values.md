@@ -1,9 +1,9 @@
 # Nullable values inside structures and collections
 
-**Status:** in progress (as of 2026-09-02). Follow-up to
+**Status:** done — merged as [PR #1091](https://github.com/krpc/krpc/pull/1091). Follow-up to
 [nullable-values.md](nullable-values.md), which made a parameter or a return value nullable but
 left every nested position non-nullable. Unblocks open question 3 of
-[struct-types.md](struct-types.md). No issue yet.
+[struct-types.md](struct-types.md).
 
 All three phases landed across the schema, the server, krpctools and every client, merged as
 [PR #1091](https://github.com/krpc/krpc/pull/1091). Every client holds nullability the way

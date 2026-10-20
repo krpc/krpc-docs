@@ -1,12 +1,9 @@
 # Object lifetime, destroyed objects and object-store reclamation
 
-**Status:** in progress. Phases 1 to 14 are built, 8a included; no PR is raised yet, and
-[#1072](https://github.com/krpc/krpc/issues/1072) is the number its changelog entries predict for
-it. Phases 15 and 16, the benchmarking, are a pull request of their own and are not built here; the
-numbers under [Performance](#performance) were measured on a build that carried them. Covers issues
-[#885](https://github.com/krpc/krpc/issues/885),
-[#764](https://github.com/krpc/krpc/issues/764),
-[#771](https://github.com/krpc/krpc/issues/771) and the follow-up left open by
+**Status:** done — phases 1 to 14 (8a included) merged as [PR #1051](https://github.com/krpc/krpc/pull/1051) "Object Lifetime";
+phases 15 and 16, the benchmarking, merged separately as [PR #1052](https://github.com/krpc/krpc/pull/1052). The numbers under
+[Performance](#performance) were measured on a build that carried them. Covers issues
+[#885](https://github.com/krpc/krpc/issues/885), [#764](https://github.com/krpc/krpc/issues/764), [#771](https://github.com/krpc/krpc/issues/771) and the follow-up left open by
 [#770](https://github.com/krpc/krpc/pull/770); the approach was agreed on
 [PR #894](https://github.com/krpc/krpc/pull/894). It sits on top of the editor scene API
 ([services/editor-scene-api.md](services/editor-scene-api.md)) and the user interface controls work

@@ -1,9 +1,8 @@
 # UI service: code-built controls, layout and new widgets
 
-**Status:** in progress. Issue [krpc/krpc#312](https://github.com/krpc/krpc/issues/312).
-All seven phases are implemented, as one PR rather than one each; PR to follow. The
-follow-ups from [ui-widget-gap-audit.md](ui-widget-gap-audit.md) land in the same PR, and
-the class hierarchy below includes them.
+**Status:** done — all seven phases merged as one PR, [PR #1040](https://github.com/krpc/krpc/pull/1040), closing
+[#312](https://github.com/krpc/krpc/issues/312). The follow-ups from [ui-widget-gap-audit.md](ui-widget-gap-audit.md) landed in the
+same PR, and the class hierarchy below includes them.
 
 ## Context
 

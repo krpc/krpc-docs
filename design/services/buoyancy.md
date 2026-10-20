@@ -1,6 +1,6 @@
 # Buoyancy and hydrodynamics
 
-**Status:** in progress. All four phases are implemented and tested; no issue or PR filed yet.
+**Status:** done — all four phases merged as [PR #1103](https://github.com/krpc/krpc/pull/1103) "Buoyancy".
 
 kRPC exposes the aerodynamic half of KSP's flight model in full: `Part.Lift`, `Part.Drag`,
 `Flight.AerodynamicForce`, `Flight.DynamicPressure`, `Flight.AtmosphereDensity`. The water half is

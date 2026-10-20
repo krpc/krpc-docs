@@ -2,7 +2,7 @@
 
 **Status:** done — see the outcome at the end. Gaps 1 to 7 are implemented alongside the
 [ui-controls-and-layout.md](ui-controls-and-layout.md) work (issue
-[krpc/krpc#312](https://github.com/krpc/krpc/issues/312)), in the same PR; gap 8 was
+[krpc/krpc#312](https://github.com/krpc/krpc/issues/312)), merged in [PR #1040](https://github.com/krpc/krpc/pull/1040); gap 8 was
 rejected. This doc measured what was still missing for "any reasonable in-game
 interface".
 

@@ -1,7 +1,6 @@
 # When the auto-pilot's control loop runs in a tick
 
-**Status:** in progress (2026-08-22) — raised as
-[#1070](https://github.com/krpc/krpc/pull/1070), together with
+**Status:** done — merged as [PR #1070](https://github.com/krpc/krpc/pull/1070), together with
 [holding a tick](../server/tick-hold.md), which gives a program a whole tick but no say in
 where in it the auto-pilot runs.
 

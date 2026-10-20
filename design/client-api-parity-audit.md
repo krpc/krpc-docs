@@ -2,7 +2,10 @@
 
 **Status:** audit (2026-07-21) — fixed: bugs 1-8 (cnano and Java), 9, 12-13 (C++), 14-15 (C#),
 17-19 (Lua), 20-22 and part of 23-48 (Python), and 49-51 — see the "bugs, as fixed" sections.
-Outstanding: 10-11 (C++ teardown), 16 (C#), and the rest of the Python sweep. Every client has
+Fixed later: 10 (C++ `Connection::close`, [PR #1065](https://github.com/krpc/krpc/pull/1065)) and 16
+(C# stream cast, by the stream and event rework and server side functions). Outstanding: 11 (C++ stream
+handles) and the rest of the Python sweep, deferred to the 0.8 conformance work
+([#1123](https://github.com/krpc/krpc/issues/1123)). Every client has
 now been swept at least once; only Python has had a dedicated one. Bugs 23-48 come from a dedicated sweep of the Python client, run after
 bugs 20-22 showed that treating it as the reference had left it the least examined client here;
 see "Python client sweep" for the findings and for what that says about this audit's method.

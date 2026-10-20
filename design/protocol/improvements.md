@@ -58,7 +58,7 @@ mechanical.
 
 #### Remaining: presence for defaults and results — [#843](https://github.com/krpc/krpc/issues/843)
 
-**Status: design agreed** — see [nullable-values.md](nullable-values.md). The detailed
+**Status: completed** in [#1017](https://github.com/krpc/krpc/pull/1017) and [#1091](https://github.com/krpc/krpc/pull/1091), see [nullable-values.md](nullable-values.md). Previously: design agreed. The detailed
 design departs from the issue's proto3 `optional` proposal (blocked by the KSP/Unity
 protobuf 3.10.1 pin and the protobuf-lua plugin): it uses additive `bool` presence/null
 fields on `Parameter`, `ProcedureResult` and `Argument` instead, retires the legacy
@@ -93,7 +93,7 @@ or a structure field is designed separately in
 
 ### 3. Extension methods — [#305](https://github.com/krpc/krpc/issues/305) + [#900](https://github.com/krpc/krpc/issues/900)
 
-**Status: design agreed** — see [extension-members.md](extension-members.md). C#
+**Status: completed** in [#1077](https://github.com/krpc/krpc/pull/1077), see [extension-members.md](extension-members.md). Previously: design agreed. C#
 extension methods with `[KRPCMethod]`/`[KRPCProperty]` are grafted server-side into the
 *target class's* service definition as ordinary `Class_Member` procedures — no schema
 change, and all clients/clientgen/docgen work unchanged (except a Python
@@ -125,7 +125,7 @@ concrete story for both static and dynamic clients.
 
 ### 4. Structure types — [#866](https://github.com/krpc/krpc/issues/866)
 
-**Status: design agreed** — see [struct-types.md](struct-types.md). `[KRPCStruct]` C#
+**Status: completed** in [#1066](https://github.com/krpc/krpc/pull/1066), see [struct-types.md](struct-types.md). Previously: design agreed. `[KRPCStruct]` C#
 structs with `[KRPCProperty]` fields; wire encoding reuses the positional Tuple format
 (tagged encoding rejected); `STRUCT = 102` TypeCode + `Struct`/`StructField` definition
 messages; append-only field evolution; non-nullable fields in v1. First adoption in a

@@ -1,7 +1,7 @@
 # Extension members for other services' classes (issues #305 + #900)
 
-**Status:** in progress — built on a branch, not yet opened as a PR. Written 2026-07-03,
-revised 2026-08-22 against `krpc` at version 0.7.0.
+**Status:** done — merged as [PR #1077](https://github.com/krpc/krpc/pull/1077), closing [#305](https://github.com/krpc/krpc/issues/305) and [#900](https://github.com/krpc/krpc/issues/900). Written
+2026-07-03, revised 2026-08-22 against `krpc` at version 0.7.0.
 
 Everything below landed as designed, with four differences:
 

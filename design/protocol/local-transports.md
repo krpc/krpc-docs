@@ -1,7 +1,9 @@
 # A local socket transport, and what else the game's runtime can carry (issue #899)
 
-**Status:** in progress (2026-08-15). Built and tested on Linux, with one Windows build break
-outstanding; pull requests not yet raised.
+**Status:** done — the local socket transport merged as [PR #1065](https://github.com/krpc/krpc/pull/1065). Windows
+support (AF_UNIX on Windows 10 1803 and later) landed in the same PR, so the "Linux and macOS only"
+plan under [Windows](#windows) is superseded. One Windows CI hang remains open as
+[#1078](https://github.com/krpc/krpc/issues/1078).
 [Issue #899](https://github.com/krpc/krpc/issues/899) asks for more communication protocols; this
 settles which of them the game's runtime can actually carry, measures whether a cheaper local
 transport is worth having, and records what was built.
