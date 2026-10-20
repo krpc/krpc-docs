@@ -6,8 +6,7 @@
 (spacecenter-test-improvements), with §3d merged earlier as PR #970. No umbrella GitHub issue was
 filed — the PRs are the record. The deferred follow-ups each have their own
 design doc: object lifetime → [#771](https://github.com/krpc/krpc/issues/771) / [PR #894](https://github.com/krpc/krpc/pull/894),
-`RemoveStream` → #906, time-warp scene gating
-([`time-warp-outside-flight.md`](../issues/time-warp-outside-flight.md)), and the deferred-state RPC
+`RemoveStream` → #906, time-warp scene gating (since implemented), and the deferred-state RPC
 audit ([`deferred-state-rpc-audit.md`](services/deferred-state-rpc-audit.md)). This doc is the
 historical record of the sweep.
 
@@ -201,7 +200,7 @@ commit.
 | --- | --- | --- | --- |
 | `service/SpaceCenter/src/Services/Parts/DockingPort.cs:373` | cleanup | ✅ fixed | `InvokeEvent` moved to a new `PartModuleExtensions` class, as the marker asked. |
 | `service/SpaceCenter/src/Services/ReferenceFrame.cs:410` | cleanup | ✅ fixed | The "better way": the orbit-space→world-space offset correction is deliberate and stays (confirmed via disassembly that `getPositionAtUT` anchors on the body's current position, so the two spaces genuinely differ by a residual), but it now measures the offset on the **node's own vessel** (which the frame already tracks) instead of `FlightGlobals.ActiveVessel`, which gave a wrong correction for maneuver frames on non-active vessels. |
-| `service/SpaceCenter/src/Services/SpaceCenter.cs:660` | feature | ✅ documented | The warp API is defined in terms of the active vessel (rails altitude limits, physics-warp fallback, `CanRailsWarpAt`), so it cannot simply be opened to the space-center/tracking-station scenes where KSP can also warp; that would need a vessel-independent API surface. TODO replaced with that rationale; widening is now a tracked proposal (see [`time-warp-outside-flight.md`](../issues/time-warp-outside-flight.md), needs issue). |
+| `service/SpaceCenter/src/Services/SpaceCenter.cs:660` | feature | ✅ documented | The warp API is defined in terms of the active vessel (rails altitude limits, physics-warp fallback, `CanRailsWarpAt`), so it cannot simply be opened to the space-center/tracking-station scenes where KSP can also warp; that would need a vessel-independent API surface. TODO replaced with that rationale; widening has since been implemented. |
 | `service/SpaceCenter/src/Services/Parts/Parachute.cs:185` | feature | ✅ implemented | New `Parachute.SafeState` + `ParachuteSafeState` enum (Safe/Risky/Unsafe/None) read from `ModuleParachute.deploymentSafeState`. Verified via disassembly that KSP updates the field every `FixedUpdate` regardless of the PAW (headless-safe, unlike #883/#889), computing the real state only in atmosphere while stowed/armed; also that KSP reports Unsafe for the first second after unpacking (`timeUnpacked` guard) — documented in the property docs and waited out in the test. Stock-only (`CheckStock`). |
 | `service/SpaceCenter/src/Services/Contract.cs:260` | feature | ✅ implemented | `DateAccepted`/`DateDeadline`/`DateExpire`/`DateFinished` as UT seconds. Disassembly-confirmed semantics: accepted set on `Accept()`, expiry on `Offer()`, deadline at offer or accept depending on deadline type, zero defaults. Note the krpctest career save's auto-completed progression contract has no recorded finish time, so `DateFinished` is documented as zero when KSP didn't record it. |
 | `service/SpaceCenter/src/Services/Contract.cs:261` | feature | ✅ stale, removed | Contract parameters have long been exposed (the `Parameters` property); the TODO was vestigial and was deleted. |

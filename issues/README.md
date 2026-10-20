@@ -7,12 +7,5 @@ stub (or, if a note grows real design, promote it into [`../design/`](../design)
 
 | Note | Maps to |
 | --- | --- |
-| [addforce-cheat-deprecation.md](addforce-cheat-deprecation.md) | No issue yet; related [#466](https://github.com/krpc/krpc/issues/466), [PR #826](https://github.com/krpc/krpc/pull/826) |
-| [changelog-reference-enforcement.md](changelog-reference-enforcement.md) | No issue yet |
-| [debugtools-service.md](debugtools-service.md) | [PR #826](https://github.com/krpc/krpc/pull/826) (external) |
-| [dotnet-10-migration.md](dotnet-10-migration.md) | No issue yet |
-| [editor-api.md](editor-api.md) | [PR #788](https://github.com/krpc/krpc/pull/788) (external) |
 | [infernal-robotics-input-linking.md](infernal-robotics-input-linking.md) | No issue yet |
-| [lua-protobuf-migration.md](lua-protobuf-migration.md) | No issue yet |
 | [nunit-4-migration.md](nunit-4-migration.md) | No issue yet |
-| [time-warp-outside-flight.md](time-warp-outside-flight.md) | No issue yet |
