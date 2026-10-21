@@ -11,12 +11,13 @@ The **GitHub** column says how the issue on GitHub stands against this plan:
 * `#N`, then a **bold action**: filed, but GitHub needs that change.
 * **To file**: not on GitHub yet. The link is the draft in [issues/](issues/), see
   [Filing a draft](#filing-a-draft).
+* **To draft**: not on GitHub, and no draft yet.
 
 | | Release | Theme | Progress |
 | --- | --- | --- | --- |
 | 🚧 | 0.7 | Server-side functions, streams and events, protocol additions, service improvements | All merged; to be tagged |
 | ⬜ | 0.8 | Single connection, then client conformance testing and thread safety | 0 of 5 started |
-| ⬜ | 1.0 | Remaining protocol improvements (#906) | 0 of 3 done; tick control has a 0.7 stopgap |
+| ⬜ | 1.0 | Remaining protocol improvements (#906), server side function follow-ups | 0 of 9 done; tick control has a 0.7 stopgap |
 
 ## 0.7: server-side functions, streams and events, service improvements
 
@@ -111,7 +112,7 @@ Everything but the `RemoveStream` change is independent of the protocol work, an
 | ⬜ | Raise the default receive timeout | **To file**: [recv-timeout-default.md](issues/recv-timeout-default.md) | enhancement, server | [server/recv-timeout-cliff.md](design/server/recv-timeout-cliff.md) |
 | ⬜ | Python: trim client frames from server error tracebacks | **To file**: [python-traceback-trim.md](issues/python-traceback-trim.md) | enhancement, client:python | — |
 
-## 1.0: remaining protocol improvements
+## 1.0: remaining protocol improvements, server side function follow-ups
 
 The rest of meta-issue #906 ([protocol/improvements.md](design/protocol/improvements.md)), built on
 the 0.8 single connection and covered by the conformance suite as it lands.
@@ -121,6 +122,19 @@ the 0.8 single connection and covered by the conformance suite as it lands.
 | ⬜ | Protocol improvements (meta issue) | [#906](https://github.com/krpc/krpc/issues/906) | enhancement, protocol | [protocol/improvements.md](design/protocol/improvements.md) |
 | 🚧 | Batching and transactions, fire-and-forget, client to server streams | [#903](https://github.com/krpc/krpc/issues/903), **add milestone** | enhancement, protocol | [protocol/reverse-streams.md](design/protocol/reverse-streams.md); `KRPC.RunFunction` (#1124) already runs a batch in one tick |
 | 🚧 | Tick control: one RPC or batch per physics update, replacing the tick hold stopgap | [#251](https://github.com/krpc/krpc/issues/251), **add milestone** | enhancement, server:api | [server/tick-hold.md](design/server/tick-hold.md) is the stopgap; protocol design open |
+
+### Server side function follow-ups
+
+Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
+
+| | Feature | GitHub | Labels | Design doc |
+| --- | --- | --- | --- | --- |
+| ⬜ | Function release: a client releases the functions it no longer needs | [#1107](https://github.com/krpc/krpc/issues/1107), closed as premature, **reopen**, **add milestone** | enhancement, server:api | [server-side-functions/function-release.md](design/server-side-functions/function-release.md) |
+| ⬜ | Shared nodes compiled once, removing the `MaxNodes` bound | **To draft** | enhancement, server:api | [server-side-functions/shared-nodes.md](design/server-side-functions/shared-nodes.md) |
+| ⬜ | Batched tree construction, gated on measuring real tree sizes | **To draft** | enhancement, client | [server-side-functions/batched-tree-construction.md](design/server-side-functions/batched-tree-construction.md) |
+| ⬜ | C# functions with statements | **To draft** | enhancement, client:csharp | [server-side-functions/csharp-statement-functions.md](design/server-side-functions/csharp-statement-functions.md) |
+| ⬜ | Yielding procedures: deferred calls and resumable functions | **To draft** | enhancement, server:api | [server-side-functions/yielding-procedures.md](design/server-side-functions/yielding-procedures.md) |
+| ⬜ | Arbitrary expressions: opt-in calls to arbitrary CLR members | **To draft** | enhancement, server:api | [server-side-functions/server-side-arbitrary-expressions.md](design/server-side-functions/server-side-arbitrary-expressions.md) |
 
 ## Not scheduled
 
@@ -133,7 +147,6 @@ the 0.8 single connection and covered by the conformance suite as it lands.
 | ⬜ | InfernalRobotics input linking and sun tracking | **To file**: [infernal-robotics-input-linking.md](issues/infernal-robotics-input-linking.md) | enhancement, service:infernal-robotics | [services/infernal-robotics-input-linking.md](design/services/infernal-robotics-input-linking.md) |
 | ⬜ | Autopilot with large planes | [#526](https://github.com/krpc/krpc/issues/526), **decide**: on 1.0.0, maybe deferred to a MechJeb integration | bug, service:space-center | [autopilot/aero-extension.md](design/autopilot/aero-extension.md) |
 | ⬜ | Autopilot extensions: bank-to-turn, heterogeneous actuators, output filter knobs, sign convention refactor | — | — | [autopilot/bank-to-turn.md](design/autopilot/bank-to-turn.md), [autopilot/heterogeneous-actuators.md](design/autopilot/heterogeneous-actuators.md), [autopilot/output-filter-manual-knobs.md](design/autopilot/output-filter-manual-knobs.md), [autopilot/sign-convention-refactor.md](design/autopilot/sign-convention-refactor.md) |
-| ⬜ | Server side function follow-ups: function release, shared nodes, batched tree construction, C# statement functions, yielding procedures, arbitrary expressions | Function release: #1107, closed as premature, **reopen when started**. The rest: — | — | [server-side-functions/](design/server-side-functions/) |
 | ⬜ | Trajectories service | — | — | [services/trajectories-service.md](design/services/trajectories-service.md) |
 | ⬜ | Nullable set elements and dictionary keys, parked and likely dropped | — | — | [protocol/nullable-keys-and-set-elements.md](design/protocol/nullable-keys-and-set-elements.md) |
 | 🚧 | More communication protocols; local sockets landed in 0.7, nothing further planned | [#899](https://github.com/krpc/krpc/issues/899) | enhancement, protocol | [protocol/local-transports.md](design/protocol/local-transports.md) |

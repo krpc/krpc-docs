@@ -1,7 +1,7 @@
 # Compiling shared nodes once
 
 **Status:** proposal, postponed. A follow-up to server side functions, which merged in #1124 to
-#1130. Not scheduled, no issue.
+#1130. Planned for 1.0, no issue yet.
 
 [`server-side-functions.md`](server-side-functions.md) bounds a function at `MaxNodes` nodes,
 counted once per use. This doc is the plan to compile each shared node once, so the bound can go.
