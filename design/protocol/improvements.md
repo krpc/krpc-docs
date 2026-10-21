@@ -158,11 +158,11 @@ the client.
 
 **Status: design agreed** — see [reverse-streams.md](reverse-streams.md). Three phased
 rungs: batch client APIs (protocol/server already support multi-call requests — no
-server work); a `no_response` flag on `Request` for fire-and-forget (version-gated
-against old servers); and reverse streams — register a call, push latest-wins argument
+server work); a `no_response` flag on `Request` for fire-and-forget (a feature negotiated
+in the handshake); and reverse streams — register a call, push latest-wins argument
 updates applied at most once per tick, with errors delivered via the #877 stream
-invalidation convention. Pushes ride `Request` on the RPC connection (zero transport
-changes; the stream connection is one-way and absent on SerialIO).
+invalidation convention. Planned for 1.0 as additions on the 0.8 single connection, see
+[protocol-compatibility.md](../protocol-compatibility.md).
 
 Server side functions (#1124 to #1130) cover part of the batching rung: `KRPC.RunFunction` runs
 several calls, setters included, in one request and one physics tick. Fire-and-forget and
@@ -258,9 +258,9 @@ calls explicitly marked overtakeable. Execution order stays strictly FIFO throug
 calls mutate shared game state, so reordering them would make pipelining useless for anything
 but pure reads.
 
-**Notes.** Backwards compatible in both directions. Does *not* supersede the `repeated
-ProcedureCall` batching field, which uniquely guarantees same-frame execution — keep it.
-Complementary to the `no_response` flag in
+**Notes.** Part of the 0.8 hard break. Phase 3 can follow in 1.0 as an addition. Does *not*
+supersede the `repeated ProcedureCall` batching field, which uniquely guarantees same-frame
+execution — keep it. Complementary to the `no_response` flag in
 [reverse-streams.md](reverse-streams.md). Enables a demultiplexing reader in
 the clients, and hence an asyncio-based Python client, though that is a separate (and larger)
 clientgen question.
@@ -279,9 +279,10 @@ the second configured port all exist to serve that workaround. Websockets repeat
 arrangement despite being natively bidirectional.
 
 **Sketch.** Deliver stream updates over the RPC connection inside the `MultiplexedResponse`
-envelope that already exists for SerialIO and already reserves a `stream_update` field, opted
-into at connection time so both paths coexist. The server side is nearly free — RPC and stream
-updates are already written from the same game thread in the same `FixedUpdate`.
+envelope that already exists for SerialIO and already reserves a `stream_update` field. A hard
+break in 0.8: the server speaks only the single connection, and a mismatched client fails at the
+handshake ([protocol-version.md](protocol-version.md)). The server side is nearly free — RPC and
+stream updates are already written from the same game thread in the same `FixedUpdate`.
 
 **Notes.** Shares its entire client-side cost with section 9: both need one socket owner that
 demultiplexes to waiting callers, so they should be designed and landed together rather than

@@ -100,6 +100,8 @@ a loop builds one function.
 ## Open questions
 
 * Whether a function stream or event should own its function, releasing it on removal, so that the
-  client makes one call instead of two.
+  client makes one call instead of two. As a default it would break a 0.8 client that removes a
+  function stream and runs the same function again, so it can only be opted into
+  ([protocol-compatibility.md](../protocol-compatibility.md)).
 * Whether phase 3 makes the reference counts in phase 2 unnecessary, since a client would then hold
   only roots.

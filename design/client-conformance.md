@@ -78,12 +78,12 @@ never sees the wire. Moving to a single connection forces rewrites in two places
 **Single connection and request ids land as one piece of work.** Both need the same
 demultiplexing reader, so doing them separately writes it twice, in four clients.
 
-**Split v1.0.** `single-connection.md` frames v1.0 as one wire break that also includes #903 and
-#251. Splitting it means only the reader rework precedes the suite. #903 and #251 then land as
-additions, with tests.
+**v1.0 is split.** The wire break is 0.8 alone, so only the reader rework precedes the suite. #903
+and #251 then land in 1.0 as additions, with tests. The suite pins the client tolerance rules that
+keep them additive ([protocol-compatibility.md](protocol-compatibility.md)).
 
 **Part 1 is mostly independent of #906.** The exception is G2: its constants include
-`stream_port`, `stream_path` and the paired socket paths, which single connection deprecates.
+`stream_port`, `stream_path` and the paired socket paths, which the single connection removes.
 
 ### Order
 

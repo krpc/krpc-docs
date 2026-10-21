@@ -119,7 +119,9 @@ Everything but the `RemoveStream` change is independent of the protocol work, an
 ## 1.0: remaining protocol improvements, server side function follow-ups
 
 The rest of meta-issue #906 ([protocol/improvements.md](design/protocol/improvements.md)), built on
-the 0.8 single connection and covered by the conformance suite as it lands.
+the 0.8 single connection and covered by the conformance suite as it lands. Each item is an
+addition on protocol version 2, so 0.8 clients keep working: see
+[protocol-compatibility.md](design/protocol-compatibility.md).
 
 | | Feature | GitHub | Labels | Design doc |
 | --- | --- | --- | --- | --- |
