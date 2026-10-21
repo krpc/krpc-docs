@@ -15,19 +15,20 @@ The **GitHub** column says how the issue on GitHub stands against this plan:
 
 | | Release | Theme | Progress |
 | --- | --- | --- | --- |
-| 🚧 | 0.7 | Server-side functions, streams and events, protocol additions, service improvements | All merged; to be tagged |
-| ⬜ | 0.8 | Single connection, then client conformance testing and thread safety | 0 of 5 started |
+| 🚧 | 0.7 | Server-side functions, streams and events, protocol additions, service improvements | Protocol version to add, then tag |
+| ⬜ | 0.8 | Single connection, then client conformance testing and thread safety | 0 of 6 started |
 | ⬜ | 1.0 | Remaining protocol improvements (#906), server side function follow-ups | 0 of 9 done; tick control has a 0.7 stopgap |
 
 ## 0.7: server-side functions, streams and events, service improvements
 
-Historical. Everything merged since v0.6.0 (PRs #1015 to #1157, milestone 0.7.0). The 0.7.0
-milestone has no open issues. **Close it on GitHub once 0.7.0 is tagged.**
+Everything merged since v0.6.0 (PRs #1015 to #1157, milestone 0.7.0), plus the protocol version,
+which is left to do before the tag. **Close the milestone on GitHub once 0.7.0 is tagged.**
 
 ### Protocol and server
 
 | | Feature | PRs | Design doc |
 | --- | --- | --- | --- |
+| ⬜ | Protocol version 1 in the handshake, with version 0 served as 1 | **To file**: [protocol-version.md](issues/protocol-version.md); labels enhancement, protocol, server, client | [protocol/protocol-version.md](design/protocol/protocol-version.md) |
 | ✅ | Server-side functions | #1124 to #1130 | [server-side-functions/server-side-functions.md](design/server-side-functions/server-side-functions.md) |
 | ✅ | Stream and event improvements: refcounting, invalidation | #1122, #1108, #1109 | [protocol/stream-and-event-improvements.md](design/protocol/stream-and-event-improvements.md), superseding [protocol/stream-refcounting.md](design/protocol/stream-refcounting.md) and [protocol/stream-invalidation.md](design/protocol/stream-invalidation.md) |
 | ✅ | Stream freezing removed | #1118 | [protocol/stream-freezing-removal.md](design/protocol/stream-freezing-removal.md) |
@@ -84,12 +85,15 @@ milestone has no open issues. **Close it on GitHub once 0.7.0 is tagged.**
 | | Feature | GitHub | Labels | Design doc |
 | --- | --- | --- | --- | --- |
 | ⬜ | Single connection: RPC and stream connections merged | **To file**: [single-connection.md](issues/single-connection.md) | enhancement, protocol, server, client | [protocol/single-connection.md](design/protocol/single-connection.md) |
+| ⬜ | Protocol version 2, with the single connection | Part of the single connection issue | — | [protocol/protocol-version.md](design/protocol/protocol-version.md) |
 | ⬜ | Request ids, with the single connection | **To file**: [request-ids.md](issues/request-ids.md) | enhancement, protocol, server, client | [protocol/request-ids.md](design/protocol/request-ids.md) |
 | ⬜ | Client conformance tests and runtime specification | [#1123](https://github.com/krpc/krpc/issues/1123), **move from 1.0.0**, **post the [comment](#comment-on-1123)** | enhancement, client | [client-conformance.md](design/client-conformance.md), [client-api-parity-audit.md](design/client-api-parity-audit.md) |
 | ⬜ | Client thread safety: define and document what is thread-safe | [#427](https://github.com/krpc/krpc/issues/427) | docs | — |
 
 * **Single connection first.** It changes connection setup and threading in every client, so the
   conformance suite is written against it rather than rewritten after it.
+* **The protocol version goes to 2 with it.** A 0.7 client and a 0.8 server then fail at the
+  handshake with a clear error, in either direction.
 * **Request ids go with it.** Both need the same demultiplexing reader in each client; doing them
   separately writes it twice (see "Sequencing against #906" in
   [client-conformance.md](design/client-conformance.md)). Move to 1.0 if 0.8 needs to shrink.
