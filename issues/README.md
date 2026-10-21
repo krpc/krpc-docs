@@ -20,7 +20,6 @@ issue number when filing.
 | [dockingcam-lidar-cleanups.md](dockingcam-lidar-cleanups.md) | Bug, docstrings and logging |
 | [recv-timeout-default.md](recv-timeout-default.md) | Server default |
 | [python-traceback-trim.md](python-traceback-trim.md) | Python client |
-| [client-public-object-id.md](client-public-object-id.md) | Clients, additive |
 
 ## No milestone
 

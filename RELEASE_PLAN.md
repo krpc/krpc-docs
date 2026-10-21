@@ -103,7 +103,6 @@ if 0.8 is far off.
 | ⬜ | DockingCamera log spam, LIDAR docstrings | [drafted](issues/dockingcam-lidar-cleanups.md) |
 | ⬜ | Raise the default receive timeout | [drafted](issues/recv-timeout-default.md) |
 | ⬜ | Python: trim client frames from server error tracebacks | [drafted](issues/python-traceback-trim.md) |
-| ⬜ | A public object id accessor in each client | [drafted](issues/client-public-object-id.md) |
 
 ## 1.0 — remaining protocol improvements
 
