@@ -1,161 +1,146 @@
 # Request ids and asynchronous RPCs
 
-**Status:** proposal — sketch (2026-07-21); every section below needs a real design pass before
-implementation. Planned for 0.8, with the [single connection](single-connection.md). Issue drafted
-in [issues/request-ids.md](../../issues/request-ids.md).
+**Status:** proposal, phase 1 ready to implement (revised 2026-10-21), built together with the
+[single connection](single-connection.md) for 0.8, as part of
+[protocol version](protocol-version.md) 2. Phases 2 and 3 are later additions, each negotiated in
+the handshake. Issue drafted in [issues/request-ids.md](../../issues/request-ids.md).
 
-Related: [improvements.md](improvements.md) (meta-issue
-[#906](https://github.com/krpc/krpc/issues/906)),
-[reverse-streams.md](reverse-streams.md) (#903 — batching, `no_response`),
+Related: [single-connection.md](single-connection.md) (its "Client reader" section specifies the
+client side of phase 1), [improvements.md](improvements.md) (meta-issue
+[#906](https://github.com/krpc/krpc/issues/906)), [reverse-streams.md](reverse-streams.md) (#903,
+batching and `no_response`), [protocol-compatibility.md](../protocol-compatibility.md),
 [client-api-parity-audit.md](../client-api-parity-audit.md) (Python bug 25).
 
 ## Problem
 
-The RPC protocol has no way to associate a response with the request that produced it. The
-correlation is purely positional: the client sends one `Request`, then reads exactly one
-`Response`, and the server never reads a second request from a client while one is still in
-flight (`core/src/Core.cs:697`, guarded by `pollRequestsCurrentClients`). Three consequences:
+A response is matched to its request by position only. The client sends one `Request` and reads one
+`Response`. The server reads no second request from a client while one is in flight
+(`pollRequestsCurrentClients` in `Core.PollRequests`). Three consequences:
 
-- **No pipelining.** Every call costs a full round-trip. A client that wants to issue fifty
-  calls pays fifty round-trips, even though the server would happily execute them all in one
-  frame. The wire protocol's `repeated ProcedureCall calls` field exists for this, but no
-  bundled client exposes it.
-- **A yielding RPC stalls the whole connection.** `YieldException` re-queues the continuation
-  for the next `FixedUpdate` and the client stays in `pollRequestsCurrentClients`, so nothing
-  else that client sends is even read until the yield resolves. `WarpTo` and friends make the
-  connection unusable for their duration.
-- **Desynchronization is silent and permanent.** If a client is interrupted between
-  `send_message` and `receive_message`, the buffered response is never consumed and every
-  later call reads the *previous* call's result, forever. This is Python bug 25
-  (`client/python/krpc/client.py:207-211`); a Ctrl-C during a slow RPC is enough to trigger
-  it. With no id on the wire, neither side can detect it.
+- **No pipelining.** Every call costs a round trip. `repeated ProcedureCall calls` batches calls in
+  one request, but no bundled client exposes it.
+- **A yielding RPC stalls the connection.** `YieldException` requeues the continuation for the next
+  update and the client stays in `pollRequestsCurrentClients`. `WarpTo` makes the connection
+  unusable while it runs.
+- **Desynchronization is silent and permanent.** An exception between the client's send and receive
+  leaves the response unread, and every later call reads the previous call's result. This is Python
+  bug 25 (`Client._invoke`). A Ctrl-C during a slow RPC triggers it.
 
-## Sketch
+It is also why the server needs a second connection for streams. See
+[single-connection.md](single-connection.md).
 
-Add an id to `Request` and echo it on `Response`:
+## Wire format
 
 ```protobuf
 message Request {
-  repeated ProcedureCall calls = 1;
   uint64 id = 2;
+  repeated ProcedureCall calls = 1;
 }
 
 message Response {
+  uint64 id = 3;
   Error error = 1;
   repeated ProcedureResult results = 2;
-  uint64 id = 3;
 }
 ```
 
-Additive and backwards compatible in both directions: proto3 ignores unknown fields, and `0`
-(the default) means "no id", which is what an old client sends and what an old server echoes
-back as absent. The id is client-allocated, opaque to the server, and scoped to the
-connection — the server only copies it.
-
-**Echoing is unconditional.** Even with no other change, a client that sets an id and checks
-it on receipt turns bug 25 from silent permanent corruption into a detectable, recoverable
-error. That is worth landing on its own, before any concurrency work.
-
-### Negotiating concurrency
-
-Echoing an id is safe for everyone. *Allowing more than one request in flight* is not — it
-changes the server's per-client scheduling and its exposure to a client that floods it. So
-gate that behind a per-connection opt-in, and default it off:
-
-- Add a field to `ConnectionRequest` (e.g. `uint32 max_requests_in_flight`, `0`/absent =
-  today's behavior of 1), and have `ConnectionResponse` report what the server actually
-  granted, so an old server (which ignores the field and reports nothing) is indistinguishable
-  from one that refused. The client then knows whether it may pipeline.
-- The granted value is also the server's flood defense: it caps the per-client queue depth,
-  and the server stops reading from that socket at the cap. TCP backpressure does the rest.
-
-The alternative — a `KRPC.SetAsyncEnabled` RPC after connecting — avoids touching
-`ConnectionRequest` but has an awkward window where the client doesn't yet know the answer.
-Prefer the connection-time field.
+- The id is client-allocated, scoped to the session and opaque to the server, which copies it. A
+  reconnect starts a new session (see [single-connection.md](single-connection.md) "Reconnecting").
+- Every version 2 client sets it, starting at 1. 0 is never sent.
+- One id per `Request`, whatever its call count. A response answers a whole request, and calls
+  within a request never complete independently.
+- A client matches a response by id, never by position. This keeps phase 3 additive
+  ([protocol-compatibility.md](../protocol-compatibility.md)).
 
 ## Ordering
 
-The central question, and the one to get right before anything else.
+**Execution stays strictly FIFO per client.** kRPC calls have side effects on shared game state.
+`control.throttle = 1` followed by `control.activate_next_stage()` means something, and a client
+that pipelines them must get that meaning. The protocol docs state this.
 
-**Execution order must stay strictly FIFO per client.** kRPC calls have side effects on a
-shared mutable game state; `control.throttle = 1` followed by `control.activate_next_stage()`
-means something, and a client that pipelines them must get that meaning. Reordering execution
-would make pipelining unusable for anything except pure reads, which is most of the value
-gone. This is non-negotiable and should be stated in the protocol docs, not left implicit.
+Given FIFO execution, responses are in order too, including for yielding calls: a yielded call
+holds up the ones behind it, as today.
 
-**Given FIFO execution, responses are naturally in order too**, including for yielding calls —
-a yielded call simply holds up the ones behind it, exactly as today, except that the client
-may keep *sending*. That is already a large win (N calls, one round-trip) and it is the
-version to build first, because it requires no new semantics anywhere: the client's existing
-mental model still holds.
+## Phases
 
-So the phasing is:
+| Phase | Release | Work | Negotiated |
+| --- | --- | --- | --- |
+| 1, ids | 0.8, with the single connection | The fields above. Server echoes the id. Clients match by id through the reader in [single-connection.md](single-connection.md). | No, part of version 2 |
+| 2, pipelining | Later, additive | Per-client FIFO queue on the server, bounded by a negotiated depth. A client API to send now and collect later. | Yes |
+| 3, out-of-order completion | Later, additive, may never be built | A per-call flag lets a yielding call step out of the head of the line. | Yes |
 
-**Phase 1 — ids only.** Echo, validate on the client, detect desync. Fixes bug 25. No
-scheduling change, no negotiation needed.
+### Phase 1
 
-**Phase 2 — pipelining, in-order.** Per-client FIFO queue in `Core.RPCServerUpdate`, bounded
-by the negotiated depth, replacing the one-in-flight guard at `core/src/Core.cs:697`.
-Responses stay ordered. Clients gain a "send now, collect later" API.
+Server, in the version 2 connection of [single-connection.md](single-connection.md):
 
-**Phase 3 — out-of-order completion, opt-in per call.** Only here do responses stop being
-ordered, and only for calls the client explicitly marks as overtakeable (a flag on
-`ProcedureCall`, or a server-declared property of procedures known to yield, such as
-`WarpTo`). A marked call that yields moves out of the head-of-line position and later calls
-proceed past it; its response arrives whenever it completes. This is the piece that genuinely
-needs the id, and the piece that needs the most vetting — it is the only place where two
-calls' effects can interleave in an order the client did not write.
+- `ExecuteContinuation` and `SendErrorResponse` copy the request's id onto the response.
+  `RequestDecodeException` carries the id for a request that parses but fails to decode.
+- A message that does not parse, or a request that fails to read, ends the connection with a
+  `disconnect`, since there is no id to answer with.
+- No scheduling change. The one-in-flight guard in `PollRequests` stays.
 
-Phase 3 may well not be worth it. Evaluate it against the alternative of just telling users to
-open a second connection for long-running calls, which costs nothing and is already possible.
+Client: the "Calls" rules in [single-connection.md](single-connection.md). In short, a pending slot
+per id, added before the write; a write lock per message; the reader fills slots by id; an
+abandoned slot's response is discarded; an unknown id is a protocol error. Lua and cnano read until
+the response with their id.
+
+What phase 1 gives on its own:
+
+- **Bug 25 is fixed.** An interrupted call abandons its slot, and its response is discarded on
+  arrival.
+- **Threads stop queuing on the client.** Several threads can write requests at once. The server
+  still runs them one at a time, and TCP holds the rest. Python's `_rpc_connection_lock` goes, so a
+  yielding call on one thread no longer blocks every thread's send.
+- **Desync is detectable.** A response with an unexpected id closes the connection with an error.
+
+### Phase 2
+
+- Replace the one-in-flight guard in `PollRequests` with a per-client FIFO queue.
+- The depth is a negotiated feature with a value: a field in `ConnectionRequest`, and the granted
+  value in `ConnectionResponse`. Absent is a depth of 1, today's behavior. See "Additive changes" in
+  [protocol-version.md](protocol-version.md).
+- The granted depth is also the server's flood defense: the server stops reading from a client at
+  the cap, and TCP backpressure does the rest.
+- Clients gain a "send now, collect later" API on top of the reader.
+
+### Phase 3
+
+Only here do responses stop being ordered, and only for calls the client marks as overtakeable. A
+marked call that yields leaves the head of the line, later calls proceed past it, and its response
+arrives when it completes. This is the one place two calls' effects can interleave in an order the
+client did not write.
+
+Evaluate it against telling users to open a second connection for long-running calls, which costs
+nothing and already works.
 
 ## Relationship to batching
 
-Keep `repeated ProcedureCall calls`. Pipelining does not subsume it: all calls in one
-`Request` are executed within a single `RequestContinuation`
-(`core/src/Service/RequestContinuation.cs:52-84`) and therefore in the same frame, which
-pipelined separate requests do not guarantee. That same-frame grouping is a real semantic —
-it is the "read `ut` and position coherently" property that stream freezing was trying to
-provide — and it composes with ids rather than competing with them (one id per `Request`,
-whatever its call count). The field also costs nothing to keep.
+Keep `repeated ProcedureCall calls`. All calls in one `Request` run in one `RequestContinuation`,
+and so in the same update, which separate pipelined requests do not guarantee. That same-update
+grouping is a real semantic, and composes with ids: one id per `Request`.
 
-The `no_response` flag from [reverse-streams.md](reverse-streams.md) is
-orthogonal and complementary: fire-and-forget for writes, ids for reads you will collect
-later. A `no_response` request simply produces no response to correlate.
+The `no_response` flag from [reverse-streams.md](reverse-streams.md) is complementary:
+fire-and-forget for writes, ids for reads collected later. A `no_response` request produces no
+response to correlate.
 
 ## Client APIs
 
-The natural shape, once the server allows it, is a **demultiplexing reader**: one thread (or
-task) owns the RPC socket, reads responses, matches each id to a pending future, and resolves
-it. Every higher-level API is then a thin layer on that:
+The reader in [single-connection.md](single-connection.md) is the base for every higher-level API:
 
-- synchronous call = submit, await the future immediately (what all clients do today);
-- pipelined batch = submit N, await all N;
-- asyncio = the futures are `asyncio.Future`s and the reader is a protocol/transport.
+- synchronous call: submit, then wait on the slot at once (phase 1, what every client does);
+- pipelined batch: submit N, then wait on all N (phase 2);
+- asyncio: the slots are `asyncio.Future`s.
 
-This also removes the Python client's whole-process `_rpc_connection_lock`
-(`client/python/krpc/client.py:40`), under which a yielding RPC currently blocks every thread
-in the client, not just the caller.
-
-For Python specifically, an `async` surface is a bigger question than the protocol work: it
-means either a parallel `krpc.aio` package with generated async stubs (clientgen work,
-doubling the generated surface) or an async-capable client that the existing sync API wraps.
-Decide that separately — the protocol change does not depend on it, and phases 1 and 2 are
-useful to the sync clients on their own.
+A Python `async` surface is a separate question: a parallel `krpc.aio` package with generated async
+stubs, or an async-capable client that the sync API wraps. The protocol work does not depend on it.
 
 ## Open questions
 
-- Does the round-robin scheduler plus a global (not per-client) `MaxTimePerUpdate`
-  (`core/src/Core.cs:420`) still give fair service when one client can queue many requests?
-  Probably needs a per-client execution budget, or at least a check that a deep queue cannot
-  starve other clients.
-- What does the connection-close path do with queued-but-unexecuted requests? Silently drop
-  seems right; confirm against [`client-disconnect-cleanup.md`](client-disconnect-cleanup.md).
-- SerialIO has no flow control worth the name — should the negotiated depth be forced to 1
-  there?
-- Should the id be per `Request` or per `ProcedureCall`? Per `Request` is simpler and matches
-  the response shape; per-call only matters if phase 3 lets calls *within* a request complete
-  independently, which it should not.
-- Interaction with stream invalidation (#877) and refcounting (#902): none expected, since
-  streams use a separate connection, but confirm the stream connection's own request path
-  (`AddStream`/`RemoveStream` are ordinary RPCs on the RPC connection).
+All for phase 2 or later. Phase 1 has none.
+
+- Does the round-robin scheduler with a global `MaxTimePerUpdate` give fair service when one client
+  can queue many requests? Probably needs a per-client budget, or at least a check that a deep queue
+  cannot starve other clients.
+- What happens to queued but unexecuted requests on disconnect? Dropping them seems right. Confirm
+  against [client-disconnect-cleanup.md](client-disconnect-cleanup.md).
+- SerialIO has no flow control worth the name. Should its granted depth be fixed at 1?

@@ -86,7 +86,7 @@ which is left to do before the tag. **Close the milestone on GitHub once 0.7.0 i
 | --- | --- | --- | --- | --- |
 | ⬜ | Single connection: RPC and stream connections merged | **To file**: [single-connection.md](issues/single-connection.md) | enhancement, protocol, server, client | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | ⬜ | Protocol version 2, with the single connection | Part of the single connection issue | — | [protocol/protocol-version.md](design/protocol/protocol-version.md) |
-| ⬜ | Request ids, with the single connection | **To file**: [request-ids.md](issues/request-ids.md) | enhancement, protocol, server, client | [protocol/request-ids.md](design/protocol/request-ids.md) |
+| ⬜ | Request ids (phase 1), on the single connection branch | **To file**: [request-ids.md](issues/request-ids.md) | enhancement, protocol, server, client | [protocol/request-ids.md](design/protocol/request-ids.md) |
 | ⬜ | Client conformance tests and runtime specification | [#1123](https://github.com/krpc/krpc/issues/1123), **move from 1.0.0**, **post the [comment](#comment-on-1123)** | enhancement, client | [client-conformance.md](design/client-conformance.md), [client-api-parity-audit.md](design/client-api-parity-audit.md) |
 | ⬜ | Client thread safety: define and document what is thread-safe | [#427](https://github.com/krpc/krpc/issues/427) | docs | — |
 
@@ -94,18 +94,18 @@ which is left to do before the tag. **Close the milestone on GitHub once 0.7.0 i
   conformance suite is written against it rather than rewritten after it.
 * **The protocol version goes to 2 with it.** A 0.7 client and a 0.8 server then fail at the
   handshake with a clear error, in either direction.
-* **Request ids go with it.** Both need the same demultiplexing reader in each client; doing them
-  separately writes it twice (see "Sequencing against #906" in
-  [client-conformance.md](design/client-conformance.md)). Move to 1.0 if 0.8 needs to shrink.
+* **Request ids go with it, on the same branch.** The single connection's client reader matches
+  responses by id, so phase 1 of request ids is part of it. Pipelining and out-of-order completion
+  are later additions.
 * **Thread safety goes with conformance.** The single connection changes client threading, and
   the conformance suite's threading tests are where the guarantees get pinned and checked across
   clients.
-* **Open question** from [single-connection.md](design/protocol/single-connection.md): whether the
-  server speaks both connection formats during the transition, or 0.8 is a hard break.
+* **A hard break.** The 0.8 server speaks only the single connection, with no transition period.
+  Clients older than 0.8 cannot connect to it.
 
 ### Fixes and smaller items
 
-Everything but the `RemoveStream` change is independent of the protocol work, and can ship in a
+Everything but the `RemoveStream` change and the Ctrl-C fix is independent of the protocol work, and can ship in a
 0.7.x release if 0.8 is far off.
 
 | | Item | GitHub | Labels | Design doc |
@@ -114,6 +114,7 @@ Everything but the `RemoveStream` change is independent of the protocol work, an
 | ⬜ | `KerbalAlarmClock.Alarm.PlaySound` has no effect | **To file**: [kac-alarm-play-sound.md](issues/kac-alarm-play-sound.md) | bug, service:kerbal-alarm-clock | [services/kac-remotetech-tests-and-api.md](design/services/kac-remotetech-tests-and-api.md) |
 | ⬜ | DockingCamera log spam, LIDAR docstrings | **To file**: [dockingcam-lidar-cleanups.md](issues/dockingcam-lidar-cleanups.md) | bug, service | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ⬜ | Raise the default receive timeout | **To file**: [recv-timeout-default.md](issues/recv-timeout-default.md) | enhancement, server | [server/recv-timeout-cliff.md](design/server/recv-timeout-cliff.md) |
+| ⬜ | Python: Ctrl-C during a call on Windows, with the single connection | **To file**: [python-ctrl-c-windows.md](issues/python-ctrl-c-windows.md) | bug, client:python | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | ⬜ | Python: trim client frames from server error tracebacks | **To file**: [python-traceback-trim.md](issues/python-traceback-trim.md) | enhancement, client:python | — |
 
 ## 1.0: remaining protocol improvements, server side function follow-ups
@@ -155,6 +156,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | Autopilot extensions: bank-to-turn, heterogeneous actuators, output filter knobs, sign convention refactor | — | — | [autopilot/bank-to-turn.md](design/autopilot/bank-to-turn.md), [autopilot/heterogeneous-actuators.md](design/autopilot/heterogeneous-actuators.md), [autopilot/output-filter-manual-knobs.md](design/autopilot/output-filter-manual-knobs.md), [autopilot/sign-convention-refactor.md](design/autopilot/sign-convention-refactor.md) |
 | ⬜ | Trajectories service | — | — | [services/trajectories-service.md](design/services/trajectories-service.md) |
 | ⬜ | Nullable set elements and dictionary keys, parked and likely dropped | — | — | [protocol/nullable-keys-and-set-elements.md](design/protocol/nullable-keys-and-set-elements.md) |
+| ⬜ | Streams and events over serial IO, after the single connection; needs flow control | **To file**: [serialio-streams.md](issues/serialio-streams.md) | enhancement, protocol, server, client:cnano | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | 🚧 | More communication protocols; local sockets landed in 0.7, nothing further planned | [#899](https://github.com/krpc/krpc/issues/899) | enhancement, protocol | [protocol/local-transports.md](design/protocol/local-transports.md) |
 | ⬜ | Inheritance for remote objects; a nicety, clients translate their OOP to procedures | [#905](https://github.com/krpc/krpc/issues/905) | enhancement, protocol | — |
 | ⬜ | Constructor calls; would add a new refcounted object kind | [#898](https://github.com/krpc/krpc/issues/898) | enhancement, protocol | — |
