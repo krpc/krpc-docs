@@ -1,7 +1,5 @@
 # Allow XML documentation crefs to kRPC exceptions
 
-Milestone: none · Labels: enhancement, tools, docs
-
 A service's XML documentation cannot link to a kRPC exception. `<see cref="ObjectNotLoadedException"/>` fails the service definitions build with "Type 'ObjectNotLoadedException' is not a kRPC service, class, enumeration or structure". Docs that should name `ObjectDestroyedException` or `ObjectNotLoadedException` describe them in words instead.
 
 The fix spans `DocumentationUtils.cs`, each language's docgen `see ()`, and the cnano `exception` macro.

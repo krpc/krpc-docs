@@ -1,7 +1,5 @@
 # In-game tests for untested mod integrations
 
-Milestone: none · Labels: tools, mod-compatibility
-
 Several mod integrations have no in-game tests:
 
 * Procedural Fairings.

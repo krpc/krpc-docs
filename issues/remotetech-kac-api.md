@@ -1,7 +1,5 @@
 # Complete the RemoteTech and KerbalAlarmClock APIs
 
-Milestone: none · Labels: enhancement, service:remote-tech, service:kerbal-alarm-clock
-
 * RemoteTech: bind the API methods the service leaves unbound, about 17. These include `ControlPath`, `HasDirectGroundStation`, `RadioBlackout`, `PowerDown`, ground station management and `Enabled`.
 * KerbalAlarmClock: expose the alarm actions on `KACAlarm.Actions`: warp, message and delete when done. The binding is the same as the `PlaySound` fix in #<kac-alarm-play-sound>.
 

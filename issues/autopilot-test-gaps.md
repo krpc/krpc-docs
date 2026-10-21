@@ -1,7 +1,5 @@
 # Close the gaps in the auto-pilot test plan
 
-Milestone: none · Labels: tools, service:space-center
-
 The in-game auto-pilot tests from #882 leave these cases untested:
 
 * `attenuation_angle`, the response with `auto_tune` off, and a purely radial nudge.
