@@ -109,9 +109,9 @@ which is left to do before the tag. **Close the milestone on GitHub once 0.7.0 i
 
 ### Fixes and smaller items
 
-Everything but the `RemoveStream` change, the Ctrl-C fix and the testee stubs can ship in a 0.7.x release if 0.8 is far off. The
+Everything but the `RemoveStream` change, the Ctrl-C fix, the testee stubs and the connection binding audit can ship in a 0.7.x release if 0.8 is far off. The
 `RemoveStream` change breaks the `KRPC` service, the Ctrl-C fix depends on the single connection, and the testee
-stubs depend on the conformance suite.
+stubs and the audit depend on the conformance suite.
 
 | | Item | GitHub | Labels | Design doc |
 | --- | --- | --- | --- | --- |
@@ -123,6 +123,7 @@ stubs depend on the conformance suite.
 | ⬜ | Python: trim client frames from server error tracebacks | **To file**: [python-traceback-trim.md](issues/python-traceback-trim.md) | enhancement, client:python | — |
 | ⬜ | Conformance testee stubs from the full TestServer definitions, with `TestService2` | **To file**: [test-service-full-definitions.md](issues/test-service-full-definitions.md) | enhancement, tools | [client-conformance/harness.md](design/client-conformance/harness.md) |
 | ⬜ | Run clang-format and clang-tidy over every C and C++ source | **To file**: [clang-tidy-all-sources.md](issues/clang-tidy-all-sources.md) | enhancement, tools | — |
+| ⬜ | Audit how each client binds static methods and streams to a connection | **To file**: [connection-binding-audit.md](issues/connection-binding-audit.md) | enhancement, client | [client-conformance/defects.md](design/client-conformance/defects.md) |
 
 ## 1.0: remaining protocol improvements, server side function follow-ups
 
