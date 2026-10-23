@@ -1,6 +1,7 @@
 # Request ids and asynchronous RPCs
 
-**Status:** proposal, phase 1 ready to implement (revised 2026-10-21), built together with the
+**Status:** in progress (2026-10-22): phase 1 implemented locally with the single connection, not yet
+in a PR. Built together with the
 [single connection](single-connection.md) for 0.8, as part of
 [protocol version](protocol-version.md) 2. Phases 2 and 3 are later additions, each negotiated in
 the handshake. Issue drafted in [issues/request-ids.md](../../issues/request-ids.md).

@@ -1,7 +1,7 @@
 # Protocol version
 
-**Status:** in progress (2026-10-21). Phase 1 is in #1162 for 0.7. Version 2
-is planned for 0.8 with the [single connection](single-connection.md). Issue drafted in
+**Status:** in progress (2026-10-22). Phase 1 is in #1162 for 0.7. Version 2 is implemented
+locally for 0.8 with the [single connection](single-connection.md), not yet in a PR. Issue drafted in
 [issues/protocol-version.md](../../issues/protocol-version.md).
 
 ## Problem
