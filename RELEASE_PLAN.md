@@ -90,6 +90,7 @@ which is left to do before the tag. **Close the milestone on GitHub once 0.7.0 i
 | ⬜ | Client codegen: the exception mapping and the service list, generated | **To file**: [client-codegen.md](issues/client-codegen.md) | enhancement, client, tools | [client-codegen.md](design/client-codegen.md) |
 | ⬜ | Client conformance tests and runtime specification | [#1123](https://github.com/krpc/krpc/issues/1123), **move from 1.0.0**, **post the [comment](#comment-on-1123)** | enhancement, client | [client-conformance/](design/client-conformance/README.md) |
 | ⬜ | Client thread safety: define and document what is thread-safe | [#427](https://github.com/krpc/krpc/issues/427) | docs | — |
+| ⬜ | C-nano: every transport compiled in, chosen at run time, so vcpkg ships them all | **To file**: [cnano-runtime-transports.md](issues/cnano-runtime-transports.md) | enhancement, client:cnano | — |
 
 * **Single connection first.** It changes connection setup and threading in every client, so the
   conformance suite is written against it rather than rewritten after it.
