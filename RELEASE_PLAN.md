@@ -176,6 +176,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | DockingCamera and LaserDist integration; needs forks | [#674](https://github.com/krpc/krpc/issues/674) | enhancement | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ⬜ | Vessel state and staging prediction; parts may be covered by the stage API | [#311](https://github.com/krpc/krpc/issues/311) | enhancement, service:space-center | — |
 | 🚧 | Docs restructure, any release | [#1050](https://github.com/krpc/krpc/issues/1050) | docs | — |
+| ⬜ | Lua: documentation for the dynamically built services | **To file**: [lua-documentation.md](issues/lua-documentation.md) | enhancement, client:lua | — |
 
 ### Fixes, tests and tooling
 
