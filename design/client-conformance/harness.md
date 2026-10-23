@@ -1,7 +1,36 @@
 # Harness
 
-How the suite runs a test against a client. Nothing here exists yet. There is no `conformance/`
-directory, testee or `ConformanceService` in `krpc`.
+How the suite runs a test against a client. C1 built the driver, the scripted server, the Bazel
+macro and the Python testee. C2 built the other five testees and the dispatch generators (local
+branch, before its PR). `ConformanceService` does not exist yet.
+
+### Built in C1
+
+| Item | As built |
+| --- | --- |
+| Layout | `conformance/testee.proto`, `conformance/driver/` (plugin, testee process, scripted server, raw client, values, native tables), `conformance/tests/`, `conformance/expected-failures/<client>.txt`. The Python testee is `client/python/conformance/testee.py`. |
+| Commands | Version 1 has only what the first set uses: `Connect`, `Close`, `Invoke`, `AddStream`, `Get`, `Wait`, `AddCallback`, `Compare`. The rest are added with their tests. |
+| Values | Scalars, string, bytes, null and `Object{handle, id}`. Each returned object gets a new handle, so two handles can name one object. Composites come with C3. The driver compares integers and floats by value, as Python cannot tell their wire types. |
+| Errors | `native_types` is a list: every native type the error is an instance of. `status` and `reason` carry a refusal or a disconnect. |
+| Native tables | `conformance/driver/natives.py`, keyed by the `Hello` client name. Kept apart from the clients, so a client's table change fails the suite. |
+| Naming check | The plugin fails collection when a test's name does not match its first `spec` id. A stale expected-failures line also fails it. |
+| TestServer launch | Factored out of `run_client_test.py` into `tools/build/serverprocess.py`. `tools/benchmarks/testserver.py` still has its own copy. |
+| Bazel | `conformance_test(name, testee, expected_failures, transports)` in `tools/build/conformance.bzl`, one target per transport (`//client/python:conformance-tcpip`), in `//:test`. |
+| Not built | The coverage report. The spec pages stay orphans until a page's tests run. |
+
+### Built in C2
+
+| Item | As built |
+| --- | --- |
+| Dispatch generators | `csharp-dispatch`, `java-dispatch`, `cpp-dispatch` and `cnano-dispatch` clientgen languages (`clientgen/dispatch.py`), left out of the `--help` list. `clientgen_dispatch` in `clientgen.bzl` declares them for `KRPC` and `TestService`. `TestService2` and the extension members are left out of the bundled definitions, so only the Python and Lua testees reach them. The fix is drafted as [test-service-full-definitions.md](../../issues/test-service-full-definitions.md). |
+| Coverage | Members whose parameters and result are scalars, strings, bytes or objects. A nullable scalar, a collection, an enum, a struct or a message leaves the member out until C3 extends `Value`. cnano also leaves out bytes and nullable strings. |
+| Testees | `client/<lang>/conformance/`. C# and Java are hand-written beside the generated half, C++ and cnano are C++ with a generated header per service, and Lua dispatches through its runtime service objects like Python. cnano's testee is C++ calling the C API, and links the full C++ protobuf for the testee protocol. |
+| Profiles | Lua reports `core` and `defaults`, cnano `core`, so the stream tests skip. cnano builds for TCP/IP only. |
+| Lua on Windows | The Lua target is off on Windows: Lua reads standard input in text mode there. |
+| `errors-mapped-exceptions` | C# and Java raise the native type itself, with no service or name, so the test checks service and name only when the testee reports them. |
+| Expected failures | 1 C#, 1 Java, 6 C++, 6 cnano, 9 Lua, each citing a new row in [defects.md](defects.md). |
+| Lint | The C++ and cnano testees are clang-formatted but not clang-tidied, like the client tests. Drafted as [clang-tidy-all-sources.md](../../issues/clang-tidy-all-sources.md). |
+| Java static streams | Broken and untested. The Java stub of a static method takes the connection first, so `addStream(<class>.class, name, connection, args...)` repeats it. The generated dispatch leaves it out, so streaming a static method raises "Method not found". The fix is in `JavaDispatchGenerator.stream`, with a test that streams a static method. No first set test does. |
 
 ```
 pytest driver --stdin/stdout, testee.proto--> testee (one per client)

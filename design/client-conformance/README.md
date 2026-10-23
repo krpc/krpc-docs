@@ -1,7 +1,8 @@
 # Client conformance
 
-**Status:** proposal (2026-10-22, reviewed 2026-10-23), planned for 0.8 as
-[#1123](https://github.com/krpc/krpc/issues/1123). The single connection and request ids phase 1
+**Status:** in progress, planned for 0.8 as [#1123](https://github.com/krpc/krpc/issues/1123).
+Proposed 2026-10-22 and reviewed 2026-10-23. C0 to C2 are built on a local branch, before their PR
+([harness.md](harness.md) "Built in C1" and "Built in C2"). The single connection and request ids phase 1
 are built, which this work waited for. Facts below were surveyed on the single connection and
 client codegen branches (before their PRs). Re-check them when a phase starts.
 
