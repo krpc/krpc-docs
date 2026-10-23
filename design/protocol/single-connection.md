@@ -2,7 +2,7 @@
 
 **Status:** implemented (2026-10-22), not yet in a PR. Planned for 0.8 as a hard break, built
 together with [request ids](request-ids.md) phase 1 and [protocol version](protocol-version.md) 2.
-Issue drafted in [issues/single-connection.md](../../issues/single-connection.md).
+Issue [#1174](https://github.com/krpc/krpc/issues/1174).
 
 Related: [protocol-compatibility.md](../protocol-compatibility.md) (the 1.0 additivity rules),
 [improvements.md](improvements.md) ([#906](https://github.com/krpc/krpc/issues/906)),

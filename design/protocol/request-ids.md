@@ -4,7 +4,7 @@
 in a PR. Built together with the
 [single connection](single-connection.md) for 0.8, as part of
 [protocol version](protocol-version.md) 2. Phases 2 and 3 are later additions, each negotiated in
-the handshake. Issue drafted in [issues/request-ids.md](../../issues/request-ids.md).
+the handshake. Issue [#1175](https://github.com/krpc/krpc/issues/1175).
 
 Related: [single-connection.md](single-connection.md) (its "Client reader" section specifies the
 client side of phase 1), [improvements.md](improvements.md) (meta-issue

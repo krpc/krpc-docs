@@ -84,13 +84,13 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 
 | | Feature | GitHub | Labels | Design doc |
 | --- | --- | --- | --- | --- |
-| ⬜ | Single connection: RPC and stream connections merged | **To file**: [single-connection.md](issues/single-connection.md) | enhancement, protocol, server, client | [protocol/single-connection.md](design/protocol/single-connection.md) |
+| ⬜ | Single connection: RPC and stream connections merged | [#1174](https://github.com/krpc/krpc/issues/1174) | enhancement, protocol | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | ⬜ | Protocol version 2, with the single connection | Part of the single connection issue | — | [protocol/protocol-version.md](design/protocol/protocol-version.md) |
-| ⬜ | Request ids (phase 1), on the single connection branch | **To file**: [request-ids.md](issues/request-ids.md) | enhancement, protocol, server, client | [protocol/request-ids.md](design/protocol/request-ids.md) |
+| ⬜ | Request ids (phase 1), on the single connection branch | [#1175](https://github.com/krpc/krpc/issues/1175) | enhancement, protocol | [protocol/request-ids.md](design/protocol/request-ids.md) |
 | ✅ | Client codegen: the exception mapping and the service list, generated | #1172 | enhancement, client, tools | [client-codegen.md](design/client-codegen.md) |
-| ⬜ | Client conformance tests and runtime specification | [#1123](https://github.com/krpc/krpc/issues/1123), **move from 1.0.0**, **post the [comment](#comment-on-1123)** | enhancement, client | [client-conformance/](design/client-conformance/README.md) |
+| ⬜ | Client conformance tests and runtime specification | [#1123](https://github.com/krpc/krpc/issues/1123) | enhancement, client | [client-conformance/](design/client-conformance/README.md) |
 | ⬜ | Client thread safety: define and document what is thread-safe | [#427](https://github.com/krpc/krpc/issues/427) | docs | — |
-| ⬜ | C-nano: every transport compiled in, chosen at run time, so vcpkg ships them all | **To file**: [cnano-runtime-transports.md](issues/cnano-runtime-transports.md) | enhancement, client:cnano | — |
+| ⬜ | C-nano: every transport compiled in, chosen at run time, so vcpkg ships them all | [#1176](https://github.com/krpc/krpc/issues/1176) | enhancement, client:cnano | — |
 
 * **Single connection first.** It changes connection setup and threading in every client, so the
   conformance suite is written against it rather than rewritten after it.
@@ -217,22 +217,5 @@ Each file in [issues/](issues/) is one issue: the heading is the title, the rest
 the milestone and labels from its row above. After filing, replace **To file** with the issue
 number, link the number from the design doc that names the draft, and delete the draft.
 
-A placeholder such as `#<single-connection>` names another draft. Replace it with that draft's
+A placeholder such as `#<recv-timeout-default>` names another draft. Replace it with that draft's
 issue number when filing.
-
-### Comment on #1123
-
-Decisions for the conformance work, from the client audits:
-
-```markdown
-The "generate more than stubs" part of this proposal is split out as #1172, which has merged.
-
-Client decisions ruled for this work:
-
-* The Lua client gets no streams in 0.8. The inert `add_stream`/`add_event` on `conn.krpc` are hidden.
-* C++: dropping a `Stream` handle leaves the server stream (parity audit bug 11). This is intended under the explicit removal model of #1122.
-* `TestService`: rename `EnumDefaultArg` and `AddMultipleValues`, and add `UInt32ToString`, `HexStringToBytes` and `StaticOptionalArguments`.
-* The open Python client bugs from the parity audit's Python sweep.
-
-Background: [client-conformance/defects.md](https://github.com/krpc/krpc-docs/blob/main/design/client-conformance/defects.md), [client-conformance/test-service.md](https://github.com/krpc/krpc-docs/blob/main/design/client-conformance/test-service.md)
-```
