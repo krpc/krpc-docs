@@ -122,6 +122,7 @@ stubs depend on the conformance suite.
 | ⬜ | Python: Ctrl-C during a call on Windows, with the single connection | **To file**: [python-ctrl-c-windows.md](issues/python-ctrl-c-windows.md) | bug, client:python | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | ⬜ | Python: trim client frames from server error tracebacks | **To file**: [python-traceback-trim.md](issues/python-traceback-trim.md) | enhancement, client:python | — |
 | ⬜ | Conformance testee stubs from the full TestServer definitions, with `TestService2` | **To file**: [test-service-full-definitions.md](issues/test-service-full-definitions.md) | enhancement, tools | [client-conformance/harness.md](design/client-conformance/harness.md) |
+| ⬜ | Run clang-format and clang-tidy over every C and C++ source | **To file**: [clang-tidy-all-sources.md](issues/clang-tidy-all-sources.md) | enhancement, tools | — |
 
 ## 1.0: remaining protocol improvements, server side function follow-ups
 
