@@ -1,6 +1,6 @@
 # Client tests
 
-What each client's own suite keeps once the conformance suite runs, and what C5 deletes.
+What each client's own suite keeps once the conformance suite runs, and what C6 deletes.
 
 ## Layers
 

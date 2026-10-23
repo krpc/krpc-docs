@@ -43,7 +43,7 @@ Doc summaries on one member of each kind exist for the docgen goldens only.
 
 ## Changes
 
-**Additions**, with the C3 tests that need them:
+**Additions**, with the C3 and C4 tests that need them:
 
 | Members | Closes |
 | --- | --- |
@@ -55,7 +55,7 @@ Doc summaries on one member of each kind exist for the docgen goldens only.
 | `ScalarDefault(x=42)`, `StringDefault(x="foo")`, `BytesDefault`, `NullDefault(obj=null)` | `calls-scalar-defaults`, `calls-null-default`, one owner each |
 | `TestClass.StaticOptionalArguments` | `calls-partial-arguments` and `calls-named-arguments` on a static method |
 
-**After C5**, once the per-client comms tests are gone:
+**In C6**, once the per-client comms tests are gone:
 
 | Change | Why |
 | --- | --- |
@@ -83,7 +83,7 @@ the call and value surface. `ConformanceService` is driven by the `control` conn
 | `TriggerEvent(id)`, `RemoveEvent(id)`, `CreateEvent() -> Event` | Firings and server-side endings on demand, in place of timers |
 | `SetValue(name, value)`, `Value(name)` | A settable watched value to stream, so a test controls each update |
 | `Block(ms)` | A call that holds its response for a set time, for interleaving and abandonment |
-| `DisconnectClient(client, reason)` | A server-side `disconnect` with a given reason |
+| `DisconnectClient(name, reason)` | A server-side `disconnect` with a given reason, to the client with that name. Each test connects with a unique client name, as no client exposes its server id |
 | `FailValue(name, exception)` | Makes `Value(name)` throw a chosen exception, so a stream of it ends on demand |
 
 The scripted server covers the wire cases this service cannot: malformed messages, unknown cases,

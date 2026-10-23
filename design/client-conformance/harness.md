@@ -28,9 +28,12 @@ A pytest plugin in `conformance/driver/`.
   module both use.
 - **The scripted server** grows out of Python's `ScriptedServer` in `krpc/test/test_session.py`.
   The C# and Java `StandInServer`s cover the same cases (refused, malformed handshake response,
-  ended by the server) and are deleted in C5.
+  ended by the server) and are deleted in C6.
+- **Testee lifetime.** The `testee` fixture is session scoped: one process per session, a fresh
+  `Connect` per test. The driver restarts a testee that crashes or misses a reply deadline, and
+  fails the test it was running.
 - **Timeouts.** A test that waits on the handshake or stall timeout sets it short through
-  `Connect` (README "Open questions").
+  `Connect`.
 
 ## Testee protocol
 
@@ -42,7 +45,8 @@ implements.
 
 **Commands** each carry an `id` and an optional `thread` name. The testee runs each command on the
 named worker thread and replies asynchronously, keyed by `id`. A test can then say "wait on thread
-A, remove on thread B", the shape of the deadlocks found in Python and Java.
+A, remove on thread B", the shape of the deadlocks found in Python and Java. A testee without the
+`threads` profile (Lua, cnano) gets no `thread`, and runs each command to completion in order.
 
 | Command | Does |
 | --- | --- |
@@ -61,15 +65,20 @@ A, remove on thread B", the shape of the deadlocks found in Python and Java.
 command can ask the callback to block, raise, make a call or close the connection, so the
 threading tests are expressible.
 
-**Values** cross as kRPC wire bytes plus a `krpc.Type`. The driver decodes them with the Python
-codec, which the codec vectors pin.
+**Values** cross as a `Value` message of plain protobuf fields: one per scalar type, string,
+bytes, null, an object id, an enum number, and repeated items, map entries and struct fields for
+the composites. The testee converts a `Value` to and from native values without its kRPC codec.
+Wire bytes would pass through the testee's decoder and then its encoder, so a symmetric codec bug
+would cancel out. Only `Encode` and `Decode` carry kRPC wire bytes, checked against fixed vectors.
 
 **Errors** cross as `{kind, service, name, message}`, where `kind` is `rpc`, `stream`,
 `connection`, `encoding`, `argument` or `timeout`, plus the name of the native type raised. The
-driver checks that name against the generated exception table.
+driver checks that name against the client's native types. Lua and cnano raise no types, and send
+none.
 
-**Dispatch is generated.** A new clientgen backend generates each testee's `Invoke` and `AddStream`
-dispatch from the service definitions.
+**Dispatch is generated.** A new clientgen backend, built in C2, generates each testee's `Invoke`
+and `AddStream` dispatch from the service definitions. It covers `KRPC`, `TestService`,
+`TestService2` and `ConformanceService` only.
 
 - Testees call the real generated stubs and the idiomatic stream API: C# lambdas, Java's method
   name form, C++ `_stream` members.
@@ -83,7 +92,10 @@ dispatch from the service definitions.
 - Each test is marked with its spec ids and profile, and skipped when the testee lacks the profile.
 - **Expected failures** live in `conformance/expected-failures/<client>.txt`, one test id per line,
   enforced strictly as in protobuf. A listed test that passes fails the run, so every gap is fixed
-  or recorded. Each line cites the defect or issue, e.g. `# defects.md cpp-error-stack-trace`.
+  or recorded. Each line cites the defect or issue, e.g. `# defects.md python-tuple-arity`.
+- **Timing tests** race the clock, e.g. the wait timeouts, the stall and the threading tests. Each
+  is marked `@timing`, and a listed `@timing` test that passes does not fail the run. Tests order
+  events through `ConformanceService` where they can, and take no `@timing` mark.
 
 ## Bazel
 
@@ -92,7 +104,7 @@ dispatch from the service definitions.
 - The testees live with their clients (`client/<lang>/conformance/`), as they build against the
   client.
 - **A coverage report** lists spec id against client, built from the test results and markers.
-  It is published with the spec in C6.
+  It is published with the spec in C7.
 
 ## TestServer
 

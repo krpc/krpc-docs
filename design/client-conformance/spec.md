@@ -43,8 +43,8 @@ A testee reports its profiles in `Hello`. A test outside them is skipped, not fa
 | `threads` | Concurrent calls, callbacks, close from other threads | yes | yes | yes | yes | no | no |
 
 Transports are reported separately: `tcpip` (all), `localsocket` (all but cnano's library, which
-takes a transport hook), `serialio` (cnano). Lua streams are an open decision
-([defects.md](defects.md)).
+takes a transport hook), `serialio` (cnano). Lua has no streams in 0.8 ([defects.md](defects.md)
+"Decisions").
 
 Levels below: **M** is MUST, **S** is SHOULD. Profile is `core` unless given.
 
@@ -64,7 +64,7 @@ Levels below: **M** is MUST, **S** is SHOULD. Profile is `core` unless given.
 | `connection-unknown-status` | M | An unknown `ConnectionResponse` status is reported with its message. |
 | `connection-disconnect-during-handshake` | M | A `disconnect` before the `connection_response` ends the attempt with its reason. |
 | `connection-unexpected-handshake-message` | M | Any other case before the `connection_response` is a protocol error. |
-| `connection-handshake-timeout` | S | Gives up after a handshake timeout, 5 s by default, settable to none. |
+| `connection-handshake-timeout` | S | Gives up after a handshake timeout, 5 s by default, settable, including to none. |
 | `connection-reconnect-gets-a-new-client` | M | A new connection is a new server client, with a new id. |
 | `connection-close` | M | Close sends a `CLOSED` `disconnect`, half-closes and drains for up to 1 s. |
 | `connection-calls-after-close-raise` | M | A call after close raises the connection error at once. |
@@ -74,7 +74,7 @@ Levels below: **M** is MUST, **S** is SHOULD. Profile is `core` unless given.
 | `connection-unknown-message-is-skipped` | M | A `Message` with no known case, once the session has started, is skipped. |
 | `connection-wrong-direction-is-a-protocol-error` | M | A client-to-server case received is a protocol error, answered with a `PROTOCOL_ERROR` `disconnect`. |
 | `connection-malformed-message` | M | A message that fails to parse ends the connection with `MALFORMED_MESSAGE`. |
-| `connection-stall` | S | A message stalled partway for the stall timeout (30 s) ends the connection with `TIMEOUT`. |
+| `connection-stall` | S | A message stalled partway for the stall timeout (30 s by default, settable) ends the connection with `TIMEOUT`. |
 | `connection-serial-resume` | M | A resumed serial client follows the resume rules in single-connection.md "Reconnecting". Profile: `serialio`. |
 
 ## Calls
@@ -91,7 +91,8 @@ Levels below: **M** is MUST, **S** is SHOULD. Profile is `core` unless given.
 | `calls-extension-members` | M | Calls members another service adds to a class, including one returning a class of a third service. |
 | `calls-void-return` | M | A procedure returning nothing completes. |
 | `calls-blocking-procedure` | M | A procedure that yields across updates returns its result. |
-| `calls-request-ids` | M | Ids start at 1 per session and increase by one. |
+| `calls-request-ids` | M | Each request in flight has an id no other request in flight has. |
+| `calls-request-id-sequence` | S | Ids start at 1 per session and increase by one. The server treats ids as opaque. |
 | `calls-responses-matched-by-id` | M | A response is matched to its call by id, never by position. Profile: `threads`. |
 | `calls-unknown-response-id` | M | A response id neither pending nor abandoned is a protocol error. |
 | `calls-abandoned-response-is-discarded` | S | A call interrupted while waiting abandons its id, and the next call gets its own result. Profile: `threads`. |
@@ -158,12 +159,12 @@ codec bug cannot pass ([test-service.md](test-service.md) "Testing values").
 
 | Id | Level | Requirement |
 | --- | :-: | --- |
-| `errors-mapped-exceptions` | M | Each server exception with a mapped type raises the native type in the client's table. The tables are generated ([client-codegen.md](../client-codegen.md) G1). |
+| `errors-mapped-exceptions` | M | Each server exception with a `mapped_type` raises the client's native type for it ([client-codegen.md](../client-codegen.md) "Native types"). A client with no exception types (Lua, cnano) reports the error with the `Service.Name: ` prefix. |
 | `errors-custom-exception` | M | A service exception raises its generated type. |
 | `errors-krpc-exceptions` | M | The `KRPC` exceptions with no mapped type (`ObjectDestroyedException`, `StreamRemovedException`, ...) raise their generated types. |
 | `errors-raised-type-is-the-exposed-type` | M | The type raised for a server exception is the type the client exposes for it, so a handler written against the stub catches it. |
 | `errors-unknown-exception-type` | M | An exception of an unknown service or type raises the generic error, carrying service, name and description. |
-| `errors-message` | M | The message is the description, then the server stack trace when sent, in the format of [client-codegen.md](../client-codegen.md) G2. |
+| `errors-message` | M | The message is the description, then the server stack trace when sent, in the format of [client-codegen.md](../client-codegen.md) "Decisions". |
 | `errors-structured` | S | The error exposes the service and name of the server exception. |
 | `errors-null-argument-rejected` | M | A null argument to a non-nullable parameter is sent, and the server's rejection raised. |
 | `errors-null-return-rejected` | M | A null return from a non-nullable procedure raises an error. |
@@ -237,7 +238,6 @@ three clients mirror.
 | `streams-calls-see-current-values` | M | After a call returns, stream values are at least as new as the server state before it. |
 | `streams-update-callback` | S | A connection-wide update callback is called once per update. |
 | `streams-scoped-removal` | S | The language's scope idiom removes the stream (Python `with`, C# `using`, Java try-with-resources). |
-| `streams-dropped-handle` | M | What dropping the last handle does. Undecided, see [defects.md](defects.md) "Decisions". |
 
 ## Events
 

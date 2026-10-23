@@ -13,7 +13,9 @@ Audit 1 to 10, 12 to 15 and 17 to 22, 49 to 51 in [PR #1002](https://github.com/
 Audit 16, 27, 28, 30, 44, and the value half of 47, by the stream and event rework
 ([#1122](https://github.com/krpc/krpc/pull/1122)). Audit 23, 24 in #1008. Audit 25, 29, 31, 37
 and 42 by the single connection. The event `wait` divergence (a timeout read from a value reset)
-is gone in all four clients, which now count firings per handle.
+is gone in all four clients, which now count firings per handle. Client codegen G1
+([client-codegen.md](../client-codegen.md)) fixed audit 26 (Python exception classes), the C++
+dropped stack trace, the C# trailing space and the Java exception table.
 
 Two lessons from the audit stand:
 
@@ -26,7 +28,6 @@ Two lessons from the audit stand:
 
 | Id | Client | Defect | Audit | Requirement |
 | --- | --- | --- | --- | --- |
-| `python-exception-classes` | Python | The stub declares its own `ArgumentException(RuntimeError)`, but the client raises the builtin `ValueError`, so `except conn.krpc.ArgumentException` never fires. Only the dynamic path agrees with itself. | 26 | `errors-raised-type-is-the-exposed-type` |
 | `python-static-method-binding` | Python | `StaticMethod.__get__` writes `_client` onto the shared stub class, so the first client to call a static method through an instance binds it for every client. | 32 | `objects-types-from-different-connections` |
 | `python-subclass-leak` | Python | `_wrapped_subclasses` values strongly reference their weak keys, so every client graph leaks. | 33 | per-client test |
 | `python-string-as-list` | Python | Any iterable coerces to a list, so a string becomes a list of characters. | 34 | `values-string-is-not-a-list` |
@@ -38,14 +39,11 @@ Two lessons from the audit stand:
 | `python-unpruned-stubs` | Python | All 12 generated services are attached whether or not the server has them. | 41 | `objects-member-rosters` |
 | `python-tuple-arity` | Python, Java | A short wire tuple decodes short. Structs check their field count. | 43 | `codec-tuple-arity` |
 | `python-unclosed-client` | Python | A dropped unclosed client keeps its threads and socket. The threads now exit when the server closes. | 45 | per-client test |
-| `python-wait-in-callback` | Python, and by design every threaded client | A callback that waits on a stream deadlocks, as only the dispatcher wakes waiters. Documented, not guarded. | 46 | Spec states it. Raising in place of hanging is a SHOULD to decide |
+| `python-wait-in-callback` | Python, and by design every threaded client | A callback that waits on a stream deadlocks, as only the dispatcher wakes waiters. Documented, not guarded. | 46 | Spec states it ("Decisions") |
 | `shared-event-handles` | Python | Two `Event` objects for one server event share a stream, so removing either ends both. | 47 | `streams-remove` (removal ends every copy, by design since #1122) |
 | `python-error-reporting` | Python | An `ImportError` from a stub silently downgrades every service to dynamic. Ordering operators raise `NotImplementedError` in place of returning `NotImplemented`. Docstrings lost when a type is first built from another service is not re-checked. | 48 | per-client test |
-| `cpp-dropped-stream-handle` | C++ | Dropping the last handle never sends `RemoveStream`. The server stream runs for the connection's life. Documented in `doc/src/cpp/client.rst`. | 11 | `streams-dropped-handle` |
-| `cpp-error-stack-trace` | C++ | The server stack trace is dropped. | divergence 4 | `errors-message` |
 | `cpp-client-destructor-doc` | C++ | The docs describe a `~Client()`. The connection closes when the last copy is released. | doc error | none, docs only |
-| `csharp-error-format` | C# | `Server stack trace: ` has a trailing space. `ArgumentNull` and `ArgumentOutOfRange` get an empty parameter name. | divergence | `errors-message`, `errors-mapped-exceptions` |
-| `java-exception-table` | Java | No `Timeout` mapping, and different native picks from Python and C#. | new | `errors-mapped-exceptions` |
+| `csharp-argument-parameter-name` | C# | `ArgumentNull` and `ArgumentOutOfRange` get an empty parameter name (`Connection.cs` `new ArgumentNullException(string.Empty, message)`). | divergence | `errors-mapped-exceptions` |
 | `codec-nan-vectors` | C#, Lua, core | The NaN vectors are the sign-set `...ff`, others `...7f`. Each is a NaN, so this is a vector drift, not a codec bug. | new | `codec-nan` |
 | `lua-cnano-stall` | Lua, cnano | No stall timeout: a stalled message blocks a call. cnano POSIX and Windows have no read timeout at all. | divergence 6 | `connection-stall` (a SHOULD) |
 | `messages-doc-client-name` | docs | `messages.rst` does not mention `GetClientName`. | doc error | none, docs only |
@@ -74,13 +72,12 @@ deadline.
 
 ## Decisions
 
-Open, to settle as part of this work. Each changes a requirement. The native exception choices,
-Python's exception classes and the error message format are settled in
-[client-codegen.md](../client-codegen.md) "Decisions".
+Ruled 2026-10-23. The native exception choices, Python's exception classes and the error message
+format are ruled in [client-codegen.md](../client-codegen.md) "Decisions".
 
-| Decision | Options | Requirement |
+| Decision | Ruling | Requirement |
 | --- | --- | --- |
-| Lua streams | Add them, or rule them out and hide the inert `add_stream`/`add_event` on `conn.krpc`. The blocker is Lua's single thread. | `streams` profile for Lua |
-| C++ dropped stream handle | Rule it intended under explicit removal (#1122), or remove the stream with the last handle. | `streams-dropped-handle` |
-| Waiting in a callback | Leave as documented, or detect and raise. | `python-wait-in-callback` |
-| Java stream creation | Keep the method name form, or move toward a typed form. Only Java's form is not compile-time checked. | none, API design |
+| Lua streams | Out of 0.8. Lua's single thread is the blocker. Hide the inert `add_stream`/`add_event` on `conn.krpc`. | No `streams` profile for Lua |
+| C++ dropped stream handle (audit 11) | Intended: removal is explicit since #1122, in every client. Dropping a handle leaves the stream, as `doc/src/cpp/client.rst` documents. | None. What a dropped handle does is left to each client |
+| Waiting in a callback | Stays documented. Detecting it and raising can be a later SHOULD. | Spec states it |
+| Java stream creation | The method name form stays. A typed form is API design, outside this work. | None |

@@ -208,15 +208,15 @@ issue number when filing.
 
 ### Comment on #1123
 
-Decisions for the conformance work, left open by the client audits:
+Decisions for the conformance work, from the client audits:
 
 ```markdown
 The "generate more than stubs" part of this proposal is split out as #<client-codegen>, which lands first.
 
-Client decisions to settle as part of this work:
+Client decisions ruled for this work:
 
-* Whether the Lua client gets streams.
-* C++: dropping a `Stream` handle never removes the server stream (parity audit bug 11). Rule it intended under the explicit removal model of #1122, or fix it.
+* The Lua client gets no streams in 0.8. The inert `add_stream`/`add_event` on `conn.krpc` are hidden.
+* C++: dropping a `Stream` handle leaves the server stream (parity audit bug 11). This is intended under the explicit removal model of #1122.
 * `TestService`: rename `EnumDefaultArg` and `AddMultipleValues`, and add `UInt32ToString`, `HexStringToBytes` and `StaticOptionalArguments`.
 * The open Python client bugs from the parity audit's Python sweep.
 

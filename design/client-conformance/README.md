@@ -1,9 +1,9 @@
 # Client conformance
 
-**Status:** proposal (2026-10-22), planned for 0.8 as
+**Status:** proposal (2026-10-22, reviewed 2026-10-23), planned for 0.8 as
 [#1123](https://github.com/krpc/krpc/issues/1123). The single connection and request ids phase 1
-are built, which this work waited for. Facts below were surveyed on the single connection branch
-(before its PR). Re-check them when a phase starts.
+are built, which this work waited for. Facts below were surveyed on the single connection and
+client codegen branches (before their PRs). Re-check them when a phase starts.
 
 This folder replaces three earlier docs: the conformance sketch (`client-conformance.md`), the
 client testing standard (`client-testing.md`) and the client API parity audit
@@ -18,8 +18,9 @@ client testing standard (`client-testing.md`) and the client API parity audit
 | [client-tests.md](client-tests.md) | What stays in each client's own suite, and what the suite replaces |
 | [defects.md](defects.md) | Open client defects from the audits, each with the requirement that catches it |
 
-Generating the exception mapping and the service list is a separate piece of
-work that lands first: [client-codegen.md](../client-codegen.md).
+Generating the exception mapping and the service list is a separate piece of work that lands
+first: [client-codegen.md](../client-codegen.md). Its G1, G3 and G5 are built. G2 and G4 were
+dropped.
 
 ## Problem
 
@@ -32,10 +33,8 @@ Only the service stubs are generated. Each feature costs one port per client, an
   others lack.
 - **Codec vectors are copied and disagree.** The NaN vectors are `...7f` in Python, Java, C++ and
   cnano, and `...ff` in C#, Lua and core. The Lua copy carries the comment "should be ...7f ??".
-- **Exception mapping disagrees.** Python and C# map 11 server exceptions to native types, Java
-  maps 10 with different picks, C++ maps none.
-- **Error messages differ.** C# adds a trailing space, C++ drops the stack trace, and Lua and cnano
-  prefix `Service.Name:`.
+- **Exception mapping and error messages disagreed** across the clients until client codegen G1.
+  Nothing pins the fix, so the clients can drift apart again.
 - **Coverage is uneven.** A null return from a non-nullable procedure, an unknown object id,
   special numeric defaults and named arguments are tested in Python only.
 - **Python as the reference hid its own bugs.** The audit asked of every client "does this match
@@ -75,50 +74,65 @@ New in this revision:
 | One requirement, one test | Variants (each scalar type, each member kind) are pytest parameters of that test. |
 | Scripted server | The driver also hosts a scripted server, so the handshake, disconnect and compatibility rules are tested. Python's `ScriptedServer` and the C# and Java `StandInServer`s are the prior art. |
 | Codec vectors | Move into the suite as `Encode`/`Decode` commands. A NaN must decode from either sign and encode to some NaN, which ends the vector drift. |
+| Testee values | Cross as a `testee.proto` `Value` of plain protobuf fields, never as kRPC wire bytes. A codec bug that is symmetric in one client would otherwise cancel out in the testee. See [harness.md](harness.md) "Values". |
 | Python is not the reference | The spec is. Where clients disagree, the spec picks, and the losing clients get expected failures until fixed. |
 | Thread safety ([#427](https://github.com/krpc/krpc/issues/427)) | Answered by the spec's threading page, and pinned by the `threads` profile. |
-| `TestService` | Renames and removals wait until the per-client comms tests are deleted (phase C5), so each moves once. Additions land with the tests that need them. |
+| Testee lifetime | One process per test session, with a fresh `Connect` per test. The driver restarts a testee that crashes or times out. `Counter` counts per client, so a fresh connection starts from clean state. |
+| Timeouts | The handshake and stall timeouts are `Connect` settings. The spec says clients SHOULD make both settable. |
+| Timing | Tests order events through `ConformanceService` (`SetValue`, `Block`, `TriggerEvent`) in place of wall-clock sleeps where they can. Tests that still race the clock are marked `@timing` ([harness.md](harness.md)). |
+| `TestService` | Renames and removals wait until the per-client comms tests are deleted (phase C6), so each moves once. Additions land with the tests that need them. |
+| Defect rulings | Lua streams, the C++ dropped stream handle, waiting in a callback and Java stream creation are ruled in [defects.md](defects.md) "Decisions". |
 
 ## Sequencing
 
 | Step | Work |
 | --- | --- |
 | 1 | Land the single connection and request ids. |
-| 2 | Client codegen, phases G1 to G5 ([client-codegen.md](../client-codegen.md)). Its exception tables and message format settle two client disagreements before the suite pins them. |
-| 3 | Conformance phases C0 to C6. |
+| 2 | Client codegen G1, G3 and G5 ([client-codegen.md](../client-codegen.md)). Its exception tables and message format settle two client disagreements before the suite pins them. |
+| 3 | Conformance phases C0 to C7. |
 | 4 | 1.0 additions ([#903](https://github.com/krpc/krpc/issues/903), [#251](https://github.com/krpc/krpc/issues/251), [#905](https://github.com/krpc/krpc/issues/905), [#898](https://github.com/krpc/krpc/issues/898)), each with conformance tests. The suite pins the client tolerance rules that keep them additive ([protocol-compatibility.md](../protocol-compatibility.md)). |
 
-C0 to C2 can overlap with codegen. Its G1 and G2 must land before the error tests in C3, or those
-tests start as expected failures in most clients.
+C0 to C2 can overlap with codegen. G1 must land before the first set's error tests, or they start
+as expected failures in most clients.
 
 ## Phases
 
+The harness and every testee come first, on a small first set of tests. Each area then grows on a
+harness that already runs all six clients.
+
 | Phase | Scope |
 | --- | --- |
-| C0 | Spec skeleton in `krpc` (`doc/src/communication-protocols/client-spec/`), with the requirement labels from [spec.md](spec.md). Draft the streams and connection pages from current behavior. |
-| C1 | Harness: `testee.proto`, the driver and its fixtures, the scripted server, the Bazel macro, the Python testee. Port the connection tests and about ten stream tests. |
-| C2 | Java testee, the `threads` profile, and the first expected-failures file. |
-| C3 | C# and C++ testees. Then calls, values, errors and objects, the codec vectors, events and server-side functions. `ConformanceService` and the `TestService` additions land here. |
-| C4 | Lua and cnano testees, without the stream, event, function or thread profiles. cnano adds the `serialio` transport. |
-| C5 | Delete the per-client tests the suite replaces ([client-tests.md](client-tests.md)), then the `TestService` renames and removals. |
-| C6 | Document the testee protocol, and ship the driver with the TestServer archive for third-party clients. |
+| C0 | Spec skeleton in `krpc` (`doc/src/communication-protocols/client-spec/`), with the requirement labels from [spec.md](spec.md). Draft the connection, calls and streams pages from current behavior. |
+| C1 | Harness: `testee.proto`, the driver and its fixtures, the scripted server, the Bazel macro and the Python testee. The first set below passes for Python. |
+| C2 | The Java, C#, C++, Lua and cnano testees on the first set, with the clientgen dispatch backend and the expected-failures files. Java proves the `threads` notifications, Lua and cnano the profile skips. |
+| C3 | Calls, values, codec, errors and objects in full, with the `TestService` additions. |
+| C4 | Streams and events in full, with `ConformanceService` and the `threads` profile. |
+| C5 | Server-side functions, and the `serialio` transport for cnano. |
+| C6 | Delete the per-client tests the suite replaces ([client-tests.md](client-tests.md)), then the `TestService` renames and removals. |
+| C7 | Document the testee protocol, and ship the driver with the TestServer archive for third-party clients. |
 
 Each phase merges on its own. A spec page is published only once its tests run.
 
+### First set
+
+Fifteen tests, chosen to use each harness mechanism once: `Hello` and profile skips, `Connect`,
+the scripted server, `Invoke`, `Value` conversion, errors, `AddStream`, `Wait` and callback
+notifications. All use members `TestService` has today.
+
+| Area | Tests |
+| --- | --- |
+| Connection | `connection-connect`, `connection-client-name`, `connection-close`, `connection-calls-after-close-raise`, `connection-refused` (scripted server) |
+| Calls | `calls-procedure`, `calls-class-method` |
+| Values | `values-scalar-arguments` (the five existing `...ToString` types), `values-string` |
+| Errors | `errors-mapped-exceptions`, `errors-message` |
+| Objects | `objects-equality` |
+| Streams | `streams-procedure`, `streams-wait`, `streams-callback` (profile `streams`, skipped in Lua and cnano) |
+
 ## Open questions
 
-- **Python codec in the driver.** The driver decodes testee values with the Python codec. The
-  codec vectors pin that codec, so this looks safe. Confirm when C1 lands.
-- **Testee lifetime.** One process per test isolates failures, one per session is faster. The
-  scripted-server tests need a fresh connection each, not a fresh process.
 - **Transports per target.** Every testee over TCP. The local socket only for the connection page,
   as the transport sits below everything else.
-- **Short timeouts.** The stall timeout is 30 s and the handshake timeout 5 s. The tests need a
-  testee knob for both, or they run for minutes. The spec should say clients make both settable.
 - **Server-side function tests.** Each client builds functions in its own idiom: Python compiles
   source, C# compiles LINQ, C++ and Java build `KRPC.Expression` calls by hand. The proposal: the
   suite sends neutral expression trees, built through each client's `Expression` stubs, and the
   builders keep their own per-client tests.
-- **Decisions the audits left open**, listed in [defects.md](defects.md) "Decisions": Lua streams,
-  C++ dropped stream handles, and waiting in a callback. The exception and message format decisions
-  are in [client-codegen.md](../client-codegen.md).
