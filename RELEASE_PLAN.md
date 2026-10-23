@@ -105,12 +105,12 @@ which is left to do before the tag. **Close the milestone on GitHub once 0.7.0 i
 
 ### Fixes and smaller items
 
-Everything but the `RemoveStream` change and the Ctrl-C fix is independent of the protocol work, and can ship in a
-0.7.x release if 0.8 is far off.
+Everything but the `RemoveStream` change and the Ctrl-C fix can ship in a 0.7.x release if 0.8 is far off. The
+`RemoveStream` change breaks the `KRPC` service, and the Ctrl-C fix depends on the single connection.
 
 | | Item | GitHub | Labels | Design doc |
 | --- | --- | --- | --- | --- |
-| ⬜ | `RemoveStream` and `SetStreamRate` take a `Stream`, with the single connection | **To file**: [remove-stream-takes-stream.md](issues/remove-stream-takes-stream.md) | enhancement, protocol, server | — |
+| ⬜ | `RemoveStream` and `SetStreamRate` take a `Stream` | **To file**: [remove-stream-takes-stream.md](issues/remove-stream-takes-stream.md) | enhancement, protocol, server | — |
 | ⬜ | `KerbalAlarmClock.Alarm.PlaySound` has no effect | **To file**: [kac-alarm-play-sound.md](issues/kac-alarm-play-sound.md) | bug, service:kerbal-alarm-clock | [services/kac-remotetech-tests-and-api.md](design/services/kac-remotetech-tests-and-api.md) |
 | ⬜ | DockingCamera log spam, LIDAR docstrings | **To file**: [dockingcam-lidar-cleanups.md](issues/dockingcam-lidar-cleanups.md) | bug, service | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ⬜ | Raise the default receive timeout | **To file**: [recv-timeout-default.md](issues/recv-timeout-default.md) | enhancement, server | [server/recv-timeout-cliff.md](design/server/recv-timeout-cliff.md) |
