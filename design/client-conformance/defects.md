@@ -14,7 +14,7 @@ Audit 16, 27, 28, 30, 44, and the value half of 47, by the stream and event rewo
 ([#1122](https://github.com/krpc/krpc/pull/1122)). Audit 23, 24 in #1008. Audit 25, 29, 31, 37
 and 42 by the single connection. The event `wait` divergence (a timeout read from a value reset)
 is gone in all four clients, which now count firings per handle. Client codegen G1
-([client-codegen.md](../client-codegen.md)) fixed audit 26 (Python exception classes), the C++
+([client-codegen.md](../client-codegen.md), #1172) fixed audit 26 (Python exception classes), the C++
 dropped stack trace, the C# trailing space and the Java exception table.
 
 Two lessons from the audit stand:

@@ -1,6 +1,7 @@
 # Documentation structure
 
-**Status:** in progress. Not yet a PR. Issue #1050.
+**Status:** done, merged as [PR #1170](https://github.com/krpc/krpc/pull/1170) for 0.8, fixing
+[#1050](https://github.com/krpc/krpc/issues/1050).
 
 ## Problem
 

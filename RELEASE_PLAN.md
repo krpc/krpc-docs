@@ -15,20 +15,19 @@ The **GitHub** column says how the issue on GitHub stands against this plan:
 
 | | Release | Theme | Progress |
 | --- | --- | --- | --- |
-| 🚧 | 0.7 | Server-side functions, streams and events, protocol additions, service improvements | Protocol version to add, then tag |
-| ⬜ | 0.8 | Single connection, client codegen, then client conformance testing and thread safety | 0 of 7 started |
+| ✅ | 0.7 | Server-side functions, streams and events, protocol additions, service improvements | Tagged 2026-10-21 |
+| 🚧 | 0.8 | Single connection, client codegen, then client conformance testing and thread safety | 1 of 7 done: client codegen |
 | ⬜ | 1.0 | Remaining protocol improvements (#906), server side function follow-ups | 0 of 9 done; tick control has a 0.7 stopgap |
 
 ## 0.7: server-side functions, streams and events, service improvements
 
-Everything merged since v0.6.0 (PRs #1015 to #1157, milestone 0.7.0), plus the protocol version,
-which is left to do before the tag. **Close the milestone on GitHub once 0.7.0 is tagged.**
+Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 2026-10-21.
 
 ### Protocol and server
 
 | | Feature | PRs | Design doc |
 | --- | --- | --- | --- |
-| ⬜ | Protocol version 1 in the handshake, with version 0 served as 1 | **To file**: [protocol-version.md](issues/protocol-version.md); labels enhancement, protocol, server, client | [protocol/protocol-version.md](design/protocol/protocol-version.md) |
+| ✅ | Protocol version 1 in the handshake, with version 0 served as 1 | #1162 | [protocol/protocol-version.md](design/protocol/protocol-version.md) |
 | ✅ | Server-side functions | #1124 to #1130 | [server-side-functions/server-side-functions.md](design/server-side-functions/server-side-functions.md) |
 | ✅ | Stream and event improvements: refcounting, invalidation | #1122, #1108, #1109 | [protocol/stream-and-event-improvements.md](design/protocol/stream-and-event-improvements.md), superseding [protocol/stream-refcounting.md](design/protocol/stream-refcounting.md) and [protocol/stream-invalidation.md](design/protocol/stream-invalidation.md) |
 | ✅ | Stream freezing removed | #1118 | [protocol/stream-freezing-removal.md](design/protocol/stream-freezing-removal.md) |
@@ -42,6 +41,7 @@ which is left to do before the tag. **Close the milestone on GitHub once 0.7.0 i
 | ✅ | RPCs deprecated in 0.6.0 removed | #1140 | — |
 | ✅ | Game state and scene handling (no game loaded, scene checks, scene loads) | #1041, #1119, #1121, #1131 | — |
 | ✅ | Client optimization, benchmark suite | #1056, #1052 | [build-tools/benchmarks.md](design/build-tools/benchmarks.md) |
+| ✅ | Get object id helper in every client | #1160 | — |
 | ✅ | Cnano client TCP/IP | #1055 | — |
 | ✅ | Lua 5.1 to 5.4, lua-protobuf, `socket.unix` on Windows | #1142 | [build-tools/lua-5.4-and-lua-protobuf.md](design/build-tools/lua-5.4-and-lua-protobuf.md), [build-tools/lua-socket-unix-on-windows.md](design/build-tools/lua-socket-unix-on-windows.md) |
 
@@ -49,7 +49,7 @@ which is left to do before the tag. **Close the milestone on GitHub once 0.7.0 i
 
 | | Feature | PRs | Design doc |
 | --- | --- | --- | --- |
-| ✅ | Debug service, force RPCs | #1033, #1146 | [services/debug-service.md](design/services/debug-service.md) |
+| ✅ | Debug service, force RPCs, `SetFlight` teleport fix | #1033, #1146, #1158 | [services/debug-service.md](design/services/debug-service.md) |
 | ✅ | Editor scene API, matched to `Vessel` and `Flight` | #1038, #1059, #1064, #1153 | [services/editor-scene-api.md](design/services/editor-scene-api.md), [services/editor-vessel-center-of-mass.md](design/services/editor-vessel-center-of-mass.md) |
 | ✅ | Value classes and tuples returned as structures | #1132, #1148 | [services/struct-adoption-audit.md](design/services/struct-adoption-audit.md) |
 | ✅ | UI: code-built controls, layout and widgets | #1040 | [services/ui-controls-and-layout.md](design/services/ui-controls-and-layout.md), [services/ui-widget-gap-audit.md](design/services/ui-widget-gap-audit.md) |
@@ -72,7 +72,7 @@ which is left to do before the tag. **Close the milestone on GitHub once 0.7.0 i
 | ✅ | Package metadata and release process cleanup | #1015 | — |
 | ✅ | Culture analyzers | #1133 | [build-tools/culture-analyzers.md](design/build-tools/culture-analyzers.md) |
 | ✅ | ruff and pyright replace pylint, black and mypy | #1134, #1135 | — |
-| ✅ | Build tools and dependencies updated | #1139 | — |
+| ✅ | Build tools and dependencies updated, sphinx-csharp 1.0.0 | #1139, #1159, #1163 | — |
 | ✅ | Doc examples checked, client API docs match the stubs, link checker | #1141, #1151, #1156 | — |
 | ✅ | Generated client files named after their service, C/C++ header includes | #1149, #1150 | — |
 | ✅ | In-game test waits, buildifier as a test | #1147, #1152 | — |
@@ -87,7 +87,7 @@ which is left to do before the tag. **Close the milestone on GitHub once 0.7.0 i
 | ⬜ | Single connection: RPC and stream connections merged | **To file**: [single-connection.md](issues/single-connection.md) | enhancement, protocol, server, client | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | ⬜ | Protocol version 2, with the single connection | Part of the single connection issue | — | [protocol/protocol-version.md](design/protocol/protocol-version.md) |
 | ⬜ | Request ids (phase 1), on the single connection branch | **To file**: [request-ids.md](issues/request-ids.md) | enhancement, protocol, server, client | [protocol/request-ids.md](design/protocol/request-ids.md) |
-| ⬜ | Client codegen: the exception mapping and the service list, generated | **To file**: [client-codegen.md](issues/client-codegen.md) | enhancement, client, tools | [client-codegen.md](design/client-codegen.md) |
+| ✅ | Client codegen: the exception mapping and the service list, generated | #1172 | enhancement, client, tools | [client-codegen.md](design/client-codegen.md) |
 | ⬜ | Client conformance tests and runtime specification | [#1123](https://github.com/krpc/krpc/issues/1123), **move from 1.0.0**, **post the [comment](#comment-on-1123)** | enhancement, client | [client-conformance/](design/client-conformance/README.md) |
 | ⬜ | Client thread safety: define and document what is thread-safe | [#427](https://github.com/krpc/krpc/issues/427) | docs | — |
 | ⬜ | C-nano: every transport compiled in, chosen at run time, so vcpkg ships them all | **To file**: [cnano-runtime-transports.md](issues/cnano-runtime-transports.md) | enhancement, client:cnano | — |
@@ -107,6 +107,15 @@ which is left to do before the tag. **Close the milestone on GitHub once 0.7.0 i
   clients.
 * **A hard break.** The 0.8 server speaks only the single connection, with no transition period.
   Clients older than 0.8 cannot connect to it.
+
+### Merged
+
+| | Item | PRs | Design doc |
+| --- | --- | --- | --- |
+| ✅ | Rails warp limit matches the game's in flight (fixes #1164) | #1167 | — |
+| ✅ | Math and units rendered in the service docs | #1169 | [build-tools/doc-math.md](design/build-tools/doc-math.md) |
+| ✅ | Docs restructured into User Guides, Clients and Developer Guide (fixes #1050) | #1170 | [build-tools/doc-structure.md](design/build-tools/doc-structure.md) |
+| ✅ | Build and CI: krpctest changelog on release, vcpkg caches, `KRPC_TEST_` variables, CI version sha, nanopb download | #1165, #1166, #1168, #1171, #1173 | — |
 
 ### Fixes and smaller items
 
@@ -176,7 +185,6 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | Raster Prop Monitor integration and camera views | [#375](https://github.com/krpc/krpc/issues/375), [#424](https://github.com/krpc/krpc/issues/424) | mod-compatibility; enhancement | — |
 | ⬜ | DockingCamera and LaserDist integration; needs forks | [#674](https://github.com/krpc/krpc/issues/674) | enhancement | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ⬜ | Vessel state and staging prediction; parts may be covered by the stage API | [#311](https://github.com/krpc/krpc/issues/311) | enhancement, service:space-center | — |
-| 🚧 | Docs restructure, any release | [#1050](https://github.com/krpc/krpc/issues/1050) | docs | — |
 | ⬜ | Lua: documentation for the dynamically built services | **To file**: [lua-documentation.md](issues/lua-documentation.md) | enhancement, client:lua | — |
 
 ### Fixes, tests and tooling
@@ -217,7 +225,7 @@ issue number when filing.
 Decisions for the conformance work, from the client audits:
 
 ```markdown
-The "generate more than stubs" part of this proposal is split out as #<client-codegen>, which lands first.
+The "generate more than stubs" part of this proposal is split out as #1172, which has merged.
 
 Client decisions ruled for this work:
 

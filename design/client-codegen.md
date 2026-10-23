@@ -1,11 +1,8 @@
 # Client codegen: generate more than stubs
 
-**Status:** in progress (2026-10-22), decisions ruled the same day. G3, G5 and G1 implemented, not
-yet in a PR. G4 and G2 dropped. Planned for 0.8 ahead of the
-[conformance suite](client-conformance/README.md). Issue drafted in
-[issues/client-codegen.md](../issues/client-codegen.md). Split out of
-[#1123](https://github.com/krpc/krpc/issues/1123). Facts surveyed on the single connection branch
-(before its PR). Re-check them when a phase starts.
+**Status:** done, G3, G5 and G1 merged as [PR #1172](https://github.com/krpc/krpc/pull/1172) for
+0.8, ahead of the [conformance suite](client-conformance/README.md). G4 and G2 dropped. Split out of
+[#1123](https://github.com/krpc/krpc/issues/1123).
 
 ## Problem
 

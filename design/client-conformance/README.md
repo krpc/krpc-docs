@@ -20,8 +20,8 @@ client testing standard (`client-testing.md`) and the client API parity audit
 | [defects.md](defects.md) | Open client defects from the audits, each with the requirement that catches it |
 
 Generating the exception mapping and the service list is a separate piece of work that lands
-first: [client-codegen.md](../client-codegen.md). Its G1, G3 and G5 are built. G2 and G4 were
-dropped.
+first: [client-codegen.md](../client-codegen.md). Its G1, G3 and G5 merged in
+[#1172](https://github.com/krpc/krpc/pull/1172). G2 and G4 were dropped.
 
 ## Problem
 
@@ -89,7 +89,7 @@ New in this revision:
 | Step | Work |
 | --- | --- |
 | 1 | Land the single connection and request ids. |
-| 2 | Client codegen G1, G3 and G5 ([client-codegen.md](../client-codegen.md)). Its exception tables and message format settle two client disagreements before the suite pins them. |
+| 2 | Done in #1172. Client codegen G1, G3 and G5 ([client-codegen.md](../client-codegen.md)). Its exception tables and message format settle two client disagreements before the suite pins them. |
 | 3 | Conformance phases C0 to C7. |
 | 4 | 1.0 additions ([#903](https://github.com/krpc/krpc/issues/903), [#251](https://github.com/krpc/krpc/issues/251), [#905](https://github.com/krpc/krpc/issues/905), [#898](https://github.com/krpc/krpc/issues/898)), each with conformance tests. The suite pins the client tolerance rules that keep them additive ([protocol-compatibility.md](../protocol-compatibility.md)). |
 
