@@ -125,14 +125,14 @@ stubs and the audit depend on the conformance suite.
 
 | | Item | GitHub | Labels | Design doc |
 | --- | --- | --- | --- | --- |
-| ⬜ | `RemoveStream` and `SetStreamRate` take a `Stream` | **To file**: [remove-stream-takes-stream.md](issues/remove-stream-takes-stream.md) | enhancement, protocol, server | — |
+| ⬜ | `RemoveStream` and `SetStreamRate` take a `Stream` | [#1178](https://github.com/krpc/krpc/issues/1178) | enhancement, protocol | — |
 | ⬜ | `KerbalAlarmClock.Alarm.PlaySound` has no effect | **To file**: [kac-alarm-play-sound.md](issues/kac-alarm-play-sound.md) | bug, service:kerbal-alarm-clock | [services/kac-remotetech-tests-and-api.md](design/services/kac-remotetech-tests-and-api.md) |
 | ⬜ | DockingCamera log spam, LIDAR docstrings | **To file**: [dockingcam-lidar-cleanups.md](issues/dockingcam-lidar-cleanups.md) | bug, service | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ⬜ | Raise the default receive timeout | **To file**: [recv-timeout-default.md](issues/recv-timeout-default.md) | enhancement, server | [server/recv-timeout-cliff.md](design/server/recv-timeout-cliff.md) |
 | ⬜ | Python: Ctrl-C during a call on Windows, with the single connection | **To file**: [python-ctrl-c-windows.md](issues/python-ctrl-c-windows.md) | bug, client:python | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | ⬜ | Python: trim client frames from server error tracebacks | **To file**: [python-traceback-trim.md](issues/python-traceback-trim.md) | enhancement, client:python | — |
 | ⬜ | Conformance testee stubs from the full TestServer definitions, with `TestService2` | **To file**: [test-service-full-definitions.md](issues/test-service-full-definitions.md) | enhancement, tools | [client-conformance/harness.md](design/client-conformance/harness.md) |
-| ⬜ | Run clang-format and clang-tidy over every C and C++ source | **To file**: [clang-tidy-all-sources.md](issues/clang-tidy-all-sources.md) | enhancement, tools | — |
+| ⬜ | Run clang-format and clang-tidy over every C and C++ source | [#1177](https://github.com/krpc/krpc/issues/1177) | enhancement, client:cpp, client:cnano | — |
 | ⬜ | Audit how each client binds static methods and streams to a connection | **To file**: [connection-binding-audit.md](issues/connection-binding-audit.md) | enhancement, client | [client-conformance/defects.md](design/client-conformance/defects.md) |
 
 ## 1.0: remaining protocol improvements, server side function follow-ups
