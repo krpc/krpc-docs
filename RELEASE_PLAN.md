@@ -87,7 +87,7 @@ which is left to do before the tag. **Close the milestone on GitHub once 0.7.0 i
 | ⬜ | Single connection: RPC and stream connections merged | **To file**: [single-connection.md](issues/single-connection.md) | enhancement, protocol, server, client | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | ⬜ | Protocol version 2, with the single connection | Part of the single connection issue | — | [protocol/protocol-version.md](design/protocol/protocol-version.md) |
 | ⬜ | Request ids (phase 1), on the single connection branch | **To file**: [request-ids.md](issues/request-ids.md) | enhancement, protocol, server, client | [protocol/request-ids.md](design/protocol/request-ids.md) |
-| ⬜ | Client conformance tests and runtime specification | [#1123](https://github.com/krpc/krpc/issues/1123), **move from 1.0.0**, **post the [comment](#comment-on-1123)** | enhancement, client | [client-conformance.md](design/client-conformance.md), [client-api-parity-audit.md](design/client-api-parity-audit.md) |
+| ⬜ | Client conformance tests and runtime specification | [#1123](https://github.com/krpc/krpc/issues/1123), **move from 1.0.0**, **post the [comment](#comment-on-1123)** | enhancement, client | [client-conformance/](design/client-conformance/README.md) |
 | ⬜ | Client thread safety: define and document what is thread-safe | [#427](https://github.com/krpc/krpc/issues/427) | docs | — |
 
 * **Single connection first.** It changes connection setup and threading in every client, so the
@@ -214,5 +214,5 @@ Client decisions to settle as part of this work:
 * `TestService`: rename `EnumDefaultArg` and `AddMultipleValues`, and add `UInt32ToString`, `HexStringToBytes` and `StaticOptionalArguments`.
 * The open Python client bugs from the parity audit's Python sweep.
 
-Background: [client-api-parity-audit.md](https://github.com/krpc/krpc-docs/blob/main/design/client-api-parity-audit.md), [client-testing.md](https://github.com/krpc/krpc-docs/blob/main/design/client-testing.md)
+Background: [client-conformance/defects.md](https://github.com/krpc/krpc-docs/blob/main/design/client-conformance/defects.md), [client-conformance/test-service.md](https://github.com/krpc/krpc-docs/blob/main/design/client-conformance/test-service.md)
 ```

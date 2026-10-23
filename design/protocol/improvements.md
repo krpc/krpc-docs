@@ -248,8 +248,8 @@ meta-issue.
 is positional, and the server refuses to read a second request from a client while one is in
 flight. So there is no pipelining (every call is a round-trip), a yielding RPC such as
 `WarpTo` stalls the whole connection, and a client interrupted between send and receive is
-silently desynchronized for the life of the connection (Python bug 25 in
-[client-api-parity-audit.md](../client-api-parity-audit.md)).
+silently desynchronized for the life of the connection (Python bug 25 of the parity audit, see
+[client-conformance/defects.md](../client-conformance/defects.md)).
 
 **Sketch.** Additive `uint64 id` on `Request`, echoed on `Response`, in three phases: echo and
 validate only (fixes bug 25, no scheduling change); then per-client FIFO pipelining behind a

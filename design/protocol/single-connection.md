@@ -241,7 +241,7 @@ batches. Fix in Follow-ups.
 ## Client reader
 
 The rules for the clients with streams: Python (the reference), C#, Java and C++. They are the target
-for the conformance suite ([client-conformance.md](../client-conformance.md)).
+for the conformance suite ([client-conformance/spec.md](../client-conformance/spec.md)).
 
 ### Threads
 
@@ -286,7 +286,7 @@ buffered before parsing, but another caller's response being handled can be lost
 4. The request is written inside its `Message` without building one; a response is parsed straight
    out of it.
 5. A caller that stops waiting (interrupt, timeout) abandons its slot, and the response is discarded.
-   This fixes Python bug 25 ([client-api-parity-audit.md](../client-api-parity-audit.md)).
+   This fixes Python bug 25 of the client API parity audit ([client-conformance/defects.md](../client-conformance/defects.md)).
 6. A response id neither pending nor abandoned is a protocol error.
 
 The handshake runs on the connecting thread before the reader and dispatcher start.

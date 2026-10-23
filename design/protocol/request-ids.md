@@ -10,7 +10,7 @@ Related: [single-connection.md](single-connection.md) (its "Client reader" secti
 client side of phase 1), [improvements.md](improvements.md) (meta-issue
 [#906](https://github.com/krpc/krpc/issues/906)), [reverse-streams.md](reverse-streams.md) (#903,
 batching and `no_response`), [protocol-compatibility.md](../protocol-compatibility.md),
-[client-api-parity-audit.md](../client-api-parity-audit.md) (Python bug 25).
+[client-conformance/defects.md](../client-conformance/defects.md) (Python bug 25 of the parity audit).
 
 ## Problem
 

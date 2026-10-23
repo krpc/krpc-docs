@@ -30,7 +30,7 @@ In short:
 | A client reports an unknown `ConnectionResponse` status with its message | New features may refuse a connection |
 | The release version from `GetStatus` never gates a feature | Release versions of the server and clients will move apart |
 
-Each client-side rule is pinned by the [conformance suite](client-conformance.md).
+Each client-side rule is pinned by the [conformance suite](client-conformance/README.md).
 
 What an older server does with each request-level field it does not know:
 
@@ -75,4 +75,4 @@ a 0.8 client by removing a procedure or changing what one means. Two items are a
 ## Related
 
 * [protocol/improvements.md](protocol/improvements.md), the overview of #906.
-* [client-conformance.md](client-conformance.md), "Sequencing against #906".
+* [client-conformance/README.md](client-conformance/README.md), "Sequencing".

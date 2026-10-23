@@ -130,7 +130,7 @@ drop a reverse stream push.
 message it cannot handle.
 
 **A client tolerates what it does not know.** The conformance suite
-([client-conformance.md](../client-conformance.md)) pins each of these:
+([client-conformance/spec.md](../client-conformance/spec.md)) pins each of these:
 
 * Once a session has started, it skips a `Message` with no known case set. Proto3 parses a newer message kind that way,
   including as a `oneof` with no case set.
@@ -157,7 +157,7 @@ Phase 1 follows the design, apart from these points:
 | WebSockets subprotocol | The server uses the first `krpc.N` entry. A malformed one, such as `krpc.x`, gets HTTP 400. |
 | Stream reported | `GetStatus` reports the version of the RPC connection. |
 | cnano | A mismatch returns `KRPC_ERROR_CONNECTION_FAILED`, as a denied connection does. |
-| Tests | Server tests cover no version, version 1 and an unsupported version, for TCP and WebSockets. There are no client tests against a server that reports version 0. These wait for the [conformance suite](../client-conformance.md) in 0.8. |
+| Tests | Server tests cover no version, version 1 and an unsupported version, for TCP and WebSockets. There are no client tests against a server that reports version 0. These wait for the [conformance suite](../client-conformance/README.md) in 0.8. |
 
 The phase also fixes a SerialIO bug: a `MultiplexedRequest` with no `ConnectionRequest` got its error response, then dereferenced null.
 
