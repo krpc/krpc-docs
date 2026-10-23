@@ -3,8 +3,8 @@
 **Status:** proposal — investigated 2026-07-16; full real-API coverage blocked on mod sourcing, the
 lightweight tests (option 3) are unblocked and recommended. Drafted as issues in
 [issues/mod-compat-tests.md](../../issues/mod-compat-tests.md) (tests) and
-[issues/dockingcam-lidar-cleanups.md](../../issues/dockingcam-lidar-cleanups.md) (docstrings and
-logging). The LiDAR service was renamed LIDAR in [PR #1149](https://github.com/krpc/krpc/pull/1149).
+[#1180](https://github.com/krpc/krpc/issues/1180) (logging) and
+[#1181](https://github.com/krpc/krpc/issues/1181) (docstrings). The LiDAR service was renamed LIDAR in [PR #1149](https://github.com/krpc/krpc/pull/1149).
 Two sibling services, `service/LiDAR/` and `service/DockingCamera/`, have shipped since v0.5.0
 with **zero tests** — no `test/` directory, no lint or integration coverage, and both are absent from
 the top-level `//:test` and `//:lint` suites (they appear in `BUILD.bazel` only in the release

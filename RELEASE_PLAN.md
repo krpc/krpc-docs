@@ -126,8 +126,9 @@ stubs and the audit depend on the conformance suite.
 | | Item | GitHub | Labels | Design doc |
 | --- | --- | --- | --- | --- |
 | ⬜ | `RemoveStream` and `SetStreamRate` take a `Stream` | [#1178](https://github.com/krpc/krpc/issues/1178) | enhancement, protocol | — |
-| ⬜ | `KerbalAlarmClock.Alarm.PlaySound` has no effect | **To file**: [kac-alarm-play-sound.md](issues/kac-alarm-play-sound.md) | bug, service:kerbal-alarm-clock | [services/kac-remotetech-tests-and-api.md](design/services/kac-remotetech-tests-and-api.md) |
-| ⬜ | DockingCamera log spam, LIDAR docstrings | **To file**: [dockingcam-lidar-cleanups.md](issues/dockingcam-lidar-cleanups.md) | bug, service | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
+| ⬜ | `KerbalAlarmClock.Alarm.PlaySound` has no effect | [#1179](https://github.com/krpc/krpc/issues/1179), **add milestone** | bug, service:kerbal-alarm-clock | [services/kac-remotetech-tests-and-api.md](design/services/kac-remotetech-tests-and-api.md) |
+| ⬜ | DockingCamera log spam | [#1180](https://github.com/krpc/krpc/issues/1180), **add milestone** | bug | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
+| ⬜ | LIDAR docstrings name LaserDist | [#1181](https://github.com/krpc/krpc/issues/1181), **add milestone** | bug, docs | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ⬜ | Raise the default receive timeout | **To file**: [recv-timeout-default.md](issues/recv-timeout-default.md) | enhancement, server | [server/recv-timeout-cliff.md](design/server/recv-timeout-cliff.md) |
 | ⬜ | Python: Ctrl-C during a call on Windows, with the single connection | **To file**: [python-ctrl-c-windows.md](issues/python-ctrl-c-windows.md) | bug, client:python | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | ⬜ | Python: trim client frames from server error tracebacks | **To file**: [python-traceback-trim.md](issues/python-traceback-trim.md) | enhancement, client:python | — |
@@ -185,7 +186,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | Raster Prop Monitor integration and camera views | [#375](https://github.com/krpc/krpc/issues/375), [#424](https://github.com/krpc/krpc/issues/424) | mod-compatibility; enhancement | — |
 | ⬜ | DockingCamera and LaserDist integration; needs forks | [#674](https://github.com/krpc/krpc/issues/674) | enhancement | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ⬜ | Vessel state and staging prediction; parts may be covered by the stage API | [#311](https://github.com/krpc/krpc/issues/311) | enhancement, service:space-center | — |
-| ⬜ | Lua: documentation for the dynamically built services | **To file**: [lua-documentation.md](issues/lua-documentation.md) | enhancement, client:lua | — |
+| ⬜ | Lua: documentation for the dynamically built services | [#1182](https://github.com/krpc/krpc/issues/1182) | enhancement, client:lua | — |
 
 ### Fixes, tests and tooling
 
@@ -195,7 +196,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | Windows CI: Python stream test flake, any release | [#1138](https://github.com/krpc/krpc/issues/1138) | bug, client:python | — |
 | 🚧 | Autopilot test-plan gaps | **To file**: [autopilot-test-gaps.md](issues/autopilot-test-gaps.md) | tools, service:space-center | [autopilot/test-plan.md](design/autopilot/test-plan.md) |
 | 🚧 | Mod compatibility tests | **To file**: [mod-compat-tests.md](issues/mod-compat-tests.md) | tools, mod-compatibility | [services/mod-compat-test-coverage.md](design/services/mod-compat-test-coverage.md), [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
-| ⬜ | XML doc crefs to exceptions | **To file**: [doc-crefs-to-exceptions.md](issues/doc-crefs-to-exceptions.md) | enhancement, tools, docs | [build-tools/doc-crefs-to-exceptions.md](design/build-tools/doc-crefs-to-exceptions.md) |
+| ⬜ | XML doc crefs to exceptions | [#1183](https://github.com/krpc/krpc/issues/1183) | enhancement, docs | [build-tools/doc-crefs-to-exceptions.md](design/build-tools/doc-crefs-to-exceptions.md) |
 | ⬜ | NUnit 5 | **To file**: [nunit-5-migration.md](issues/nunit-5-migration.md) | enhancement, tools | [build-tools/nunit-5-migration.md](design/build-tools/nunit-5-migration.md) |
 | ⬜ | Bazel sandbox in CI | **To file**: [buildenv-linux-sandbox.md](issues/buildenv-linux-sandbox.md) | enhancement, build-scripts | — |
 | ⬜ | Lua API docs on sphinx-lua-ls, when luadomain breaks on a Sphinx bump | **To file**: [lua-sphinx-domain.md](issues/lua-sphinx-domain.md) | docs, tools, client:lua | — |

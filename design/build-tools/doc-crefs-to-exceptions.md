@@ -1,7 +1,7 @@
 # Allow XML doc crefs to exceptions
 
-**Status:** proposal, not started. Issue drafted in
-[issues/doc-crefs-to-exceptions.md](../../issues/doc-crefs-to-exceptions.md).
+**Status:** proposal, not started. Issue
+[#1183](https://github.com/krpc/krpc/issues/1183).
 
 A service's XML documentation cannot link to a kRPC exception. Writing
 `<see cref="ObjectNotLoadedException"/>` fails the service definitions build:
