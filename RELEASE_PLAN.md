@@ -109,8 +109,9 @@ which is left to do before the tag. **Close the milestone on GitHub once 0.7.0 i
 
 ### Fixes and smaller items
 
-Everything but the `RemoveStream` change and the Ctrl-C fix can ship in a 0.7.x release if 0.8 is far off. The
-`RemoveStream` change breaks the `KRPC` service, and the Ctrl-C fix depends on the single connection.
+Everything but the `RemoveStream` change, the Ctrl-C fix and the testee stubs can ship in a 0.7.x release if 0.8 is far off. The
+`RemoveStream` change breaks the `KRPC` service, the Ctrl-C fix depends on the single connection, and the testee
+stubs depend on the conformance suite.
 
 | | Item | GitHub | Labels | Design doc |
 | --- | --- | --- | --- | --- |
@@ -120,6 +121,7 @@ Everything but the `RemoveStream` change and the Ctrl-C fix can ship in a 0.7.x 
 | ⬜ | Raise the default receive timeout | **To file**: [recv-timeout-default.md](issues/recv-timeout-default.md) | enhancement, server | [server/recv-timeout-cliff.md](design/server/recv-timeout-cliff.md) |
 | ⬜ | Python: Ctrl-C during a call on Windows, with the single connection | **To file**: [python-ctrl-c-windows.md](issues/python-ctrl-c-windows.md) | bug, client:python | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | ⬜ | Python: trim client frames from server error tracebacks | **To file**: [python-traceback-trim.md](issues/python-traceback-trim.md) | enhancement, client:python | — |
+| ⬜ | Conformance testee stubs from the full TestServer definitions, with `TestService2` | **To file**: [test-service-full-definitions.md](issues/test-service-full-definitions.md) | enhancement, tools | [client-conformance/harness.md](design/client-conformance/harness.md) |
 
 ## 1.0: remaining protocol improvements, server side function follow-ups
 
