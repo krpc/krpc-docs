@@ -16,7 +16,7 @@ The **GitHub** column says how the issue on GitHub stands against this plan:
 | | Release | Theme | Progress |
 | --- | --- | --- | --- |
 | 🚧 | 0.7 | Server-side functions, streams and events, protocol additions, service improvements | Protocol version to add, then tag |
-| ⬜ | 0.8 | Single connection, then client conformance testing and thread safety | 0 of 6 started |
+| ⬜ | 0.8 | Single connection, client codegen, then client conformance testing and thread safety | 0 of 7 started |
 | ⬜ | 1.0 | Remaining protocol improvements (#906), server side function follow-ups | 0 of 9 done; tick control has a 0.7 stopgap |
 
 ## 0.7: server-side functions, streams and events, service improvements
@@ -78,7 +78,7 @@ which is left to do before the tag. **Close the milestone on GitHub once 0.7.0 i
 | ✅ | In-game test waits, buildifier as a test | #1147, #1152 | — |
 | ✅ | Changelogs grouped by topic | #1157 | — |
 
-## 0.8: single connection, then client conformance and thread safety
+## 0.8: single connection, client codegen, then client conformance and thread safety
 
 ### Features
 
@@ -87,6 +87,7 @@ which is left to do before the tag. **Close the milestone on GitHub once 0.7.0 i
 | ⬜ | Single connection: RPC and stream connections merged | **To file**: [single-connection.md](issues/single-connection.md) | enhancement, protocol, server, client | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | ⬜ | Protocol version 2, with the single connection | Part of the single connection issue | — | [protocol/protocol-version.md](design/protocol/protocol-version.md) |
 | ⬜ | Request ids (phase 1), on the single connection branch | **To file**: [request-ids.md](issues/request-ids.md) | enhancement, protocol, server, client | [protocol/request-ids.md](design/protocol/request-ids.md) |
+| ⬜ | Client codegen: the exception mapping and the service list, generated | **To file**: [client-codegen.md](issues/client-codegen.md) | enhancement, client, tools | [client-codegen.md](design/client-codegen.md) |
 | ⬜ | Client conformance tests and runtime specification | [#1123](https://github.com/krpc/krpc/issues/1123), **move from 1.0.0**, **post the [comment](#comment-on-1123)** | enhancement, client | [client-conformance/](design/client-conformance/README.md) |
 | ⬜ | Client thread safety: define and document what is thread-safe | [#427](https://github.com/krpc/krpc/issues/427) | docs | — |
 
@@ -97,6 +98,9 @@ which is left to do before the tag. **Close the milestone on GitHub once 0.7.0 i
 * **Request ids go with it, on the same branch.** The single connection's client reader matches
   responses by id, so phase 1 of request ids is part of it. Pipelining and out-of-order completion
   are later additions.
+* **Client codegen before conformance.** It is a separate piece of work. Its exception tables and
+  error message format settle two client disagreements, so the suite's error tests start out
+  passing.
 * **Thread safety goes with conformance.** The single connection changes client threading, and
   the conformance suite's threading tests are where the guarantees get pinned and checked across
   clients.
@@ -207,6 +211,8 @@ issue number when filing.
 Decisions for the conformance work, left open by the client audits:
 
 ```markdown
+The "generate more than stubs" part of this proposal is split out as #<client-codegen>, which lands first.
+
 Client decisions to settle as part of this work:
 
 * Whether the Lua client gets streams.

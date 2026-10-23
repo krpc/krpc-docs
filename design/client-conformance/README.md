@@ -16,8 +16,10 @@ client testing standard (`client-testing.md`) and the client API parity audit
 | [harness.md](harness.md) | The driver, the testee protocol, the scripted server, Bazel, expected failures |
 | [test-service.md](test-service.md) | `TestService` as it stands, the changes, and the new `ConformanceService` |
 | [client-tests.md](client-tests.md) | What stays in each client's own suite, and what the suite replaces |
-| [generation.md](generation.md) | Part 1: generating exception tables, constants, type tables and the service list |
 | [defects.md](defects.md) | Open client defects from the audits, each with the requirement that catches it |
+
+Generating the exception mapping and the service list is a separate piece of
+work that lands first: [client-codegen.md](../client-codegen.md).
 
 ## Problem
 
@@ -82,12 +84,12 @@ New in this revision:
 | Step | Work |
 | --- | --- |
 | 1 | Land the single connection and request ids. |
-| 2 | Part 1 phases G1, G3, G4 and G5, in any order. G2 was blocked on the single connection removing `stream_port` and the paired socket paths, and is now free. |
+| 2 | Client codegen, phases G1 to G5 ([client-codegen.md](../client-codegen.md)). Its exception tables and message format settle two client disagreements before the suite pins them. |
 | 3 | Conformance phases C0 to C6. |
 | 4 | 1.0 additions ([#903](https://github.com/krpc/krpc/issues/903), [#251](https://github.com/krpc/krpc/issues/251), [#905](https://github.com/krpc/krpc/issues/905), [#898](https://github.com/krpc/krpc/issues/898)), each with conformance tests. The suite pins the client tolerance rules that keep them additive ([protocol-compatibility.md](../protocol-compatibility.md)). |
 
-Part 1 and Part 2 can overlap. G1 must precede the error tests in C3, and G2 the message format
-test.
+C0 to C2 can overlap with codegen. Its G1 and G2 must land before the error tests in C3, or those
+tests start as expected failures in most clients.
 
 ## Phases
 
@@ -118,5 +120,5 @@ Each phase merges on its own. A spec page is published only once its tests run.
   suite sends neutral expression trees, built through each client's `Expression` stubs, and the
   builders keep their own per-client tests.
 - **Decisions the audits left open**, listed in [defects.md](defects.md) "Decisions": Lua streams,
-  C++ dropped stream handles, the Python exception classes, Java's exception picks, and C++ native
-  exceptions.
+  C++ dropped stream handles, and waiting in a callback. The exception and message format decisions
+  are in [client-codegen.md](../client-codegen.md).

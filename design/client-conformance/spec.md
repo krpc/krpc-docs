@@ -158,12 +158,12 @@ codec bug cannot pass ([test-service.md](test-service.md) "Testing values").
 
 | Id | Level | Requirement |
 | --- | :-: | --- |
-| `errors-mapped-exceptions` | M | Each server exception with a mapped type raises the native type in the client's table. The tables are generated ([generation.md](generation.md) G1). |
+| `errors-mapped-exceptions` | M | Each server exception with a mapped type raises the native type in the client's table. The tables are generated ([client-codegen.md](../client-codegen.md) G1). |
 | `errors-custom-exception` | M | A service exception raises its generated type. |
 | `errors-krpc-exceptions` | M | The `KRPC` exceptions with no mapped type (`ObjectDestroyedException`, `StreamRemovedException`, ...) raise their generated types. |
 | `errors-raised-type-is-the-exposed-type` | M | The type raised for a server exception is the type the client exposes for it, so a handler written against the stub catches it. |
 | `errors-unknown-exception-type` | M | An exception of an unknown service or type raises the generic error, carrying service, name and description. |
-| `errors-message` | M | The message is the description, then the server stack trace when sent, in the format of [generation.md](generation.md) G2. |
+| `errors-message` | M | The message is the description, then the server stack trace when sent, in the format of [client-codegen.md](../client-codegen.md) G2. |
 | `errors-structured` | S | The error exposes the service and name of the server exception. |
 | `errors-null-argument-rejected` | M | A null argument to a non-nullable parameter is sent, and the server's rejection raised. |
 | `errors-null-return-rejected` | M | A null return from a non-nullable procedure raises an error. |

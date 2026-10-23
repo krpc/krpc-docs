@@ -11,7 +11,7 @@ What each client's own suite keeps once the conformance suite runs, and what C5 
 | Codec vectors | `test_encodedecode`, `EncoderTest`, `test_encode_decode`, ... | Replaced by `test_codec.py`. Core's `EncoderTest.cs` stays, as it tests the server |
 | Transport and framing | `connectiontest.py`, `connection_test.hpp`, cnano `test_communication_*` | Kept: they test the client's socket layer below the testee |
 | Type system and coercion | `test_types`, `test_limits` | Kept: language specific |
-| Name parsing and conversion | `test_attributes`, `test_snake_case` | Kept. Shared vectors are a lower priority ([generation.md](generation.md)) |
+| Name parsing and conversion | `test_attributes`, `test_snake_case` | Kept. Shared vectors are a lower priority ([client-codegen.md](../client-codegen.md)) |
 | Function builders | `test_functioncompiler`, `FunctionCompilerTest`, `test_expressiontree`, `ExpressionTreeTest` | Kept: each builder is its own idiom |
 | Golden fixtures | `tools/krpctools/krpctools/test/clientgen-*`, `docgen-*` | Kept: they pin generated code, defaults' spellings and deprecation markers |
 
