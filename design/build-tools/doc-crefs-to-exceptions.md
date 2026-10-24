@@ -1,7 +1,21 @@
 # Allow XML doc crefs to exceptions
 
-**Status:** proposal, not started. Issue
-[#1183](https://github.com/krpc/krpc/issues/1183).
+**Status:** in review, draft PR [#1185](https://github.com/krpc/krpc/pull/1185). Issue
+[#1183](https://github.com/krpc/krpc/issues/1183). The PR grew into a general pass over the
+client API docs: crefs link in the generated code of every client, and Doxygen, javadoc and
+Sphinx check each client's docs in its test suite.
+
+Where the implementation differs from the proposal:
+
+* A cref to a .NET exception that a kRPC exception maps, such as
+  `System.InvalidOperationException`, resolves to the kRPC exception. Service code throws the
+  .NET type, so its docs can name the type they throw.
+* C-nano renders a cref to an exception as the literal full name, e.g. `KRPC.Error`.
+* docgen has no `<seealso>`, so the two object exceptions cross-reference each other in a
+  `<remarks>` sentence.
+* Also linked: the `Stage` remarks, and `Antenna.Deployed` and `Leg.Deployed`, as Camera.
+  `doc/src/extending.rst` documents crefs, with an example.
+* The core changelog has an entry, as service authors can now link exceptions.
 
 A service's XML documentation cannot link to a kRPC exception. Writing
 `<see cref="ObjectNotLoadedException"/>` fails the service definitions build:
