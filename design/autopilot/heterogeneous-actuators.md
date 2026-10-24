@@ -1,7 +1,10 @@
 # Heterogeneous fast/slow actuator allocation
 
-**Status:** proposal — not started. The most speculative of the three attitude extensions; phase 1
-decides whether it is worth building at all.
+**Status:** not planned for the built-in auto-pilot (ruled 2026-10-24). The built-in controller
+commands the game's pitch/yaw/roll inputs and models how the game distributes them (see the phase 1
+findings in [`aero-extension.md`](aero-extension.md)). Per-actuator allocation is left to user scripts,
+which the `ControlSurface` RPCs (`DeflectionOverride`, `DeflectionAngle`, `ControlRange`,
+`ActuatorSpeed`) support. Kept as a record of the design.
 **Scope:** `service/SpaceCenter/src/AutoPilot/AttitudeController.cs`,
 `service/SpaceCenter/src/AutoPilot/MitigationPolicy.cs`,
 `service/SpaceCenter/src/Services/AutoPilot.cs`,

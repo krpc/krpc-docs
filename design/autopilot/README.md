@@ -30,8 +30,8 @@ Each is an independently-buildable future change, kept as its own doc.
 
 | Doc | Status | What it proposes |
 | --- | --- | --- |
-| [aero-extension.md](aero-extension.md) | proposal | Extending the controller to aerodynamic flight. |
+| [aero-extension.md](aero-extension.md) | in progress | Extending the controller to aerodynamic flight. Phase 1 findings recorded; first changes being ported for #526. |
 | [bank-to-turn.md](bank-to-turn.md) | proposal | Bank-to-turn control for asymmetric-authority craft. |
-| [heterogeneous-actuators.md](heterogeneous-actuators.md) | proposal | Fast/slow actuator allocation across mixed effectors. |
+| [heterogeneous-actuators.md](heterogeneous-actuators.md) | not planned | Fast/slow actuator allocation across mixed effectors. Left to user scripts. |
 | [sign-convention-refactor.md](sign-convention-refactor.md) | proposal | Move the inner loop to a right-handed sign convention. |
 | [output-filter-manual-knobs.md](output-filter-manual-knobs.md) | proposal | Expose oscillation-mitigation internals as manual knobs. |

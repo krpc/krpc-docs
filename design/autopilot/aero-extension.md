@@ -1,7 +1,9 @@
 # Design proposal: extending the autopilot to aerodynamic flight
 
-**Status:** proposal — not started. High-level control-loop plan; implementation details
-deliberately deferred to per-phase design docs.
+**Status:** in progress for [#526](https://github.com/krpc/krpc/issues/526). Phase 1 measurements
+done (2026-10-24); the first set of changes is ported and tested (2026-10-25), not yet in a PR. See
+[Phase 1 findings](#phase-1-findings-2026-10-24) and [Port findings](#port-findings-2026-10-25),
+which supersede parts of sections A, D, E and the roadmap below.
 **Scope:** `service/SpaceCenter/src/AutoPilot/` (AttitudeController, OscillationDetectors,
 MitigationPolicy), `service/SpaceCenter/src/Services/AutoPilot.cs`,
 `service/SpaceCenter/src/Services/Parts/ControlSurface.cs`
@@ -12,14 +14,207 @@ axis flies a heading change on a weak-yaw craft) and [`heterogeneous-actuators.m
 single axis's command across fast and slow actuators). Section E below is the home of the
 slow-actuator handling those docs build on.
 
-## Open: whether to build this at all
+## Decided: build it, on the game's pitch/yaw/roll inputs
 
-Upstream of the roadmap below and of both sibling proposals is a go/no-go decision: growing kRPC's
-own attitude controller into aerodynamic regimes is listed as "maybe don't do", against the
-alternative of **deferring to a MechJeb integration** rather than reimplementing aerodynamic flight
-control here. The asymmetric-torque / bank-to-turn work ([`bank-to-turn.md`](bank-to-turn.md))
-stands on its own, but this aero-extension roadmap is the part a MechJeb integration would make
-redundant. Settle this before starting phase 1.
+The go/no-go question (build here, or defer to a MechJeb integration) is settled: build it. Phase 1
+showed most of the aircraft failures come from wrong plant figures and an unmodelled actuator law,
+which are cheap to fix in kRPC's own controller.
+
+The built-in auto-pilot keeps commanding the game's aggregate pitch, yaw and roll inputs and
+models how the game distributes them. Per-actuator allocation is left to user scripts, which the
+`ControlSurface` RPCs support. See [`heterogeneous-actuators.md`](heterogeneous-actuators.md).
+
+## Phase 1 findings (2026-10-24)
+
+Method: the basic loop (stopping-point profile, autotuned PI per axis) reimplemented as a server
+side function and streamed every tick, so the control law could change without restarting the game.
+Steps in pitch (10°), roll (30° bank), heading (5°) and a turn (bank 30°, heading +30°, roll level),
+plus a pitch-step speed sweep, on three stock aircraft:
+
+| Craft | Mass | Pitch MoI | Character |
+|---|---|---|---|
+| Aeris 3A | 5.6 t | 23 t·m² | stiff, high authority |
+| Thunderbird | 14 t | 90 t·m² | middle |
+| Mallard | 37 t | 1500 t·m² | low elevator authority, long wings |
+
+### Plant figures were wrong (fixed)
+
+| Defect | Effect | Fix | Verified |
+|---|---|---|---|
+| `Vessel.MOI` (and kRPC's own tensors) take each part's parallel-axis offset from its origin, not its CoM | Aeris pitch MoI 39% high, roll 10% low | Compute about `rb.worldCenterOfMass`, flight and editor | Reaction-wheel spin-up in vacuum: 1.000-1.002 on every axis of two craft |
+| Stock `ModuleControlSurface.GetPotentialTorque` multiplies `r × ΔL` component-wise by the lever arm (`Vector3.Scale`) | Each axis scaled by the arm along that same axis: Mallard pitch 3.2× high, some yaw fins 0.46× | Form `r × ΔL` from `GetPotentialLift` | Early change in applied aero torque (`Flight.AerodynamicTorque`) matches prediction × measured deflection within 2% (pitch), 2-18% (roll, yaw) |
+
+Also added `ControlSurface.DeflectionAngle` (read back), `ControlRange` and `ActuatorSpeed`. The
+readback shows deflection is an exact linear ramp at `ActuatorSpeed` up to `ControlRange`.
+
+Fixing the figures alone made the Mallard worse with the built-in controller: its gains rose 3×,
+and its 0.6 s surface swing then rate-limits large commands into a limit cycle. The figures were
+low enough before to hide this.
+
+### The game's roll law
+
+For roll the game deflects each surface by `clamp(K × roll input)`, K growing with the surface's
+lateral distance from the CoM (about 0.26-0.5 × the distance in m, from geometry in
+`FixedCtrlSurfaceUpdate`). Measured on the runway:
+
+| Craft | Surface | K | Full deflection at roll input |
+|---|---|---|---|
+| Mallard | ailerons at 10-12 m | 3.4-3.9 | 0.27 |
+| Aeris 3A | elevons at 3.3 m | 1.6 | 0.6 |
+| Thunderbird | elevons / canards | 2.1 / 0.31 | 0.5 / never |
+
+Roll torque is piecewise linear in the input. On the Mallard the small-signal gain is several times
+the assumed one, which drove a ±60° roll limit cycle. `AvailableTorque` assumes full deflection, so
+it overstates roll torque where K < 1 (Thunderbird by about 37%). Pitch and yaw deflection is the
+input projected onto the hinge axis, at most 1.
+
+### Controller changes that worked
+
+| Change | Replaces | What it does |
+|---|---|---|
+| Actuator model | E's bandwidth ceiling | Rate-limit each axis's output to `1 / (ControlRange / ActuatorSpeed)` per second, and hold the integral while limited |
+| Turn-rate cap | none | Cap commanded pitch and yaw rate at 0.7 × the steady rate the spare control torque holds, estimated from `Flight.SimulateAerodynamicTorqueAt`/`ForceAt` (pitch: lift at the incidence where the restoring moment uses the spare elevator; yaw: side force likewise; roll: rate where aero damping uses the spare torque). Trim is the slow average of the input |
+| Roll linearization | none | PI and actuator model work in roll-torque fraction; the output inverts `Σ w·clamp(K·u)` |
+| Narrow attenuation band | none | 0.05° instead of 1° on surface-controlled axes, which removes a 0.5° steady offset |
+
+The bandwidth ceiling in E is too blunt: the Aeris and Mallard have the same 0.6 s actuator time,
+yet the Aeris is fine at default bandwidth. Rate limiting bites only at large amplitude, so the
+actuator model handles it without detuning small signals. A fixed load-factor cap was also tried and
+rejected: n = 5 still limit-cycles the Mallard (its elevator holds only 3.3 g at 120 m/s) while a
+fighter pulls 8 g or more. The aero-model estimate matches the full-elevator pitch rate measured on
+the Mallard (0.20 vs 0.19-0.25 rad/s) and is an upper bound on the Aeris, where 8-14 g bleeds speed.
+
+Results, worst step of each pair (built-in today / prototype):
+
+| Craft | Pitch 10° | Bank 30° | Heading 5° |
+|---|---|---|---|
+| Aeris 3A | 7%, 0.5° offset / 5%, 1.5 s | 169%, limit cycle / 0%, 1.5 s | 12% / 1%, 1.6 s |
+| Thunderbird | 103%, oscillates / 1.4%, 2.1 s | 29% / 0-3%, 1.6 s | departs, AoA 25° (#526) / 0.6%, 1.3 s |
+| Mallard | 33%, oscillates / 0.7%, 2.3 s | 43% / 10-15%, rings | 276% / 0.6%, 1.2 s |
+
+Speed sweep (pitch step, 100-300 m/s): the built-in limit-cycles on the Thunderbird and Mallard above
+about 150 m/s; the prototype is clean throughout (worst: Aeris at 300 m/s, 7%, 3.8 s).
+
+### Still open
+
+- Mallard roll rings at about 1 Hz after a step (settles in 6-13 s). Likely wing flex; the oscillation
+  mitigations in [`oscillation.md`](oscillation.md) target this.
+- Heading changes while banked take 9-15 s and climb the nose 11-12°: the controller slews the nose
+  by shortest rotation and leaves the turn to the weak yaw axis. Coordinated turns are
+  [`bank-to-turn.md`](bank-to-turn.md).
+- The online estimator (A) is not needed for the first set: with the figures fixed, α is right to
+  within the measurement. It stays relevant for FAR and for trim (B).
+- Unmeasured: false latching of the chatter detector at high Q (experiment 2), FAR parity (7).
+
+### Port plan
+
+All four steps are done; [Port findings](#port-findings-2026-10-25) records where the port diverged.
+
+1. The two figure fixes and the `ControlSurface` RPCs (done, with tests).
+2. Actuator model, roll linearization (K computed from the game's geometry, roll torque corrected
+   by it), narrow band on surface-controlled axes.
+3. Turn-rate cap, on by default, with a toggle that leaves only `MaxAngularVelocity`.
+4. In-game aircraft step tests on the three craft above, and the full auto-pilot suite as the
+   rocket regression gate (the figure fixes change rocket gains too).
+
+## Port findings (2026-10-25)
+
+The C# port into `AttitudeController`, tested in game on five aircraft (Aeris 3A, Aeris 4A, Gull,
+Thunderbird, Mallard), the 14 launch craft and the two reentry craft. The rule for the PR: no
+rocket ascent may get worse than `main`, and the design stays general. A craft the general scheme
+handles less well gets a looser per-craft test limit, not a special case.
+
+### What the port does
+
+| Mechanism | How it works | Diverges from Phase 1 |
+|---|---|---|
+| Actuator model | Tracks a modeled surface command moving at the surfaces' rate, scaled by their share of the axis's torque. A tick where it lags the command holds that axis's integral and counts toward the back-off. | The command is not clamped. Clamping it also slowed gimbals and wheels on mixed craft. |
+| Reversal lag | The stopping distance adds the surface reversal time times the angular velocity relative to the target. | New. Needs a target-rate estimate, see below. |
+| Target-rate estimate | Angular velocity minus the rate of change of the error, low-passed at 0.5 s. A rate above 0.2 rad/s counts as a target step and is ignored. | A first, internal part of D. It feeds only the reversal lag, not the command. |
+| Bandwidth back-off | Scales an axis's bandwidth down while the actuators lag over 50% of a 2 s window, then recovers at 0.1/s. The lag flags of the body axes are projected onto the roll-invariant pitch and yaw axes. | New. Replaces E's bandwidth ceiling and classifier for this set. |
+| Roll linearization | As Phase 1, with K from the game's geometry. | None. |
+| Attenuation band | Shrinks with the surfaces' share of the axis's torque. | Scaled by share, not switched. |
+| Aero rate cap (`LimitAngularVelocity`) | As Phase 1, with four refinements below. 0.7 × the estimate. | See below. |
+
+The aero cap needed four refinements before rockets flew as well as on `main`:
+
+- **Weight across the flight path, by direction.** Subtracting the full weight in both directions,
+  as for a level pull-up, held a climbing rocket's cap at 0. The weight now helps a turn toward it
+  and opposes a turn away, so pitch and yaw each have a limit per direction.
+- **Thrust.** `T·sin(incidence)` turns the flight path along with the aerodynamic force.
+- **Surface share.** The cap divides by the surfaces' share of the axis's torque. An axis with no
+  surfaces has no cap, as it has no surface lag to limit-cycle.
+- **Floor.** Each pitch and yaw limit is at least the incidence the spare torque holds over 10 s.
+  A zero limit in one direction otherwise zeroed the other axis through the limit ellipse.
+
+### Tried and rejected
+
+| Attempt | Why rejected |
+|---|---|
+| Clamp the command to the surface rate (the Phase 1 actuator model) | On mixed craft it slowed gimbals and wheels as well. The Dynawing's pitch command reversed in 0.5 s and it limit-cycled. Dropping the clamp took aircraft bank overshoot from 12-19% to under 1%. |
+| Stricter anti-windup: hold the integral while the unclamped output is past a limit | Stopped the Gull's roll integral winding up through a bank, but slowed rockets out of a saturating launch transient. Orbiter One launch: 1.04-1.13° vs 0.73-0.79° on `main`. |
+| Reversal lag on the absolute angular velocity | Penalized steady ramp tracking, where the surfaces never reverse. Kerbal 1 smooth turn: 0.85° vs 0.70° on `main`. |
+| Latch the reversal lag, back-off and cap behind a detected surface limit cycle | Aircraft steps overshot 60-350%. A step is not a limit cycle, and the lag and cap must act from the first step. The latch engaged once in 15 step tests. |
+| Gate the back-off on the command envelope | Aircraft limit cycles (0.21-0.30) and rocket ramps (up to 0.22) overlap, so no threshold separates them. |
+| Lean floor of 2 s | The incidence search tops out at 30°, a 0.26 rad/s floor, above the steady yaw rate. The Thunderbird's rudder limit-cycled. |
+| Low-pass the rate in the reversal lag (for the Aeris 4A's 8 Hz pitch chatter) | Overshoot rose to 10-21% and the activity did not drop. |
+| Fixed bandwidth ceiling `k / swing time` | Slows high-authority craft. The Aeris 3A and 4A have the same 0.6 s actuator. |
+| Back-off and integral hold shared between pitch and yaw | The Aeris 4A's elevator cycle crippled its rudder loop, and a heading step never settled. |
+
+### Results
+
+Aircraft steps, final code (overshoot, settle time):
+
+| Craft | Pitch 10° | Bank 30° | Heading 5° |
+|---|---|---|---|
+| Aeris 3A | 0.7%, 2.8 s | 0%, 3.3 s | 1.6%, 2.8 s |
+| Aeris 4A (100 m/s) | 4.8%, 3.6 s | 0.4%, 3.2 s | 2.5%, 3.1 s |
+| Gull (35 m/s) | 0%, 8.1 s | 0%, 3.1 s | 0.8%, 2.3 s |
+| Thunderbird | 1.1%, 2.5 s | 0%, 3.4 s | 0.7%, 2.9 s |
+| Mallard | 0%, 3.7 s | 0%, 5.6 s | 0%, 4.2 s |
+
+The two reentry tests pass. The Aeris 4A's pitch-upset recovery, skipped on `main`, now passes.
+
+Launch tests, attitude error in degrees (`main` / port), where they differ by more than 0.1°:
+
+| Craft | Test | `main` | Port | Cause |
+|---|---|---|---|---|
+| Kerbal 1, winglets on | sharp turn | 11.0, limit cycle | 0.08 | Surface model. The test disabled the winglets on `main`; they are now flown as built. |
+| Dynawing | sharp turn | 4.2, limit cycle | 0.43 | |
+| AeroEquus | launch, sharp turn | 0.63, 1.72 | 0.21, 0.49 | Oscillation after the pitch-over gone |
+| Kerbal 1, Kerbal 2 | smooth, jittery turns | 0.70-0.74 | 0.35-0.59 | Reversal lag relative to the target |
+| ZMAP | smooth, jittery turns | 0.70-0.74 | 0.97-1.11 | Back-off while its surfaces rate-limit in a turn. Within the default 1.2. |
+| Orbiter One | smooth turn | 0.96 | 1.12 | Within spread; no surfaces |
+
+### Info window and user guide
+
+The info window has an AERODYNAMICS section with one row each for the surface share, the rate
+limit, the actuator lag, the actuator-limited fraction and the bandwidth cut, on the roll-invariant
+axes. Its sections now collapse. The user guide documents the mechanisms under "Aircraft and control
+surfaces" and "Control surfaces".
+
+### Test changes
+
+- Kerbal 1 flies with its winglets; the test parameter that disabled control surfaces is gone.
+- The Aeris 4A pitch-upset test is no longer skipped.
+- AeroEquus limits drop to the defaults apart from a 2° turn error.
+- Looser limits, each with a comment: Gull pitch settle 10 s, Learstar A1 turn oscillation 0.5,
+  GDLV3 hold oscillation 1.5.
+
+### Still open
+
+- **GDLV3 bending mode.** The actuators at times limit-cycle through its 5 Hz mode, in a hold as
+  well as a turn, and the chatter detector does not latch (level 0.2-0.34 vs the 0.6 threshold).
+  The craft has no surfaces and its turns cycle on `main` too; a detector issue, see
+  [`oscillation.md`](oscillation.md).
+- **Dynawing.** An intermittent pitch limit cycle on `main` and the port alike, landing in a
+  different test each run.
+- **Learstar A1.** Pitch oscillation in a turn is 0.35-0.43 vs 0.29-0.31 on `main`. The corrected
+  torque figures raise its gains: `main` overestimated its roll torque about 5×.
+- **Aeris 4A 8 Hz pitch chatter** through the elevator rate limit, driven by the controller. A fix
+  needs the rate loop's high-frequency phase (the one-tick delay plus the actuator) modeled.
+- **Section D in full.** The target-rate estimate exists but feeds only the reversal lag.
+- The cap is off under FAR, and a `RollGain` RPC is not exposed.
 
 ## Motivation
 
@@ -192,6 +387,9 @@ don't duplicate.
 | Limit-cycle classifier (E) | `FrequencyTracker`, `MitigationPolicy` | Bandwidth back-off must not depend on an accurate frequency estimate |
 
 ## Phased roadmap (each phase independently game-testable)
+
+Superseded in part by [Phase 1 findings](#phase-1-findings-2026-10-24): phase 1 is done, and the port
+plan there replaces phases 3 and 5 for the first set of changes.
 
 1. **Instrumentation, no behavior change.** Expose actuator params on `ControlSurface`; add the
    per-tick ω̇ residual (measured minus torque-model-predicted angular acceleration), Q and AoA to
