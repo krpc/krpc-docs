@@ -183,7 +183,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | 🚧 | Principia support; phase 1 shipped as a docs page, phases 2 and 3 wait on upstream | [#767](https://github.com/krpc/krpc/issues/767) | enhancement, service:space-center | [services/principia-service.md](design/services/principia-service.md) |
 | ⬜ | MechJeb2 and Kerbal Engineer Redux services | [#288](https://github.com/krpc/krpc/issues/288) | enhancement | — |
 | ⬜ | Raster Prop Monitor integration and camera views | [#375](https://github.com/krpc/krpc/issues/375), [#424](https://github.com/krpc/krpc/issues/424) | mod-compatibility; enhancement | — |
-| ⬜ | DockingCamera and LaserDist integration; needs forks | [#674](https://github.com/krpc/krpc/issues/674) | enhancement | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
+| ⬜ | DockingCamera on the public release, deprecate LIDAR; supersedes #674 | **To file**: [dockingcam-lidar-public-mods.md](issues/dockingcam-lidar-public-mods.md) | enhancement, mod-compatibility | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ⬜ | Vessel state and staging prediction; parts may be covered by the stage API | [#311](https://github.com/krpc/krpc/issues/311) | enhancement, service:space-center | — |
 | ⬜ | Lua: documentation for the dynamically built services | [#1182](https://github.com/krpc/krpc/issues/1182) | enhancement, client:lua | — |
 
