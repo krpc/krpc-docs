@@ -91,7 +91,7 @@ New in this revision:
 | 1 | Land the single connection and request ids. |
 | 2 | Done in #1172. Client codegen G1, G3 and G5 ([client-codegen.md](../client-codegen.md)). Its exception tables and message format settle two client disagreements before the suite pins them. |
 | 3 | Conformance phases C0 to C7. |
-| 4 | 1.0 additions ([#903](https://github.com/krpc/krpc/issues/903), [#251](https://github.com/krpc/krpc/issues/251), [#905](https://github.com/krpc/krpc/issues/905), [#898](https://github.com/krpc/krpc/issues/898)), each with conformance tests. The suite pins the client tolerance rules that keep them additive ([protocol-compatibility.md](../protocol-compatibility.md)). |
+| 4 | 1.0 additions ([#903](https://github.com/krpc/krpc/issues/903), [#251](https://github.com/krpc/krpc/issues/251), [#905](https://github.com/krpc/krpc/issues/905)), each with conformance tests. The suite pins the client tolerance rules that keep them additive ([protocol-compatibility.md](../protocol-compatibility.md)). |
 
 C0 to C2 can overlap with codegen. G1 must land before the first set's error tests, or they start
 as expected failures in most clients.

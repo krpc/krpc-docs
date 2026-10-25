@@ -135,6 +135,22 @@ Each phase is mergeable on its own.
    returning it.
 5. **Later major release.** Drop the flattened procedures.
 
+## Constructors
+
+[#898](https://github.com/krpc/krpc/issues/898) asked for `[KRPCConstructor]`, called from the
+client as `Vessel("foo")`. It is closed. A `public static` `[KRPCMethod]` on a `[KRPCClass]` is the
+supported factory, e.g. `Orbit.CreateFromOrbitalElements`, `ReferenceFrame.CreateRelative` and
+`ResourceTransfer.Start`.
+
+| Constructor drawback | Detail |
+| --- | --- |
+| One per class | Procedure names are unique, so `Orbit`'s two factories cannot both be constructors |
+| Clashes with decoding | Each OOP client's class constructor wraps a returned object id |
+| Weaker semantics | A constructor cannot be streamed or return null |
+| Few objects to construct | The game creates vessels, parts and bodies. kRPC-created objects need a parent, e.g. `Container.AddButton` |
+
+Inheritance needs no constructor support. A C# constructor is not inherited.
+
 ## Open points
 
 * Whether an override may narrow a return type (C# 9 covariant returns). The mod targets net472,

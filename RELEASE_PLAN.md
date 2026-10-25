@@ -179,7 +179,6 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | Streams and events over serial IO, after the single connection; needs flow control | **To file**: [serialio-streams.md](issues/serialio-streams.md) | enhancement, protocol, server, client:cnano | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | 🚧 | More communication protocols; local sockets landed in 0.7, nothing further planned | [#899](https://github.com/krpc/krpc/issues/899) | enhancement, protocol | [protocol/local-transports.md](design/protocol/local-transports.md) |
 | ⬜ | Inheritance for remote objects; additive, UI and Drawing first, then robotics and #900 modules | [#905](https://github.com/krpc/krpc/issues/905) | enhancement, protocol | [protocol/inheritance.md](design/protocol/inheritance.md) |
-| ⬜ | Constructor calls; would add a new refcounted object kind | [#898](https://github.com/krpc/krpc/issues/898) | enhancement, protocol | — |
 | ⬜ | SSL encryption and authentication; likely out of scope, use a proxy or tunnel | [#11](https://github.com/krpc/krpc/issues/11) | enhancement, protocol | — |
 | 🚧 | Principia support; phase 1 shipped as a docs page, phases 2 and 3 wait on upstream | [#767](https://github.com/krpc/krpc/issues/767) | enhancement, service:space-center | [services/principia-service.md](design/services/principia-service.md) |
 | ⬜ | MechJeb2 and Kerbal Engineer Redux services | [#288](https://github.com/krpc/krpc/issues/288) | enhancement | — |
@@ -209,6 +208,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | Service versioning | [services/service-versioning.md](design/services/service-versioning.md) |
 | CI lite and merge queue | [build-tools/ci-lite-merge-queue.md](design/build-tools/ci-lite-merge-queue.md) |
 | CI remote cache | [build-tools/ci-remote-cache.md](design/build-tools/ci-remote-cache.md) |
+| Constructor calls ([#898](https://github.com/krpc/krpc/issues/898)), closed: static class methods cover it | [protocol/inheritance.md](design/protocol/inheritance.md#constructors) |
 
 ## Updating GitHub
 
