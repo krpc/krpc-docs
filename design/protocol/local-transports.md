@@ -10,7 +10,7 @@ transport is worth having, and records what was built.
 
 Related: [improvements.md](improvements.md) (meta-issue
 [#906](https://github.com/krpc/krpc/issues/906), which deliberately left #899 out of scope),
-[reverse-streams.md](reverse-streams.md), [single-connection.md](single-connection.md).
+[non-blocking-calls.md](non-blocking-calls.md), [single-connection.md](single-connection.md).
 
 ## The question
 
@@ -114,7 +114,7 @@ covered the first and the measurement covered the second.
 
 **Batching is still an order of magnitude larger.** Ten calls in one request take 17–22 µs against
 roughly 200 µs issued singly, and fifty take about 40 µs against roughly 1000 µs — 10× and 23×,
-against the transport's 20%. So the ranking in [reverse-streams.md](reverse-streams.md) stands even
+against the transport's 20%. So batching ([non-blocking-calls.md](non-blocking-calls.md)) stays ahead even
 though the transport is worth having: the two are complementary, and batching is where the larger
 win remains.
 
@@ -242,5 +242,5 @@ fallback, deferred above, remains the route to Windows rather than AF_UNIX.
   with no automated coverage, and the runtime probe still to run on a Windows install. The transport
   ships as Linux and macOS only until then, and TCP remains the default everywhere.
 - **The named pipe fallback** has not been built, and is what Windows support would rest on.
-- **Batching** ([reverse-streams.md](reverse-streams.md)) remains the larger performance lever and is
+- **Batching** ([non-blocking-calls.md](non-blocking-calls.md)) remains the larger performance lever and is
   unaffected by any of this.

@@ -1,124 +1,34 @@
-# Batched calls, fire-and-forget, and reverse streams (issue #903)
+# Reverse streams (issue #903)
 
 **Status:** proposal — design agreed, not yet implemented (2026-07-03). Planned for 1.0. Revised
-2026-10-21 for the 0.8 single connection, request ids and protocol version: one connection per
-client, and features negotiated in the handshake. The code references are from before 0.8.
+2026-10-21 for the 0.8 single connection, request ids and protocol version. The code references
+are from before 0.8. On 2026-10-25 non-blocking calls and fire-and-forget moved to their own docs.
+
+One of three designs under [issue #903](https://github.com/krpc/krpc/issues/903), which is tracked
+as one issue: [non-blocking calls and batching](non-blocking-calls.md),
+[fire-and-forget](fire-and-forget.md), **reverse streams**. Each ships on its own, in that order.
+
+Register a call once, then push latest-wins argument updates that the server applies **at most
+once per tick**. Errors invalidate the reverse stream and arrive as a `StreamUpdate` using the
+#877 error convention. Use is gated on a feature granted in the handshake, as for
+[fire-and-forget](fire-and-forget.md). Schema additions are plain proto3 fields and messages
+(Unity protobuf 3.10.1, protobuf-lua).
 
 ## Context
 
-[Issue #903](https://github.com/krpc/krpc/issues/903): control writes are blocking
-round-trips — `control.pitch = x; control.yaw = y` measured at ~40 ms — and there is no
-non-blocking send path analogous to (receive) streams.
+* **Execution is FIFO per client**, round-robin across clients. Phase 2 of
+  [request ids](request-ids.md) replaces the server's one-in-flight guard with a per-client FIFO
+  queue.
+* **One connection carries both directions.** From 0.8 each client has a single connection
+  ([single-connection.md](single-connection.md)), framed as `Message` in both directions on every
+  transport, SerialIO included. Pushes travel client to server on it, and invalidation errors come
+  back on it as a `StreamUpdate`.
+* **Prior art.** Latest-wins-per-tick evaluation is the forward stream loop
+  (`Core.StreamServerUpdate`). Server-side call storage is `Expression.Call`.
+* **Why not [fire-and-forget](fire-and-forget.md) alone.** A burst of writes each executes.
+  Latest-wins makes a high-rate control loop backpressure-proof.
 
-Why writes are slow: the server only processes RPCs inside `RPCServerUpdate`, once per
-`FixedUpdate` (`core/src/Core.cs:403-496`), with an adaptive time budget
-(`MaxTimePerUpdate` self-tuning 1–25 ms, `Core.cs:380-394`). A blocking client waits up
-to a full game tick per call, and strictly sequential setters each pay that wait.
-
-What exploration established:
-
-- **Batching already exists everywhere except client APIs.** `Request` carries
-  `repeated ProcedureCall calls`; `RequestContinuation` (`core/src/Service/RequestContinuation.cs:19-84`)
-  executes multiple calls in order in one tick (yield-aware, completed calls not
-  re-run), with **per-call error isolation** (`ProcedureCallContinuation.Run`,
-  `ProcedureCallContinuation.cs:35-49`) and ordered results; the protocol docs already
-  advertise it (`messages.rst:59-60`). Every client hard-codes one call per request and
-  reads `results[0]` — but every client also already has standalone `ProcedureCall`
-  builders (used by streams): Python `get_call`/`_build_call` (`client.py:150,229`),
-  C# `GetCall` (`Connection.cs:169-296`), Java `buildCall`/`getCall`
-  (`Connection.java:238,362`), C++ `build_call` (+ `invoke(Request)` already accepts
-  multi-call, `client.cpp:53-120`), cnano generated call builders, Lua inline.
-- **Responses are written at exactly one place** — `client.Stream.Write(response)` in
-  `Core.ExecuteContinuation` (`Core.cs:762`) — the natural seam for a no-response flag.
-  No `oneway`/`no_response` concept exists anywhere today.
-- **Ordering model**: strict FIFO execution per client, round-robin across clients. Before
-  0.8 the server will not read a client's next request while one of its continuations is
-  queued or yielded (the `pollRequestsCurrentClients` guard, `Core.cs:683-734`). Phase 2 of
-  [request ids](request-ids.md), after 0.8, replaces the guard with a per-client FIFO
-  queue, bounded by a negotiated depth.
-- **One connection carries both directions.** From 0.8 each client has a single
-  connection ([single-connection.md](single-connection.md)), framed as `Message` in both
-  directions on every transport, SerialIO included. Pushes travel client to
-  server on it, and invalidation errors come back on it as a `StreamUpdate`.
-- Prior art for latest-wins-per-tick evaluation is the forward stream loop
-  (`Core.StreamServerUpdate`, `Core.cs:503-578`); prior art for server-side call
-  storage is `Expression.Call` (`core/src/Service/KRPC/Expression.cs:105-138`).
-
-## Decisions
-
-Three rungs, phased; each ships independently and the later ones build on the earlier.
-
-1. **Batching** — client-API work only; no protocol or server change.
-2. **Fire-and-forget** — `bool no_response = 2` on `Request`; server skips the response
-   write. Client use is **gated on a feature granted in the handshake** (see version
-   skew below).
-3. **Reverse streams** — register a call once, push latest-wins argument updates that
-   the server applies **at most once per tick**; errors invalidate the reverse stream
-   and are delivered as a `StreamUpdate` using the #877 error convention. Also gated
-   on a granted feature.
-
-Cross-cutting: all schema additions are plain proto3 fields/messages — no toolchain
-issues (Unity protobuf 3.10.1, protobuf-lua).
-
-## Rung 1 — Batching (client APIs)
-
-Semantics (already guaranteed by the server): calls execute in order in a single
-request, normally within one tick; each call's error is isolated in its
-`ProcedureResult` and raised only when that call's result is accessed; a call that
-yields (multi-tick RPC) delays completion of the whole request — documented, with the
-advice to keep long-running calls out of latency-sensitive batches.
-
-Per-client API sketches (exact shapes finalised at implementation):
-
-- **Python**: a context manager that intercepts `_invoke`:
-  ```python
-  with conn.batch() as batch:
-      control.pitch = 0.1          # queued
-      control.yaw = 0.2            # queued
-      alt = vessel.flight().mean_altitude   # queued, returns a BatchResult
-  print(alt.value)                 # available after the block exits
-  ```
-  Inside the block, stub invocations enqueue `(ProcedureCall, return_type)` pairs and
-  return `BatchResult` handles; on exit, one multi-call `Request` is sent and results
-  are decoded per handle. Accessing `.value` inside the block raises. Lua mirrors this.
-- **C# / Java**: explicit batch objects reusing the existing call builders —
-  `var b = conn.NewBatch(); var r = b.Add(() => vessel.Flight().MeanAltitude); b.Execute(); r.Value`.
-  Property *setters* can't appear in C# expression lambdas, so the batch gains a
-  `b.Set(() => control.Pitch, 0.1f)` form that derives the setter procedure from the
-  getter expression (the `X_get_Y` → `X_set_Y` naming convention).
-- **C++**: `Client::invoke(schema::Request)` already accepts multi-call; add a
-  `krpc::Batch` helper wrapping `build_call` + indexed result decoding.
-- **cnano**: raise the `calls`/`results` nanopb capacities in
-  `client/cnano/src/krpc.options` and add `krpc_invoke_batch(conn, calls, results, n)`
-  (`krpc.c:61-104` currently hard-codes `calls_count = 1` and rejects `results_count != 1`).
-
-## Rung 2 — Fire-and-forget
-
-**Schema**: `Request { repeated ProcedureCall calls = 1; bool no_response = 2; }`.
-Request-level, not per-call — mixed batches would need partial responses.
-
-**Server**: thread the flag through `Messages.Request` → `RequestContinuation`;
-`ExecuteContinuation` skips `client.Stream.Write(response)` (`Core.cs:762`) when set.
-Errors from no-response requests are logged at info level and otherwise dropped.
-Execution is unchanged — same FIFO ordering, same tick budget, same per-client queue
-(a burst of pipelined fire-and-forget requests drains within ticks).
-
-**The fence idiom** (document): because execution is FIFO per client, a subsequent
-*normal* RPC's response confirms that all prior fire-and-forget requests have executed —
-a free flush/barrier. A call marked for out-of-order completion
-([request-ids.md](request-ids.md) phase 3) is not covered by the fence.
-
-**Version skew — the one hazard**: an older server ignores the unknown field and writes a
-`Response` the client does not expect. Client libraries therefore ask for the
-`no_response` feature in the handshake, and raise a clear "server too old" error on first
-use if it was not granted. The same applies to reverse streams. The rule is in
-[protocol-version.md](protocol-version.md) under "Additive changes". Old client + new
-server is trivially fine.
-
-**Client APIs**: an option on the batch API (`with conn.batch(no_response=True):`,
-`b.Execute(noResponse: true)`), which also covers the single-call case.
-
-## Rung 3 — Reverse streams
+## Design
 
 **Schema** (where the pushes go is open question 3):
 
@@ -193,21 +103,13 @@ wrapper semantics.
 
 ## Documentation
 
-`doc/src/communication-protocols/messages.rst`: `no_response` semantics + the fence
-idiom; `ReverseStreamUpdate` + the new RPCs; latest-wins and once-per-tick execution;
-the error/invalidation convention (cross-referencing the #877 section); the features
-negotiated in the handshake. Client docs: batch API, fire-and-forget option, reverse-stream API, and a
-rewritten "fast control loops" guidance section (this is the issue's use case).
+`doc/src/communication-protocols/messages.rst`: `ReverseStreamUpdate` and the new RPCs,
+latest-wins and once-per-tick execution, the error and invalidation convention (cross-referencing
+the #877 section), and the handshake feature. Client docs: the reverse-stream API, added to the
+"fast control loops" section.
 
 ## Tests
 
-- **Batching**: multi-call round trip with mixed success/error results (error isolated
-  to its handle); ordering; extend `test_performance.py:11-21` with a batched variant
-  demonstrating the latency win (assert batched < N× single, loosely — headless-KSP
-  timing is noisy).
-- **Fire-and-forget**: no-response setter observed applied via a subsequent read (the
-  fence); ordering across a mix of no-response and normal requests; gating against a
-  server that grants no features.
 - **Reverse streams**: register + push + read-back next tick; latest-wins (burst of
   pushes → final value only; TestService gains a counter that increments per *applied*
   set, proving superseded pushes never execute); invalidation via a TestService
@@ -220,12 +122,10 @@ rewritten "fast control loops" guidance section (this is the issue's use case).
 
 ## Implementation order
 
-1. Batching client APIs (Python → C#/Java/C++/cnano/Lua) + perf test. No server work.
-2. `no_response`: schema + server + client batch option + feature gating + docs.
-3. Reverse streams server: schema additions, RPCs, registry, executor, error channel
-   (depends on #877's client/server invalidation work being in place).
-4. Reverse streams client APIs, Python first; remaining clients.
-5. `CHANGELOG.md` entries per component as the final pre-merge commit.
+1. Server: schema additions, RPCs, registry, executor, error channel. Depends on #877's
+   invalidation work.
+2. Client APIs, Python first, then the remaining clients.
+3. `CHANGELOG.md` entries per component as the final pre-merge commit.
 
 ## Interactions
 

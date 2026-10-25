@@ -8,8 +8,8 @@ the handshake. Issue [#1175](https://github.com/krpc/krpc/issues/1175).
 
 Related: [single-connection.md](single-connection.md) (its "Client reader" section specifies the
 client side of phase 1), [improvements.md](improvements.md) (meta-issue
-[#906](https://github.com/krpc/krpc/issues/906)), [reverse-streams.md](reverse-streams.md) (#903,
-batching and `no_response`), [protocol-compatibility.md](../protocol-compatibility.md),
+[#906](https://github.com/krpc/krpc/issues/906)), [non-blocking-calls.md](non-blocking-calls.md) and
+[fire-and-forget.md](fire-and-forget.md) (#903), [protocol-compatibility.md](../protocol-compatibility.md),
 [client-conformance/defects.md](../client-conformance/defects.md) (Python bug 25 of the parity audit).
 
 ## Problem
@@ -67,7 +67,7 @@ holds up the ones behind it, as today.
 | Phase | Release | Work | Negotiated |
 | --- | --- | --- | --- |
 | 1, ids | 0.8, with the single connection | The fields above. Server echoes the id. Clients match by id through the reader in [single-connection.md](single-connection.md). | No, part of version 2 |
-| 2, pipelining | Later, additive | Per-client FIFO queue on the server, bounded by a negotiated depth. A client API to send now and collect later. | Yes |
+| 2, pipelining | Later, additive | Per-client FIFO queue on the server, bounded by a negotiated depth. | Yes |
 | 3, out-of-order completion | Later, additive, may never be built | A per-call flag lets a yielding call step out of the head of the line. | Yes |
 
 ### Phase 1
@@ -102,7 +102,8 @@ What phase 1 gives on its own:
   [protocol-version.md](protocol-version.md).
 - The granted depth is also the server's flood defense: the server stops reading from a client at
   the cap, and TCP backpressure does the rest.
-- Clients gain a "send now, collect later" API on top of the reader.
+- No client API change. `submit` ([non-blocking-calls.md](non-blocking-calls.md)) works from
+  phase 1, and phase 2 lets its requests overlap on the server.
 
 ### Phase 3
 
@@ -120,7 +121,7 @@ Keep `repeated ProcedureCall calls`. All calls in one `Request` run in one `Requ
 and so in the same update, which separate pipelined requests do not guarantee. That same-update
 grouping is a real semantic, and composes with ids: one id per `Request`.
 
-The `no_response` flag from [reverse-streams.md](reverse-streams.md) is complementary:
+The `no_response` flag from [fire-and-forget.md](fire-and-forget.md) is complementary:
 fire-and-forget for writes, ids for reads collected later. A `no_response` request produces no
 response to correlate.
 
@@ -128,12 +129,11 @@ response to correlate.
 
 The reader in [single-connection.md](single-connection.md) is the base for every higher-level API:
 
-- synchronous call: submit, then wait on the slot at once (phase 1, what every client does);
-- pipelined batch: submit N, then wait on all N (phase 2);
-- asyncio: the slots are `asyncio.Future`s.
-
-A Python `async` surface is a separate question: a parallel `krpc.aio` package with generated async
-stubs, or an async-capable client that the sync API wraps. The protocol work does not depend on it.
+- non-blocking call: `conn.submit(func, *args)` returns a future on the slot. Designed in
+  [non-blocking-calls.md](non-blocking-calls.md), with the reader rules it adds;
+- synchronous call: a submit, then `result()` at once. One core, which the sync API wraps;
+- asyncio: `asyncio.wrap_future` on a submitted future. No parallel `krpc.aio` package with
+  generated async stubs.
 
 ## Open questions
 

@@ -45,9 +45,9 @@ What an older server does with each request-level field it does not know:
 
 | Item | Design | Wire change | 0.8 clients |
 | --- | --- | --- | --- |
-| Batching | [reverse-streams.md](protocol/reverse-streams.md) rung 1 | None, multi-call `Request` exists | Unaffected |
-| Fire-and-forget | [reverse-streams.md](protocol/reverse-streams.md) rung 2 | `Request.no_response`, negotiated | Unaffected, never set it |
-| Reverse streams | [reverse-streams.md](protocol/reverse-streams.md) rung 3 | A push field and new `KRPC` RPCs, negotiated. Errors use the existing `StreamResult` | Unaffected, never register one |
+| Non-blocking calls and batching | [non-blocking-calls.md](protocol/non-blocking-calls.md) | None, multi-call `Request` exists | Unaffected |
+| Fire-and-forget | [fire-and-forget.md](protocol/fire-and-forget.md) | `Request.no_response`, negotiated | Unaffected, never set it |
+| Reverse streams | [reverse-streams.md](protocol/reverse-streams.md) | A push field and new `KRPC` RPCs, negotiated. Errors use the existing `StreamResult` | Unaffected, never register one |
 | Out-of-order completion | [request-ids.md](protocol/request-ids.md) phase 3 | A per-call flag, negotiated | Unaffected, never set it |
 | Tick control | [tick-hold.md](server/tick-hold.md) is the stopgap, design open | Unknown | See below |
 | Function release | [function-release.md](server-side-functions/function-release.md) | `KRPC.RemoveFunction` | See below |

@@ -24,7 +24,7 @@ old. Measured against a 60 Hz `TestServer`, five calls with 2 ms of work between
 
 Nothing already available fixes this:
 
- * **Batching** ([reverse-streams.md](../protocol/reverse-streams.md) rung 1, #903) puts several
+ * **Batching** ([non-blocking-calls.md](../protocol/non-blocking-calls.md), #903) puts several
    calls in one request so they run in one tick. It cannot help: the computing sits between the
    reads and the writes, so the writes are a separate request in a later tick.
  * **Raising `RecvTimeout`** moves the cliff and costs that much frame time on every idle update.

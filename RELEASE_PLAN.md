@@ -146,7 +146,7 @@ addition on protocol version 2, so 0.8 clients keep working: see
 | | Feature | GitHub | Labels | Design doc |
 | --- | --- | --- | --- | --- |
 | ⬜ | Protocol improvements (meta issue) | [#906](https://github.com/krpc/krpc/issues/906) | enhancement, protocol | [protocol/improvements.md](design/protocol/improvements.md) |
-| 🚧 | Batching and transactions, fire-and-forget, client to server streams | [#903](https://github.com/krpc/krpc/issues/903), **add milestone** | enhancement, protocol | [protocol/reverse-streams.md](design/protocol/reverse-streams.md); `KRPC.RunFunction` (#1124) already runs a batch in one tick |
+| 🚧 | Non-blocking calls and batching, fire-and-forget, client to server streams | [#903](https://github.com/krpc/krpc/issues/903), **add milestone** | enhancement, protocol | [protocol/non-blocking-calls.md](design/protocol/non-blocking-calls.md), [protocol/fire-and-forget.md](design/protocol/fire-and-forget.md), [protocol/reverse-streams.md](design/protocol/reverse-streams.md); `KRPC.RunFunction` (#1124) already runs a batch in one tick |
 | 🚧 | Tick control: one RPC or batch per physics update, replacing the tick hold stopgap | [#251](https://github.com/krpc/krpc/issues/251), **add milestone** | enhancement, server:api | [server/tick-hold.md](design/server/tick-hold.md) is the stopgap; protocol design open |
 
 ### Server side function follow-ups
@@ -175,7 +175,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | Autopilot extensions: bank-to-turn, heterogeneous actuators, output filter knobs, sign convention refactor | — | — | [autopilot/bank-to-turn.md](design/autopilot/bank-to-turn.md), [autopilot/heterogeneous-actuators.md](design/autopilot/heterogeneous-actuators.md), [autopilot/output-filter-manual-knobs.md](design/autopilot/output-filter-manual-knobs.md), [autopilot/sign-convention-refactor.md](design/autopilot/sign-convention-refactor.md) |
 | ⬜ | Trajectories service | — | — | [services/trajectories-service.md](design/services/trajectories-service.md) |
 | ⬜ | Nullable set elements and dictionary keys, parked and likely dropped | — | — | [protocol/nullable-keys-and-set-elements.md](design/protocol/nullable-keys-and-set-elements.md) |
-| ⬜ | Python: an asyncio client, after the single connection | **To file**: [python-asyncio-client.md](issues/python-asyncio-client.md) | enhancement, client:python | [protocol/request-ids.md](design/protocol/request-ids.md) |
+| ⬜ | Python: asyncio conveniences over `submit`, after the single connection | **To file**: [python-asyncio-client.md](issues/python-asyncio-client.md) | enhancement, client:python | [protocol/request-ids.md](design/protocol/request-ids.md) |
 | ⬜ | Streams and events over serial IO, after the single connection; needs flow control | **To file**: [serialio-streams.md](issues/serialio-streams.md) | enhancement, protocol, server, client:cnano | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | 🚧 | More communication protocols; local sockets landed in 0.7, nothing further planned | [#899](https://github.com/krpc/krpc/issues/899) | enhancement, protocol | [protocol/local-transports.md](design/protocol/local-transports.md) |
 | ⬜ | Inheritance for remote objects; additive, UI and Drawing first, then robotics and #900 modules | [#905](https://github.com/krpc/krpc/issues/905) | enhancement, protocol | [protocol/inheritance.md](design/protocol/inheritance.md) |
