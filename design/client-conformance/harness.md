@@ -30,7 +30,7 @@ branch, before its PR). `ConformanceService` does not exist yet.
 | `errors-mapped-exceptions` | C# and Java raise the native type itself, with no service or name, so the test checks service and name only when the testee reports them. |
 | Expected failures | 1 C#, 1 Java, 6 C++, 6 cnano, 9 Lua, each citing a new row in [defects.md](defects.md). |
 | Lint | The C++ and cnano testees are clang-formatted but not clang-tidied, like the client tests. Filed as [#1177](https://github.com/krpc/krpc/issues/1177). |
-| Java static streams | Broken and untested. The Java stub of a static method takes the connection first, so `addStream(<class>.class, name, connection, args...)` repeats it. The generated dispatch leaves it out, so streaming a static method raises "Method not found". The fix is in `JavaDispatchGenerator.stream`, with a test that streams a static method. No first set test does. |
+| Java static streams | The Java stub of a static method takes the connection first, so `addStream(<class>.class, name, connection, args...)` passes it. `test_streams.py::test_class_static_method` checks it. |
 
 ```
 pytest driver --stdin/stdout, testee.proto--> testee (one per client)
