@@ -8,7 +8,7 @@ and planning notes that do not ship with the mod.
 ## Layout
 
  * `design/` — one doc per feature/issue, filed by area: `autopilot/`, `protocol/`, `services/`,
-   `build-tools/`. Docs spanning all areas (audits, sweeps) sit in `design/` itself.
+   `build-tools/`, `ksa/`. Docs spanning all areas (audits, sweeps) sit in `design/` itself.
  * `RELEASE_PLAN.md` — the authoritative list of planned work, by milestone, with each item's GitHub
    issue, labels and design doc. GitHub is updated to match it.
  * `issues/` — drafts of issues not yet on GitHub, one per file: the title as the heading, then the
