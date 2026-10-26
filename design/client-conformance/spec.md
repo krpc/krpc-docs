@@ -50,6 +50,10 @@ wrong argument types, counts and ranges (C3 ruling). The server takes any enum n
 C# named arguments are compiler syntax over the stub's declared defaults, which `defaults` already
 checks by leaving arguments off the end, so C# takes no `named-args` profile (C3 ruling).
 
+C4 rulings: `streams-property-setters-are-invalid` is `dynamic`, as a compiler rejects such a
+stream. `calls-request-ids` is `threads`, as it holds trivially with one call in flight. The
+other C4 rewordings are listed in [harness.md](harness.md) "Built in C4".
+
 Transports are reported separately: `tcpip` (all), `localsocket` (all but cnano's library, which
 takes a transport hook), `serialio` (cnano). Lua has no streams in 0.8 ([defects.md](defects.md)
 "Decisions").

@@ -190,6 +190,9 @@ ends the connection with `TIMEOUT`. This holds on both sides.
 | SerialIO | 3 s | Resynchronizes a reset client. Its only timeout. |
 | TCP, local socket, WebSockets | 30 s | Catches a dead peer, above TCP retransmission backoff on a lossy link. Applies from the second message; the handshake timeout covers the first. |
 
+- The Python, C#, Java and C++ clients take a stall timeout when connecting, beside the handshake
+  timeout. It defaults to 30 s, and can wait indefinitely. Added 2026-10-26, so the conformance
+  stall test waits a second.
 - The clock restarts with every byte, and no timeout applies between messages.
 - The clock is checked only after a read finds no new bytes, so a game freeze never ends a message
   whose bytes are waiting.

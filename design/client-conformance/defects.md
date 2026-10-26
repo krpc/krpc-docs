@@ -17,6 +17,8 @@ is gone in all four clients, which now count firings per handle. Client codegen 
 ([client-codegen.md](../client-codegen.md), #1172) fixed audit 26 (Python exception classes), the C++
 dropped stack trace, the C# trailing space and the Java exception table.
 
+C4 recorded its defects and fixed none, as client fixes follow the suite as their own work.
+
 C3 found and fixed a C++ crash on decoding a tuple of the wrong length, and a C# nullable enum return, which threw `InvalidCastException` as the decoder
 returned the enum's integer value.
 
@@ -50,7 +52,7 @@ Two lessons from the audit stand:
 | `codec-nan-vectors` | C#, Lua, core | The NaN vectors are the sign-set `...ff`, others `...7f`. Each is a NaN, so this is a vector drift, not a codec bug. | new | `codec-nan` |
 | `lua-cnano-stall` | Lua, cnano | No stall timeout: a stalled message blocks a call. cnano POSIX and Windows have no read timeout at all. | divergence 6 | `connection-stall` (a SHOULD) |
 | `csharp-call-after-dispose` | C# | A call after `Dispose` raises `ObjectDisposedException`, not the connection error. | C2 | `connection-calls-after-close-raise` |
-| `java-wrapped-connection-error` | Java | A call after close raises `RPCException("Failed to invoke call")`, with the `ConnectionException` as its cause. | C2 | `connection-calls-after-close-raise` |
+| `java-wrapped-connection-error` | Java | A call that fails with the connection raises `RPCException("Failed to invoke call")`, with the `ConnectionException` as its cause: after close, in flight at a close or connection failure, and on a protocol error. | C2 | `connection-calls-after-close-raise`, and in C4 `connection-pending-calls-fail-on-end`, `threading-close-with-a-call-in-flight` and five connection failure tests |
 | `cpp-no-close` | C++ | A `Client` has no close. It closes when the last copy is destroyed, so no call can follow a close. | C2 | `connection-calls-after-close-raise` |
 | `cpp-exception-registration` | C++ | The `KRPC` exception types are registered by constructing a `KRPC` service object. A program that never does gets `RPCError` and the `KRPC.Name: ` prefix. | C2 | `errors-mapped-exceptions`, `errors-message` |
 | `lua-error-position` | Lua | RPC errors are raised with `error(msg)`, so the message starts with the client's source position (`client.lua:136: `). | C2 | `errors-mapped-exceptions`, `errors-message` |
@@ -62,6 +64,16 @@ Two lessons from the audit stand:
 | `lua-cnano-refusal-status` | Lua, cnano | A refused connection reports its status only inside the message. | C2 | `connection-refused` |
 | `cnano-no-drain` | cnano | `krpc_disconnect` sends the `disconnect` and closes, with no half-close or drain. By design in the single connection, but the spec makes the drain a MUST. | C2 | `connection-close` |
 | `cnano-error-message-length` | cnano | The error message is cut to `KRPC_ERROR_MESSAGE_LENGTH` (256), which cuts the stack trace. | C2 | `errors-message` |
+| `csharp-stream-removed-type` | C# | A removed stream raises `InvalidOperationException`, the type a server `InvalidOperationException` maps to, so the two cannot be told apart. | C4 | `streams-remove`, `streams-remove-wakes-a-waiting-thread` |
+| `cpp-stream-decode-on-read` | C++ | A stream value is decoded when it is read, so a value that fails to decode raises on each read and never ends the stream or calls its end callbacks. | C4 | `streams-a-value-that-fails-to-decode-ends-only-its-stream` |
+| `java-stream-ending-connection-error` | Java | A stream or event ended by a close or a connection failure ends with `StreamException("Connection closed")`, not the connection error with its reason. | C4 | `events-end-callback-on-connection-failure`, `streams-close-wakes-a-waiting-thread`, `streams-connection-failure-wakes-a-waiting-thread`, `events-close-wakes-an-event-wait` |
+| `stream-ending-drops-reason` | Python, C# | A stream ended by a connection failure raises a connection error with no disconnect reason, though pending calls carry it. | C4 | `streams-connection-failure-wakes-a-waiting-thread` |
+| `add-callback-livelock` | C#, Java, C++ | The adding thread makes a callback's first call, then passes on every value the dispatcher queued meanwhile. A callback slower than its stream's updates keeps `addCallback` from returning. One shared design. | C4 | `streams-a-callback-runs-on-one-thread-at-a-time` (marked `@timing`) |
+| `csharp-interrupt-reader` | C# | `Thread.Interrupt` does not reach a call that holds the reader role, blocked in a socket read. | C4 | `calls-abandoned-response-is-discarded` |
+| `unknown-status-crash` | Python, C#, Lua | An unknown `ConnectionResponse` status raises `ValueError` from the protobuf enum (Python), crashes the process (C#), or raises a nil concatenation error (Lua). cnano drops the message. | C4 | `connection-unknown-status` |
+| `lua-cnano-disconnect-reason` | Lua, cnano | A server `disconnect` is reported without its reason as a field (Lua puts it in the message). | C4 | `connection-disconnect-during-handshake`, `connection-ended-by-the-server` |
+| `lua-cnano-malformed-message` | Lua, cnano | A message that fails to parse leaves the call waiting. | C4 | `connection-malformed-message` |
+| `cnano-handshake-timeout` | cnano | No handshake timeout. | C4 | `connection-handshake-timeout` |
 | `messages-doc-client-name` | docs | `messages.rst` does not mention `GetClientName`. | doc error | none, docs only |
 
 ## Parity

@@ -76,16 +76,18 @@ unknown (`ArgumentException`). The destroyed case needs the game and is tested i
 
 ## ConformanceService
 
-A new TestServer service with its own servicedefs JSON, so testees get stubs. `TestService` stays
-the call and value surface. `ConformanceService` is driven by the `control` connection.
+Built in C4, in `tools/TestServer/src/ConformanceService.cs` (id 9996). Its state is keyed by
+name and shared by every client, so each test uses its own names. The `control` connection
+drives it, and the testee streams and calls it.
 
 | Member | For |
 | --- | --- |
-| `TriggerEvent(id)`, `RemoveEvent(id)`, `CreateEvent() -> Event` | Firings and server-side endings on demand, in place of timers |
-| `SetValue(name, value)`, `Value(name)` | A settable watched value to stream, so a test controls each update |
-| `Block(ms)` | A call that holds its response for a set time, for interleaving and abandonment |
-| `DisconnectClient(name, reason)` | A server-side `disconnect` with a given reason, to the client with that name. Each test connects with a unique client name, as no client exposes its server id |
-| `FailValue(name, exception)` | Makes `Value(name)` throw a chosen exception, so a stream of it ends on demand |
+| `SetValue(name, value)`, `Value(name)` | A watched value, so a test chooses each stream update. `SetValue` clears a failure |
+| `FailValue(name, message)` | Makes `Value(name)` throw `InvalidOperationException`, ending its stream on demand |
+| `CreateEvent(name)`, `TriggerEvent(name)`, `RemoveEvent(name)` | An event that fires once per trigger, and ends after its unsent firings |
+| `Block(milliseconds)` | Returns after the time, by `YieldException`, without holding up other clients |
+| `DisconnectClient(name, reason, message)` | A server `disconnect` with a reason, to the clients with that name. Each test connects with its own name |
+| `CreateProbe()`, `Probe.ClientName()`, static `Probe.StaticClientName()` | The name of the client a call came over, for `objects-types-from-different-connections` |
 
 The scripted server covers the wire cases this service cannot: malformed messages, unknown cases,
-wrong-direction messages and stalls.
+wrong-direction messages, stalls and stream updates out of order.

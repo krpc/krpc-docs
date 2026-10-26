@@ -1,8 +1,9 @@
 # Harness
 
 How the suite runs a test against a client. C1 built the driver, the scripted server, the Bazel
-macro and the Python testee. C2 built the other five testees and the dispatch generators (local
-branch, before its PR). `ConformanceService` does not exist yet.
+macro and the Python testee. C2 built the other five testees and the dispatch generators, C3
+the calls, values, codec, errors and objects, and C4 the streams, events, threads and connection
+tests with `ConformanceService` (local branch, before its PR).
 
 ### Built in C1
 
@@ -52,6 +53,25 @@ branch, before its PR). `ConformanceService` does not exist yet.
 | Moved to C4 | `objects-types-from-different-connections` needs a testee with two connections, which comes with the threads work and the connection binding audit ([connection-binding-audit.md](../../issues/connection-binding-audit.md)). The SHOULDs `objects-sorting` and `objects-different-classes-are-not-equal` are not built. |
 | Published | The spec index is linked from the communication protocols page, with the calls, values, codec, errors and objects pages. The connection and streams pages stay orphans until C4 builds the rest of their tests. |
 | Coverage | Every member of `KRPC` and `TestService` whose types are scalars, strings, bytes, objects, enums, structs of the service and collections of these. A protobuf message (`GetStatus`, `GetServices`) is still left out. cnano now takes bytes and nullable strings too. The cnano testee leaks what it allocates. |
+
+### Built in C4
+
+| Item | As built |
+| --- | --- |
+| `ConformanceService` | Id 9996, in the `TestService` assembly with its own definitions, in `CONFORMANCE_SERVICES` (`tools/krpctools/services.bzl`). `clientgen_dispatch` declares its stubs beside the typed testees only, so the shipped clients do not change. The as-built surface is in [test-service.md](test-service.md). The Python and Lua clients' own roster tests list it. |
+| Stream commands | `SetRate`, `Rate`, `Remove`, `CopyStream`, `RemoveCallback`, `AddEndCallback`, `RemoveEndCallback`, `AddUpdateCallback`, `RemoveUpdateCallback`, and `AddStream.scoped`. A `Notification` carries a value, an `Ending` with the error an end callback was passed, or neither. Callback ids last as long as the testee. |
+| `UNSUPPORTED` | An error kind a testee replies with for a feature its client lacks (update callback in C# and Java, scoped removal outside Python, `Interrupt` in Python and C++). The driver skips the test. |
+| Events | A call that returns an event replies with a `Value.event` handle. `WaitEvent`, `AddEventCallback` and `EventStream` take it, and `AddEndCallback` and `Remove` take an event or a stream. The dispatch generators convert a `KRPC.Event` result, and do not stream a procedure that returns one. cnano has no events. |
+| Threads | `Command.condition` holds a stream's or event's condition around a command. A reply and a notification name their thread. A callback `Behavior` sleeps, reports its return, and blocks until `Release`, fails, invokes or closes. `Interrupt` interrupts a worker (C#, Java). The driver's `Client.start` sends a command without waiting, and returns a `Pending`. |
+| Connections | `Command.connection` names a connection beside the default one. Connecting the default closes the others and drops every handle. Only the threaded testees take a name, so `objects-types-from-different-connections` (core in the spec) runs in Python, C#, Java and C++ only. `ConformanceService.Probe` reports the connection each call came over. |
+| Scripted server | Answers `AddStream` and `RemoveStream`, records each call once answered, sends stream updates and raw frames from the test thread, listens on a local socket path, and closes once its script returns. C-nano names a procedure by its id, which the scripts allow for. |
+| Local socket | Every client but cnano has a `conformance-localsocket` target, which runs `test_connection.py` only. The testee's `XDG_RUNTIME_DIR` and `LOCALAPPDATA` are a scratch directory, so `connection-default-socket-path` listens on `krpc.sock` there. |
+| Sharding | `conformance_test` runs four shards, each with its own server and testee. The six clients' twelve targets take 44 s together, most of it Lua and cnano waiting out the reply deadline on expected failures that hang. |
+| Rewordings | Matched to the server and the clients: a stream of a yielding procedure delivers its result; a call sees the updates written before its response (single-connection guarantee 3); streaming a setter is `dynamic`; an event's stream is a stream of bool, true on each firing (Python refuses to stream a procedure returning an event); a refused port may raise the platform's error, as every typed client does; a callback's first call may run on the adding thread; `calls-request-ids` is `threads`. |
+| Test shapes | `threading-rpc-interleaving` runs on a scripted server, as the server answers one client's requests in order. `threading-a-blocked-callback-stalls-only-callbacks` reads the other stream's first value before blocking, as waiters are woken through the callback thread in all four clients. The close tests check only that a later call fails, as `connection-calls-after-close-raise` checks the error. `events-a-removed-callback-does-not-take-a-firing` removes the callback before the firing; the replay race stays in Python's own tests. `connection-stall` sets a 1 s stall timeout, which the four clients that have one take since a single-connection addition. |
+| Not built | `connection-serial-resume` and `events-custom-event`, in C5. |
+| Published | The connection, streams, events and threading pages, so every page is linked from the spec index. |
+| Testee builds | The C++ and cnano testees build without warnings. |
 
 ```
 pytest driver --stdin/stdout, testee.proto--> testee (one per client)
