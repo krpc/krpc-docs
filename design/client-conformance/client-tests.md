@@ -73,16 +73,39 @@ Decisions made while deleting:
 - **No stand-in server file goes.** Each still holds a case the suite lacks, such as a malformed
   handshake response or a response after the disconnect.
 
-Gaps in the suite the classification found, each keeping client tests alive. Closing one lets more
-tests go:
+## Built after C6
+
+The suite closed most of the gaps the C6 classification found (harness.md "Built after C6"), and
+a second read-only pass per client deleted the tests it now covers, under the same rule.
+
+| Client | Deleted | Covered by |
+| --- | --- | --- |
+| C# | 23 tests, 281 lines | Exact mapped types for all eleven, held-condition waits, first callback call, stream value types, tuple and nullable collection vectors |
+| Java | 18 tests, 253 lines | As C#, and the callback that raises |
+| C++ | 23 tests, 254 lines | Codec vectors, held-condition and update waits, close and connection failure waking a wait |
+| Python | 33 tests, 350 lines | As C++, the mapped exceptions, and object and double function values |
+| Lua | 17 tests, 161 lines | New calls and values cases, tuple and nullable collection vectors, malformed data |
+| cnano | 22 tests, 393 lines | The calls and values tests, keeping the caller's buffer, null result and `krpc_free` tests |
+
+Closed: errors of every mapped type and exactly the mapped native type, removal errors where the
+client's own removal raises them, the first callback call (a `first-call-on-add` profile),
+holding a condition across commands (one update per wait, a zero timeout, the connection-wide
+wait), stream values of nulls, enums and collections holding nulls, object-typed class
+properties, 1- and 3-tuples, a nullable collection or struct in a list, functions at double,
+nullable, list and object types with double and object arguments, a missing local socket path
+and an unknown host.
+
+Gaps left, each keeping client tests alive:
 
 | Gap | Keeps |
 | --- | --- |
-| Errors are checked by kind: `raised` accepts any error, and `is_removed_error` a stream or RPC error | Every exact exception type test, in all four typed clients |
-| `errors-mapped-exceptions` covers 4 of the 11 mapped types | `MappedExceptions` in each client |
-| The C++ testee drops the client on close, so a call after close never reaches the client | The C++ close tests |
-| A first callback call may run on the adding thread, so the suite cannot ask for it | The synchronous first call tests |
-| No exact one update per wait with the condition held, no zero timeout | `test_wait` and its variants |
-| No `GetStatus`, object-typed class property, null int or string stream value, 1- or 3-tuple, nullable collection in a list | The tests of each |
-| Functions only at sint32, bool and string, with no object argument | Most function stream tests |
-| `connection-wrong-port` never opens a missing local socket path | The localsocket connect tests |
+| A client's own error types (`RPCException`, `EncodingException`, `StreamError`, `ArgumentException`) are checked by kind only | The typed clients' tests of a client-side error type |
+| Expected failures: C++ KRPC exception registration, Java `StreamException` endings, the C# removed-stream type, Lua's error position | The client tests of each, until fixed |
+| No `GetStatus`: the testees' generated dispatch skips message-typed results | `test_version` in every client |
+| No empty set or dictionary through a call, no uint32 set or dictionary vectors | The collection call and vector tests |
+| No consecutive callback values, no timed rate, no callback that waits on a condition, no forced races | `TestCallback`, `TestRate`, the first-call wait tests, the race tests |
+| Functions not at string, struct, tuple or dictionary types, and function stream error types | Most function stream tests |
+| The C++ testee drops the client on close | The C++ close tests |
+
+Wording, NaN bytes, multi-entry set and dictionary order, idioms and internals stay client tests
+by design.

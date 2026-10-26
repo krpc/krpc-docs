@@ -82,6 +82,11 @@ tests with `ConformanceService` (local branch, before its PR).
 | Python float parsing | Python's `json_format` rejects `3.4028235e+38`, the shortest form of the largest float that C++ and C# print, as too large: it compares the double before rounding to single precision. The same bug was fixed in C# (protocolbuffers/protobuf#10509). The driver rounds such a value to the largest float before parsing. |
 | Lua on Windows | The Lua target runs on Windows again. Only CI can prove it, after a push. |
 | cnano local socket | Waits for the cnano build with every transport at once, which removes the compile-time transport choice (user, 2026-10-26). |
+| Holding a condition | `HoldCondition{stream}` holds a stream's or event's condition, or the connection's update condition for handle 0, while the thread runs its later commands, until `ReleaseCondition`. Python, C# and C++ take the lock in one command and let go in another on the same thread. Java's monitor needs a block, so its worker runs the later commands inside `synchronized`. `WaitForUpdate{timeout}` is the connection-wide wait (Python and C++; C# and Java reply UNSUPPORTED). |
+| `first-call-on-add` profile | A MAY: a client claiming it makes the first call of a callback before the add returns, so the notification comes before the reply. Python, C#, C++ and Java claim it. |
+| Unsupported values | A codec type a fixed-table testee has no type for, and a null its type cannot hold (a C++ string or vector, a C-nano string or collection), reply UNSUPPORTED, so the test skips. C-nano's dispatch wraps a non-nullable string parameter in `NotNull<String>` for this. |
+| Function types | `AddFunctionStream` and `RunFunction` also take `double`, `nullable sint32`, `list(sint32)` and `TestClass`, and runs take double and object arguments. |
+| `ThrowMappedException` | One TestService procedure throws the seven mapped exceptions that had none, by name, so `errors-mapped-exceptions` covers all eleven. |
 
 ### Built in C5
 
