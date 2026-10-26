@@ -16,7 +16,7 @@ The **GitHub** column says how the issue on GitHub stands against this plan:
 | | Release | Theme | Progress |
 | --- | --- | --- | --- |
 | ✅ | 0.7 | Server-side functions, streams and events, protocol additions, service improvements | Tagged 2026-10-21 |
-| 🚧 | 0.8 | Single connection, client codegen, then client conformance testing and thread safety | 1 of 8 done: client codegen |
+| 🚧 | 0.8 | Single connection, client codegen, then client conformance testing and thread safety | 1 of 9 done: client codegen |
 | ⬜ | 1.0 | Remaining protocol improvements (#906), server side function follow-ups | 0 of 9 done; tick control has a 0.7 stopgap |
 
 ## 0.7: server-side functions, streams and events, service improvements
@@ -92,6 +92,7 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 | ⬜ | Client conformance tests and runtime specification | [#1123](https://github.com/krpc/krpc/issues/1123) | enhancement, client | [client-conformance/](design/client-conformance/README.md) |
 | ⬜ | Client thread safety: define and document what is thread-safe | [#427](https://github.com/krpc/krpc/issues/427) | docs | — |
 | ⬜ | C-nano: every transport compiled in, chosen at run time, so vcpkg ships them all | [#1176](https://github.com/krpc/krpc/issues/1176) | enhancement, client:cnano | — |
+| ⬜ | Streams of calls and server side functions that return no value, run for their side effects | **To file**: [streams-without-a-value.md](issues/streams-without-a-value.md) | enhancement, protocol, server, client | — |
 
 * **Single connection first.** It changes connection setup and threading in every client, so the
   conformance suite is written against it rather than rewritten after it.
