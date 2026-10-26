@@ -40,7 +40,7 @@ One integer, the protocol version, carried in the handshake of every transport:
 | --- | --- | --- | --- |
 | 0 | before 0.7 | | No version in the handshake |
 | 1 | 0.7 | 0 and 1 | The version itself. Renumbered `KRPC` procedures, structures, nullable values |
-| 2 | 0.8 | 2 | Single connection, request ids |
+| 2 | 0.8 | 2 | Single connection, request ids, [procedure ids from names](procedure-ids.md) |
 
 **A 0.7 server serves version 0 as version 1.** The messages are the same, so the two differ only in
 what they record: `0` is a client that did not say, which may not understand everything 0.7 sends.

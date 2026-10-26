@@ -16,7 +16,7 @@ The **GitHub** column says how the issue on GitHub stands against this plan:
 | | Release | Theme | Progress |
 | --- | --- | --- | --- |
 | ✅ | 0.7 | Server-side functions, streams and events, protocol additions, service improvements | Tagged 2026-10-21 |
-| 🚧 | 0.8 | Single connection, client codegen, then client conformance testing and thread safety | 1 of 7 done: client codegen |
+| 🚧 | 0.8 | Single connection, client codegen, then client conformance testing and thread safety | 1 of 8 done: client codegen |
 | ⬜ | 1.0 | Remaining protocol improvements (#906), server side function follow-ups | 0 of 9 done; tick control has a 0.7 stopgap |
 
 ## 0.7: server-side functions, streams and events, service improvements
@@ -86,6 +86,7 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 | --- | --- | --- | --- | --- |
 | ⬜ | Single connection: RPC and stream connections merged | [#1174](https://github.com/krpc/krpc/issues/1174) | enhancement, protocol | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | ⬜ | Protocol version 2, with the single connection | Part of the single connection issue | — | [protocol/protocol-version.md](design/protocol/protocol-version.md) |
+| ⬜ | Procedure ids derived from names, with protocol version 2 | **To file**: [procedure-ids-from-names.md](issues/procedure-ids-from-names.md) | enhancement, protocol, client:cnano | [protocol/procedure-ids.md](design/protocol/procedure-ids.md) |
 | ⬜ | Request ids (phase 1), on the single connection branch | [#1175](https://github.com/krpc/krpc/issues/1175) | enhancement, protocol | [protocol/request-ids.md](design/protocol/request-ids.md) |
 | ✅ | Client codegen: the exception mapping and the service list, generated | #1172 | enhancement, client, tools | [client-codegen.md](design/client-codegen.md) |
 | ⬜ | Client conformance tests and runtime specification | [#1123](https://github.com/krpc/krpc/issues/1123) | enhancement, client | [client-conformance/](design/client-conformance/README.md) |
@@ -96,6 +97,8 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
   conformance suite is written against it rather than rewritten after it.
 * **The protocol version goes to 2 with it.** A 0.7 client and a 0.8 server then fail at the
   handshake with a clear error, in either direction.
+* **Procedure ids change with it.** Deriving them from names renumbers every procedure, which only
+  C-nano sees. Version 2 already rejects 0.7 clients, so it needs no version of its own.
 * **Request ids go with it, on the same branch.** The single connection's client reader matches
   responses by id, so phase 1 of request ids is part of it. Pipelining and out-of-order completion
   are later additions.
