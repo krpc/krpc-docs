@@ -309,8 +309,8 @@ stubs. The builders (Python's compiler, C#'s LINQ) keep their own per-client tes
 | --- | :-: | --- |
 | `functions-function-stream` | M | A function stream delivers the function's value. |
 | `functions-function-stream-error` | M | An error in the function ends only its stream. |
-| `functions-function-streams-over-one-function` | M | Each add of one function is a separate stream, and state advances once per evaluation each. |
-| `functions-events-over-one-function` | M | Each event over one function is separate. |
+| `functions-function-streams-over-one-function` | M | Each add of one function is a separate stream: removing one leaves the other. |
+| `functions-events-over-one-function` | M | Each event over one function is separate: removing one leaves the other. |
 | `functions-run-function-with-arguments` | M | `KRPC.RunFunction` runs a function with arguments and returns its value. |
 | `functions-run-function-with-a-null-argument` | M | A null argument reaches the function. |
 | `functions-stream-of-a-function-with-parameters-rejected` | M | A function with parameters cannot be streamed. |

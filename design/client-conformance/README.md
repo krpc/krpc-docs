@@ -1,8 +1,8 @@
 # Client conformance
 
 **Status:** in progress, planned for 0.8 as [#1123](https://github.com/krpc/krpc/issues/1123).
-Proposed 2026-10-22 and reviewed 2026-10-23. C0 to C4 are built on a local branch, before their PR
-([harness.md](harness.md) "Built in C1" to "Built in C4"), and C5 is next. Client defects the
+Proposed 2026-10-22 and reviewed 2026-10-23. C0 to C5 are built on a local branch, before their PR
+([harness.md](harness.md) "Built in C1" to "Built in C5"), and C6 is next. Client defects the
 suite finds are recorded as expected failures, and fixed later as their own work. The single connection and request ids phase 1
 are built, which this work waited for. Facts below were surveyed on the single connection and
 client codegen branches (before their PRs). Re-check them when a phase starts.
@@ -134,7 +134,6 @@ notifications. All use members `TestService` has today.
 
 - **Transports per target.** Every testee over TCP. The local socket only for the connection page,
   as the transport sits below everything else.
-- **Server-side function tests.** Each client builds functions in its own idiom: Python compiles
-  source, C# compiles LINQ, C++ and Java build `KRPC.Expression` calls by hand. The proposal: the
-  suite sends neutral expression trees, built through each client's `Expression` stubs, and the
-  builders keep their own per-client tests.
+- **Server-side function tests.** Settled in C5: the driver builds functions with `Invoke`s of each
+  client's `KRPC.Expression` stubs, with no tree format of its own. The builders (Python's
+  compiler, C#'s LINQ) keep their own per-client tests.

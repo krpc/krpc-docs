@@ -17,7 +17,7 @@ is gone in all four clients, which now count firings per handle. Client codegen 
 ([client-codegen.md](../client-codegen.md), #1172) fixed audit 26 (Python exception classes), the C++
 dropped stack trace, the C# trailing space and the Java exception table.
 
-C4 recorded its defects and fixed none, as client fixes follow the suite as their own work.
+C4 and C5 recorded their defects and fixed none, as client fixes follow the suite as their own work.
 
 C3 found and fixed a C++ crash on decoding a tuple of the wrong length, and a C# nullable enum return, which threw `InvalidCastException` as the decoder
 returned the enum's integer value.
@@ -74,6 +74,7 @@ Two lessons from the audit stand:
 | `lua-cnano-disconnect-reason` | Lua, cnano | A server `disconnect` is reported without its reason as a field (Lua puts it in the message). | C4 | `connection-disconnect-during-handshake`, `connection-ended-by-the-server` |
 | `lua-cnano-malformed-message` | Lua, cnano | A message that fails to parse leaves the call waiting. | C4 | `connection-malformed-message` |
 | `cnano-handshake-timeout` | cnano | No handshake timeout. | C4 | `connection-handshake-timeout` |
+| `cnano-no-silent-retry` | cnano | A `MALFORMED_MESSAGE` or `TIMEOUT` answer to a resumed serial handshake returns an error for the program to retry, as cnano has no timed read to wait silently with (single-connection.md "Simple clients"). | C5 | `connection-serial-resume` |
 | `messages-doc-client-name` | docs | `messages.rst` does not mention `GetClientName`. | doc error | none, docs only |
 
 ## Parity

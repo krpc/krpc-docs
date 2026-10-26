@@ -69,9 +69,23 @@ tests with `ConformanceService` (local branch, before its PR).
 | Sharding | `conformance_test` runs four shards, each with its own server and testee. The six clients' twelve targets take 44 s together, most of it Lua and cnano waiting out the reply deadline on expected failures that hang. |
 | Rewordings | Matched to the server and the clients: a stream of a yielding procedure delivers its result; a call sees the updates written before its response (single-connection guarantee 3); streaming a setter is `dynamic`; an event's stream is a stream of bool, true on each firing (Python refuses to stream a procedure returning an event); a refused port may raise the platform's error, as every typed client does; a callback's first call may run on the adding thread; `calls-request-ids` is `threads`. |
 | Test shapes | `threading-rpc-interleaving` runs on a scripted server, as the server answers one client's requests in order. `threading-a-blocked-callback-stalls-only-callbacks` reads the other stream's first value before blocking, as waiters are woken through the callback thread in all four clients. The close tests check only that a later call fails, as `connection-calls-after-close-raise` checks the error. `events-a-removed-callback-does-not-take-a-firing` removes the callback before the firing; the replay race stays in Python's own tests. `connection-stall` sets a 1 s stall timeout, which the four clients that have one take since a single-connection addition. |
-| Not built | `connection-serial-resume` and `events-custom-event`, in C5. |
+| Not built | `connection-serial-resume` and `events-custom-event`, built in C5. |
 | Published | The connection, streams, events and threading pages, so every page is linked from the spec index. |
 | Testee builds | The C++ and cnano testees build without warnings. |
+
+### Built in C5
+
+| Item | As built |
+| --- | --- |
+| Building functions | The driver builds a function with `Invoke`s of the `KRPC.Expression` and `KRPC.Type` static methods (`driver/functions.py`), so a function is an object handle, with no neutral tree format. `Call{invoke}` builds `Expression.Call` over the `ProcedureCall` the client builds for a stream of the member: the dispatch generators emit it per streamed member (C# `Connection.GetCall`, Java `getCall`, C++ `_call`), and Python uses `get_call`. |
+| Function commands | `AddFunctionStream{function, type}`, `AddFunctionEvent{function}` (replies with an event handle) and `RunFunction{function, type, arguments}`. The type is `sint32`, `bool` or `string`, which C# (`AddStream<T>`, `Run<T>`) and C++ (templates over `std::optional<T>`) need, and Python and Java ignore, as they read the type from the server. Arguments are sint32, bool, string or null Values. C++ visits up to two over a `std::variant`. Lua and cnano have no `functions` profile. |
+| Function tests | All seven `functions-*` requirements and `events-custom-event` (in `test_events.py`, profiles `events` and `functions`) pass in Python, C#, Java and C++, with no new defect. The run test subtracts, so a client that swapped arguments fails (negative control). |
+| Function rewordings | `functions-function-streams-over-one-function` and `functions-events-over-one-function`: each add is separate, and removing one leaves the other. The state advancing once per evaluation is not observable without racing the clock. |
+| Python testee | Escapes a member named after a keyword (`Expression.lambda_`), which the C4 dispatch never met. |
+| Serial transport | cnano has a `conformance-serialio` target, Linux only, running `test_connection.py`. The library picks its transport at compile time, so `conformance_test` takes `transport_testees`, and cnano builds `conformance-testee-serialio` on `krpc_cnano_serialio`. TestServer's `--type` takes a comma list: the target runs `serialio,protobuf`, so the control connection and `raw` calls go over TCP/IP while the testee is on a socat pseudo-terminal pair. |
+| Serial scripted server | `ScriptedServer` runs on its own socat pair on the serialio target (`SerialLine`), as the testee has no other transport. A serial server sees no close: socat stays up when the client closes its end. So `connection-close` skips (no half-close), and a test whose connect fails stops socat to wake its script. `connection-wrong-port` opens a missing device path. |
+| Serial skips | `connection-disconnect-during-handshake`, `connection-unexpected-handshake-message` and `connection-refused` for `MALFORMED_MESSAGE` and `TIMEOUT` skip over serial, as the resume rules override them. An expected-failure line holds for every transport of a client, so a test whose outcome differs by transport skips on one. |
+| `connection-serial-resume` | Parametrized: a leftover `response`, `stream_update` or `disconnect` before the `connection_response`; a second `connection_response` before the first `response`; `MALFORMED_MESSAGE` and `TIMEOUT` as no answer, then a retry after a 3.5 s handshake timeout; and a refusal not retried, for which the script waits 5 s. cnano fails the two no-answer cases (`cnano-no-silent-retry`). A cnano that fails on a leftover fails three cases (negative control). |
 
 ```
 pytest driver --stdin/stdout, testee.proto--> testee (one per client)
@@ -126,7 +140,7 @@ A, remove on thread B", the shape of the deadlocks found in Python and Java. A t
 | `AddStream{invoke}`, `SetRate`, `Rate`, `Get`, `Wait{timeout?}`, `Remove` | Streams. `Wait` returns whether the stream updated |
 | `AddCallback`, `RemoveCallback`, `AddEndCallback`, `RemoveEndCallback` | Callbacks, reported as notifications |
 | `AddEvent{invoke or expression}`, `WaitEvent{timeout?}` | Events, with the stream commands for the rest |
-| `AddFunctionStream{expression}`, `RunFunction{expression, args}` | Server-side functions |
+| `Call{invoke}`, `AddFunctionStream{function, type}`, `AddFunctionEvent{function}`, `RunFunction{function, type, args}` | Server-side functions, built by `Invoke`s of the `KRPC.Expression` stubs (C5) |
 | `Compare{a, b}`, `Hash{a}`, `ObjectId{a}` | Object identity |
 | `Encode{type, value}`, `Decode{type, bytes}` | The codec, with no connection |
 | `Members{service, class?}` | The member roster the client exposes |
