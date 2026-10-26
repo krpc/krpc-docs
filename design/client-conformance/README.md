@@ -1,8 +1,8 @@
 # Client conformance
 
 **Status:** in progress, planned for 0.8 as [#1123](https://github.com/krpc/krpc/issues/1123).
-Proposed 2026-10-22 and reviewed 2026-10-23. C0 to C2 are built on a local branch, before their PR
-([harness.md](harness.md) "Built in C1" and "Built in C2"). The single connection and request ids phase 1
+Proposed 2026-10-22 and reviewed 2026-10-23. C0 to C3 are built on a local branch, before their PR
+([harness.md](harness.md) "Built in C1" to "Built in C3"), and C4 is next. The single connection and request ids phase 1
 are built, which this work waited for. Facts below were surveyed on the single connection and
 client codegen branches (before their PRs). Re-check them when a phase starts.
 
@@ -107,7 +107,7 @@ harness that already runs all six clients.
 | C1 | Harness: `testee.proto`, the driver and its fixtures, the scripted server, the Bazel macro and the Python testee. The first set below passes for Python. |
 | C2 | The Java, C#, C++, Lua and cnano testees on the first set, with the clientgen dispatch backend and the expected-failures files. Java proves the `threads` notifications, Lua and cnano the profile skips. |
 | C3 | Calls, values, codec, errors and objects in full, with the `TestService` additions. |
-| C4 | Streams and events in full, with `ConformanceService` and the `threads` profile. |
+| C4 | Streams and events in full, with `ConformanceService` and the `threads` profile. Also `calls-request-ids` and `objects-types-from-different-connections`, moved from C3, and the connection page's remaining tests. |
 | C5 | Server-side functions, and the `serialio` transport for cnano. |
 | C6 | Delete the per-client tests the suite replaces ([client-tests.md](client-tests.md)), then the `TestService` renames and removals. |
 | C7 | Document the testee protocol, and ship the driver with the TestServer archive for third-party clients. |

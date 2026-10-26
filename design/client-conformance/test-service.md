@@ -54,6 +54,7 @@ Doc summaries on one member of each kind exist for the docgen goldens only.
 | `EchoNullableFloat`, `EchoNullableBool`, `EchoNullableEnum`, `EchoNullableSet`, `EchoNullableDictionary`, `EchoNullableTuple` | `values-nullable-*`. Low priority: the same paths as the covered int and list |
 | `ScalarDefault(x=42)`, `StringDefault(x="foo")`, `BytesDefault`, `NullDefault(obj=null)` | `calls-scalar-defaults`, `calls-null-default`, one owner each |
 | `TestClass.StaticOptionalArguments` | `calls-partial-arguments` and `calls-named-arguments` on a static method |
+| `RemoveTestObject(obj)` | `errors-krpc-exceptions`: removes the object from the object store, so a later call on it raises `ObjectDestroyedException`. Added in C3 |
 
 **In C6**, once the per-client comms tests are gone:
 

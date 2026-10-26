@@ -17,6 +17,9 @@ is gone in all four clients, which now count firings per handle. Client codegen 
 ([client-codegen.md](../client-codegen.md), #1172) fixed audit 26 (Python exception classes), the C++
 dropped stack trace, the C# trailing space and the Java exception table.
 
+C3 found and fixed a C++ crash on decoding a tuple of the wrong length, and a C# nullable enum return, which threw `InvalidCastException` as the decoder
+returned the enum's integer value.
+
 Two lessons from the audit stand:
 
 - **A reference client is not checked by comparison.** Python was the reference and had 26 defects
@@ -37,7 +40,7 @@ Two lessons from the audit stand:
 | `python-parameter-name-clash` | Python | A parameter named `cls`, or two differing only in case, fails `connect()` with a `SyntaxError`. | 39 | per-client test |
 | `python-procedure-property-clash` | Python | A procedure and a property with one name: the procedure is lost. | 40 | per-client test |
 | `python-unpruned-stubs` | Python | All 12 generated services are attached whether or not the server has them. | 41 | `objects-member-rosters` |
-| `python-tuple-arity` | Python, Java | A short wire tuple decodes short. Structs check their field count. | 43 | `codec-tuple-arity` |
+| `python-tuple-arity` | Python, Lua, cnano | A short wire tuple decodes short. Structs check their field count. Java has since been fixed, and C++ crashed on one until C3. | 43 | `codec-tuple-arity` |
 | `python-unclosed-client` | Python | A dropped unclosed client keeps its threads and socket. The threads now exit when the server closes. | 45 | per-client test |
 | `python-wait-in-callback` | Python, and by design every threaded client | A callback that waits on a stream deadlocks, as only the dispatcher wakes waiters. Documented, not guarded. | 46 | Spec states it ("Decisions") |
 | `shared-event-handles` | Python | Two `Event` objects for one server event share a stream, so removing either ends both. | 47 | `streams-remove` (removal ends every copy, by design since #1122) |
@@ -51,6 +54,11 @@ Two lessons from the audit stand:
 | `cpp-no-close` | C++ | A `Client` has no close. It closes when the last copy is destroyed, so no call can follow a close. | C2 | `connection-calls-after-close-raise` |
 | `cpp-exception-registration` | C++ | The `KRPC` exception types are registered by constructing a `KRPC` service object. A program that never does gets `RPCError` and the `KRPC.Name: ` prefix. | C2 | `errors-mapped-exceptions`, `errors-message` |
 | `lua-error-position` | Lua | RPC errors are raised with `error(msg)`, so the message starts with the client's source position (`client.lua:136: `). | C2 | `errors-mapped-exceptions`, `errors-message` |
+| `lua-invalid-enum` | Lua | An enum type takes any number, so an out-of-range value is sent. | C3 | `values-invalid-enum` |
+| `lua-integer-range` | Lua | The encoder does not check an integer against its parameter's type. | C3 | `values-integer-out-of-range` |
+| `lua-extra-arguments` | Lua | Arguments past the last parameter are dropped, not rejected. | C3 | `calls-too-many-arguments` |
+| `cnano-unknown-response-id` | cnano | A response with an unknown id is taken as the result of the waiting call. | C3 | `calls-unknown-response-id` |
+| `lua-uint64-range` | Lua | A `uint64` above the `sint64` range decodes as a negative integer, as Lua integers are signed 64-bit. | C3 | `calls-special-defaults` |
 | `lua-cnano-refusal-status` | Lua, cnano | A refused connection reports its status only inside the message. | C2 | `connection-refused` |
 | `cnano-no-drain` | cnano | `krpc_disconnect` sends the `disconnect` and closes, with no half-close or drain. By design in the single connection, but the spec makes the drain a MUST. | C2 | `connection-close` |
 | `cnano-error-message-length` | cnano | The error message is cut to `KRPC_ERROR_MESSAGE_LENGTH` (256), which cuts the stack trace. | C2 | `errors-message` |

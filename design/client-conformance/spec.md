@@ -35,12 +35,20 @@ A testee reports its profiles in `Hello`. A test outside them is skipped, not fa
 | Profile | Covers | Python | C# | C++ | Java | Lua | cnano |
 | --- | --- | :-: | :-: | :-: | :-: | :-: | :-: |
 | `core` | Connection, calls, values, codec, errors, objects | yes | yes | yes | yes | yes | yes |
+| `dynamic` | Rejecting wrong arguments, in a dynamically typed language | yes | no | no | no | yes | no |
 | `defaults` | Omitting arguments that have defaults | yes | yes | yes | no | yes | no |
-| `named-args` | Passing arguments by name | yes | yes | no | no | no | no |
+| `named-args` | Passing arguments by name, at run time | yes | no | no | no | no | no |
 | `streams` | Streams | yes | yes | yes | yes | no | no |
 | `events` | Events | yes | yes | yes | yes | no | no |
 | `functions` | Server-side function streams, events and runs | yes | yes | yes | yes | no | no |
 | `threads` | Concurrent calls, callbacks, close from other threads | yes | yes | yes | yes | no | no |
+
+The `dynamic` profile holds the requirements a compiler enforces in a statically typed language:
+wrong argument types, counts and ranges (C3 ruling). The server takes any enum number, as
+`KRPC.GameScene` is a flags enum, so `values-invalid-enum` is a `dynamic` requirement too.
+
+C# named arguments are compiler syntax over the stub's declared defaults, which `defaults` already
+checks by leaving arguments off the end, so C# takes no `named-args` profile (C3 ruling).
 
 Transports are reported separately: `tcpip` (all), `localsocket` (all but cnano's library, which
 takes a transport hook), `serialio` (cnano). Lua has no streams in 0.8 ([defects.md](defects.md)
@@ -96,8 +104,8 @@ Levels below: **M** is MUST, **S** is SHOULD. Profile is `core` unless given.
 | `calls-responses-matched-by-id` | M | A response is matched to its call by id, never by position. Profile: `threads`. |
 | `calls-unknown-response-id` | M | A response id neither pending nor abandoned is a protocol error. |
 | `calls-abandoned-response-is-discarded` | S | A call interrupted while waiting abandons its id, and the next call gets its own result. Profile: `threads`. |
-| `calls-too-many-arguments` | M | Too many arguments raise the client's argument error, before sending where the language allows. |
-| `calls-too-few-arguments` | M | Omitting an argument with no default raises the argument error. |
+| `calls-too-many-arguments` | M | Too many arguments raise the client's argument error, before sending. Profile: `dynamic`. |
+| `calls-too-few-arguments` | M | Omitting an argument with no default raises the argument error. Profile: `dynamic`. |
 | `calls-scalar-defaults` | M | An omitted scalar, string or bytes argument takes its default. Profile: `defaults`. |
 | `calls-collection-defaults` | M | An omitted list, set, dictionary or tuple argument takes its default, including an empty one. Profile: `defaults`. |
 | `calls-null-default` | M | An omitted argument whose default is null is sent as null. Profile: `defaults`. |
@@ -122,7 +130,7 @@ codec bug cannot pass ([test-service.md](test-service.md) "Testing values").
 | `values-line-endings` | M | CR and LF survive a string round trip. |
 | `values-bytes` | M | Bytes, both directions. |
 | `values-enums` | M | An enum value, both directions. |
-| `values-invalid-enum` | M | An out-of-range enum argument raises an error. |
+| `values-invalid-enum` | M | An out-of-range enum argument raises an error. Profile: `dynamic`. |
 | `values-collections` | M | Lists, sets, dictionaries and tuples of scalars, both directions. |
 | `values-nested-collections` | M | A collection of collections, both directions. |
 | `values-collections-of-objects` | M | Lists, sets, dictionaries and tuples of objects, both directions. |
@@ -133,7 +141,7 @@ codec bug cannot pass ([test-service.md](test-service.md) "Testing values").
 | `values-nullable-object` | M | A nullable object, through a procedure, an instance method and a static method. |
 | `values-nullable-struct-fields` | M | Nullable struct fields, and a nullable struct. |
 | `values-nullable-elements` | M | Null list elements, dictionary values and tuple items, also nested. |
-| `values-incorrect-parameter-type` | M | A value of the wrong type raises the client's encoding or argument error. |
+| `values-incorrect-parameter-type` | M | A value of the wrong type raises the client's encoding or argument error. Profile: `dynamic`. |
 | `values-integer-out-of-range` | S | An integer outside its parameter's type raises the encoding error. Applies to dynamically typed clients. |
 | `values-string-is-not-a-list` | S | A string passed for a list of strings raises an error. Applies to dynamically typed clients. |
 
