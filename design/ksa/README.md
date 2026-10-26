@@ -20,6 +20,7 @@ carry, and keeps a KSA change from paying for KSP work it does not touch.
 | [releases.md](releases.md) | Release trains, per-game client stubs, tags, channels |
 | [docs-website.md](docs-website.md) | One source, one site build per game |
 | [borea.md](borea.md) | Listing the KSA mod on the Borea mod manager, from `ksa-v0.2.0` |
+| [api-coverage.md](api-coverage.md) | Gaps in the `KSA` service against KSP's, and the phases that fill them |
 
 Related, outside this folder:
 
