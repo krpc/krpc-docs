@@ -101,7 +101,7 @@ Gaps left, each keeping client tests alive:
 | --- | --- |
 | A client's own error types (`RPCException`, `EncodingException`, `StreamError`, `ArgumentException`) are checked by kind only | The typed clients' tests of a client-side error type |
 | Expected failures: C++ KRPC exception registration, Java `StreamException` endings, the C# removed-stream type, Lua's error position | The client tests of each, until fixed |
-| No `GetStatus`: the testees' generated dispatch skips message-typed results | `test_version` in every client |
+| No `GetStatus`: the testees' generated dispatch skips message-typed results ([status-as-a-struct.md](../../issues/status-as-a-struct.md)) | `test_version` in every client |
 | No empty set or dictionary through a call, no uint32 set or dictionary vectors | The collection call and vector tests |
 | No consecutive callback values, no timed rate, no callback that waits on a condition, no forced races | `TestCallback`, `TestRate`, the first-call wait tests, the race tests |
 | Functions not at string, struct, tuple or dictionary types, and function stream error types | Most function stream tests |

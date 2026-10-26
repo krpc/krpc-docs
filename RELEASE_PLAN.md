@@ -93,6 +93,7 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 | ⬜ | Client thread safety: define and document what is thread-safe | [#427](https://github.com/krpc/krpc/issues/427) | docs | — |
 | ⬜ | C-nano: every transport compiled in, chosen at run time, so vcpkg ships them all | [#1176](https://github.com/krpc/krpc/issues/1176) | enhancement, client:cnano | — |
 | ⬜ | Streams of calls and server side functions that return no value, run for their side effects | **To file**: [streams-without-a-value.md](issues/streams-without-a-value.md) | enhancement, protocol, server, client | — |
+| ⬜ | `GetStatus` returns a kRPC struct in place of the `KRPC.Status` protobuf message | **To file**: [status-as-a-struct.md](issues/status-as-a-struct.md) | enhancement, protocol, server, client | — |
 
 * **Single connection first.** It changes connection setup and threading in every client, so the
   conformance suite is written against it rather than rewritten after it.
