@@ -65,6 +65,11 @@ Doc summaries on one member of each kind exist for the docgen goldens only.
 | Remove `AddMultipleValues` | Argument order is covered by `OptionalArguments`, the types by the conversions |
 | `BlockingProcedure` keeps `sum=0` | No longer counted as a defaults test |
 
+As built in C6: `EnumDefaultArg` is `EnumDefault`, and `EnumReturn` is removed, with the kept client
+tests calling `StringToEnum("ValueB")`. `EnumEcho` stays, as the Python and C# function compiler
+tests call it. `AddMultipleValues` stays, as it is the "round trip, 3 arguments" case of every
+client benchmark.
+
 ## Invalid object ids
 
 `errors-invalid-object-id` needs a handle the server never issued. Every generated handle type

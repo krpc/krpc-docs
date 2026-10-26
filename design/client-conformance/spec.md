@@ -54,8 +54,8 @@ C4 rulings: `streams-property-setters-are-invalid` is `dynamic`, as a compiler r
 stream. `calls-request-ids` is `threads`, as it holds trivially with one call in flight. The
 other C4 rewordings are listed in [harness.md](harness.md) "Built in C4".
 
-Transports are reported separately: `tcpip` (all), `localsocket` (all but cnano's library, which
-takes a transport hook), `serialio` (cnano). Lua has no streams in 0.8 ([defects.md](defects.md)
+Transports are reported separately: `tcpip` (all), `localsocket` (all but cnano, until cnano is built
+with every transport at once), `serialio` (cnano). Lua has no streams in 0.8 ([defects.md](defects.md)
 "Decisions").
 
 Levels below: **M** is MUST, **S** is SHOULD. Profile is `core` unless given.

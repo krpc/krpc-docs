@@ -27,7 +27,7 @@ tests with `ConformanceService` (local branch, before its PR).
 | Coverage | Members whose parameters and result are scalars, strings, bytes or objects. Extended in C3. |
 | Testees | `client/<lang>/conformance/`. C# and Java are hand-written beside the generated half, C++ and cnano are C++ with a generated header per service, and Lua dispatches through its runtime service objects like Python. cnano's testee is C++ calling the C API, and links the full C++ protobuf for the testee protocol. |
 | Profiles | Lua reports `core` and `defaults`, cnano `core`, so the stream tests skip. cnano builds for TCP/IP only. |
-| Lua on Windows | The Lua target is off on Windows: Lua reads standard input in text mode there. |
+| Lua on Windows | The Lua target was off on Windows, as Lua reads standard input in text mode there. Fixed after C6 by the line framing. |
 | `errors-mapped-exceptions` | C# and Java raise the native type itself, with no service or name, so the test checks service and name only when the testee reports them. |
 | Expected failures | 1 C#, 1 Java, 6 C++, 6 cnano, 9 Lua, each citing a new row in [defects.md](defects.md). |
 | Lint | The C++ and cnano testees are clang-formatted but not clang-tidied, like the client tests. Filed as [#1177](https://github.com/krpc/krpc/issues/1177). |
@@ -72,6 +72,16 @@ tests with `ConformanceService` (local branch, before its PR).
 | Not built | `connection-serial-resume` and `events-custom-event`, built in C5. |
 | Published | The connection, streams, events and threading pages, so every page is linked from the spec index. |
 | Testee builds | The C++ and cnano testees build without warnings. |
+
+### Built after C6
+
+| Item | As built |
+| --- | --- |
+| JSON lines | The testee protocol frames each message as its proto3 JSON form on a line (user request, 2026-10-26), replacing varint prefixes. Base64 lines came first, and JSON replaced them for readability. Python and the driver use `json_format`, C# `JsonFormatter`/`JsonParser`, Java `JsonFormat` (`protobuf-java-util`, newly pinned), and one header shared by the C++ and cnano testees (`conformance/cpp/framing.hpp`) `util::MessageToJsonString`. The C testees drop `_setmode`. A testee that writes a line that is not a message fails at once, with the line in the error (negative control: a base64-writing Python testee). Python and Lua testees were fed hand-written lines against a TestServer. |
+| Lua converter | lua-protobuf has no JSON mapping, so `client/lua/conformance/protojson.lua` converts between its tables and JSON, driven by `pb.fields`, with a small JSON reader and writer. It lasts until lua-protobuf is replaced. |
+| Python float parsing | Python's `json_format` rejects `3.4028235e+38`, the shortest form of the largest float that C++ and C# print, as too large: it compares the double before rounding to single precision. The same bug was fixed in C# (protocolbuffers/protobuf#10509). The driver rounds such a value to the largest float before parsing. |
+| Lua on Windows | The Lua target runs on Windows again. Only CI can prove it, after a push. |
+| cnano local socket | Waits for the cnano build with every transport at once, which removes the compile-time transport choice (user, 2026-10-26). |
 
 ### Built in C5
 
@@ -121,8 +131,10 @@ A pytest plugin in `conformance/driver/`.
 
 ## Testee protocol
 
-`conformance/testee.proto`, versioned. Varint length-delimited framing, which every client already
-implements.
+`conformance/testee.proto`, versioned. Each message is its proto3 JSON form on a line of its own,
+and a reader ignores a carriage return before the newline and rejects an unknown field. Text mode on
+Windows cannot corrupt it, so a testee needs no binary mode switch, and a person can read a trace or
+feed a testee commands by hand (changed after C6, from varint length-delimited framing).
 
 **Hello** reports the client name, the testee protocol version, the profiles and the transports
 ([spec.md](spec.md) "Profiles").
