@@ -17,7 +17,7 @@ tests with `ConformanceService` (local branch, before its PR).
 | Naming check | The plugin fails collection when a test's name does not match its first `spec` id. A stale expected-failures line also fails it. |
 | TestServer launch | Factored out of `run_client_test.py` into `tools/build/serverprocess.py`. `tools/benchmarks/testserver.py` still has its own copy. |
 | Bazel | `conformance_test(name, testee, expected_failures, transports)` in `tools/build/conformance.bzl`, one target per transport (`//client/python:conformance-tcpip`), in `//:test`. |
-| Not built | The coverage report. The spec pages stay orphans until a page's tests run. |
+| Not built | The coverage report (built in C7). The spec pages stay orphans until a page's tests run. |
 
 ### Built in C2
 
@@ -79,7 +79,7 @@ tests with `ConformanceService` (local branch, before its PR).
 | --- | --- |
 | JSON lines | The testee protocol frames each message as its proto3 JSON form on a line (user request, 2026-10-26), replacing varint prefixes. Base64 lines came first, and JSON replaced them for readability. Python and the driver use `json_format`, C# `JsonFormatter`/`JsonParser`, Java `JsonFormat` (`protobuf-java-util`, newly pinned), and one header shared by the C++ and cnano testees (`conformance/cpp/framing.hpp`) `util::MessageToJsonString`. The C testees drop `_setmode`. A testee that writes a line that is not a message fails at once, with the line in the error (negative control: a base64-writing Python testee). Python and Lua testees were fed hand-written lines against a TestServer. |
 | Lua converter | lua-protobuf has no JSON mapping, so `client/lua/conformance/protojson.lua` converts between its tables and JSON, driven by `pb.fields`, with a small JSON reader and writer. It lasts until lua-protobuf is replaced. |
-| Python float parsing | Python's `json_format` rejects `3.4028235e+38`, the shortest form of the largest float that C++ and C# print, as too large: it compares the double before rounding to single precision. The same bug was fixed in C# (protocolbuffers/protobuf#10509). The driver rounds such a value to the largest float before parsing. |
+| Python float parsing | Python's `json_format` rejects `3.4028235e+38`, the shortest form of the largest float that C++ and C# print, as too large: it compares the double before rounding to single precision. The same bug was fixed in C# (protocolbuffers/protobuf#10509). Reported as protocolbuffers/protobuf#31051. The driver rounds such a value to the largest float before parsing, until a protobuf release with the fix is in the lock file. |
 | Lua on Windows | The Lua target runs on Windows again. Only CI can prove it, after a push. |
 | cnano local socket | Waits for the cnano build with every transport at once, which removes the compile-time transport choice (user, 2026-10-26). |
 | Holding a condition | `HoldCondition{stream}` holds a stream's or event's condition, or the connection's update condition for handle 0, while the thread runs its later commands, until `ReleaseCondition`. Python, C# and C++ take the lock in one command and let go in another on the same thread. Java's monitor needs a block, so its worker runs the later commands inside `synchronized`. `WaitForUpdate{timeout}` is the connection-wide wait (Python and C++; C# and Java reply UNSUPPORTED). |
@@ -87,6 +87,16 @@ tests with `ConformanceService` (local branch, before its PR).
 | Unsupported values | A codec type a fixed-table testee has no type for, and a null its type cannot hold (a C++ string or vector, a C-nano string or collection), reply UNSUPPORTED, so the test skips. C-nano's dispatch wraps a non-nullable string parameter in `NotNull<String>` for this. |
 | Function types | `AddFunctionStream` and `RunFunction` also take `double`, `nullable sint32`, `list(sint32)` and `TestClass`, and runs take double and object arguments. |
 | `ThrowMappedException` | One TestService procedure throws the seven mapped exceptions that had none, by name, so `errors-mapped-exceptions` covers all eleven. |
+
+### Built in C7
+
+| Item | As built |
+| --- | --- |
+| Tests as the source | The requirements were written twice, on the spec pages and as `@spec` markers (user, 2026-10-26). Now each test's docstring is the requirement text, its name the id, `@should` and `@may` the level, and `section("Title", "text")` statements the page's sections. `@spec` is gone. The tests were reordered into page order. The four requirements with no test (`calls-deprecated-procedure-warns`, `objects-sorting`, `objects-different-classes-are-not-equal`, `codec-message`) are tests marked `@untested(reason)`, which skip. The test that carried two ids was split: `errors-raised-type-is-the-exposed-type` has its own test over a custom and a KRPC exception. Transport-only tests are marked `@transport`. |
+| specgen | `conformance/specgen.py` reads the tests with `ast` and writes `requirements/<area>.txt`, which each page includes after its hand-written intro. Profiles every requirement on a page shares are stated once for the page, and those a section shares once for the section. The generated lists matched the hand-written ones, except that the tests needed `threads` for two streams callback requirements and `objects-types-from-different-connections`. A plugin check fails a test with no docstring. |
+| Coverage page | `client-spec/coverage.rst` holds a generated table per area of requirement against client: Pass, Fail, Partial (some parameters listed), `-` (outside the client's profiles) or Untested, plus a profiles table. The inputs are the expected failures files and new `conformance/profiles/<client>.txt` files, which the plugin checks against `Hello` (negative control: a Lua file without `dynamic` stops the run). Built from static files, not test results, so the doc build runs no testee. |
+| Testee protocol page | `client-spec/conformance.rst`: running the shipped driver, writing a testee (an exchange captured from the Python testee), the expected failures format, and `testee.proto` included as the reference. |
+| Shipped driver | `TestServer-<version>.zip` gains `conformance/`: the driver, the tests, `testee.proto`, `testee_pb2.py`, `serverprocess.py` and a `requirements.txt` (`krpc==<version>`, `pytest>=9`). `driver/main.py` takes `--testee COMMAND` (split with shlex), `--server` (defaulting to the archive's TestServer), `--transport`, `--expected-failures` and `--profiles`; Bazel passes `--config`. The transport-to-test-files rule moved from the macro to `main.py`. Verified from an unzipped archive in a venv with the locally built krpc package, against the C++ and Python testees, with the same results as the Bazel targets. |
 
 ### Built in C5
 
@@ -190,7 +200,7 @@ and `AddStream` dispatch from the service definitions. It covers `KRPC`, `TestSe
 ## Tests, profiles and expected failures
 
 - Tests live in `conformance/tests/test_<area>.py`, named as in [spec.md](spec.md) "Naming".
-- Each test is marked with its spec ids and profile, and skipped when the testee lacks the profile.
+- Each test is marked with its profiles, and skipped when the testee lacks one.
 - **Expected failures** live in `conformance/expected-failures/<client>.txt`, one test id per line,
   enforced strictly as in protobuf. A listed test that passes fails the run, so every gap is fixed
   or recorded. Each line gives the reason as a comment. The files ship in `krpc`, so they name no
@@ -205,8 +215,8 @@ and `AddStream` dispatch from the service definitions. It covers `KRPC`, `TestSe
   `tools/build/client_test.bzl`. Each client BUILD instantiates it, and the targets join `//:test`.
 - The testees live with their clients (`client/<lang>/conformance/`), as they build against the
   client.
-- **A coverage report** lists spec id against client, built from the test results and markers.
-  It is published with the spec in C7.
+- **A coverage report** lists spec id against client, generated from the tests, the expected
+  failures files and the profiles files ("Built in C7").
 
 ## TestServer
 

@@ -244,7 +244,7 @@ batches. Fix in Follow-ups.
 ## Client reader
 
 The rules for the clients with streams: Python (the reference), C#, Java and C++. They are the target
-for the conformance suite ([client-conformance/spec.md](../client-conformance/spec.md)).
+for the conformance suite ([client-conformance](../client-conformance/README.md)).
 
 ### Threads
 

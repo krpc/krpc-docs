@@ -39,7 +39,7 @@ Each phase merges on its own. G3 and G5 change no behavior. G1 does, as ruled un
 Suggested order: G3 first, as it gives G1 a golden to change. Then G5, then G1. G1 is checked by
 each client's own tests, updated to the new behavior. The conformance suite later pins
 them as `errors-mapped-exceptions` and `errors-message`
-([client-conformance/spec.md](client-conformance/spec.md)).
+(tests in `krpc` `conformance/tests/test_errors.py`, [client-conformance](client-conformance/README.md)).
 
 ### Dropped: G4
 
