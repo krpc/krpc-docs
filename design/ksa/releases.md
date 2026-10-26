@@ -17,7 +17,7 @@ release versions are free to move apart.
 | --- | --- | --- | --- |
 | Clients and tools | every client runtime, KSP stubs bundled; `krpctools`; `krpctest`; the `TestServer` image | `clients-v1.2.0` | GitHub (Java), PyPI, NuGet, vcpkg, Arduino, LuaRocks, ghcr.io |
 | KSP | the KSP mod and its services, KSP API docs | `ksp-v1.0.3` | GitHub, CKAN |
-| KSA | the KSA mod, the KSA stubs archive, KSA API docs | `ksa-v0.2.0` | GitHub, SpaceDock |
+| KSA | the KSA mod, the KSA stubs archive, KSA API docs | `ksa-v0.2.0` | GitHub, SpaceDock, Borea ([borea.md](borea.md)) |
 | Protocol | an integer in the handshake | none | none |
 
 * **The clients release in lockstep.** They share the protocol version. One version per language

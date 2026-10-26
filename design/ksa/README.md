@@ -19,6 +19,7 @@ carry, and keeps a KSA change from paying for KSP work it does not touch.
 | [ci.md](ci.md) | What CI checks for each game, with no new jobs |
 | [releases.md](releases.md) | Release trains, per-game client stubs, tags, channels |
 | [docs-website.md](docs-website.md) | One source, one site build per game |
+| [borea.md](borea.md) | Listing the KSA mod on the Borea mod manager, from `ksa-v0.2.0` |
 
 Related, outside this folder:
 
