@@ -13,6 +13,12 @@ further. This doc lists the gaps that KSA can fill today, and orders them into p
   values), not KSP names.
 * **A member with no game counterpart is dropped**, never approximated.
 * **`TestingTools`** is a second service, for the in-game tests only.
+* **A number is a `float` unless it needs a `double`.** A float is half the size on the wire, which
+  matters to C-nano on microcontrollers. These stay `double`: absolute times (`UT` and anything
+  added to it), vectors and quaternions, every `Orbit` member, the mass, radius and sphere of
+  influence of a body, latitudes and longitudes, and altitudes. Durations outside `Orbit` are
+  `float`, as their precision scales with them. Decided in the API review before the phase 6 PR,
+  and applied to the released 0.1.0 members as one breaking change.
 
 The original proposal was a strict subset of `SpaceCenter`, with kRPC's signatures, so KSP scripts
 would run unchanged. It was dropped on the prototype's findings:
@@ -93,7 +99,7 @@ Each phase merges on its own, with in-game tests for every new member.
 
 ### 1. Existing Classes
 
-Built and tested in game, not yet in a PR. The table is the plan. The built API and where it
+Built and tested in game, in PR #1207. The table is the plan. The built API and where it
 differs follow it.
 
 | Class | Add | Game source |
@@ -126,6 +132,22 @@ Built differently, or dropped:
 | `Orbit` | `TimeOfClosestApproach`, `DistanceAtClosestApproach` | To the vehicle's target, from the encounters the game finds while predicting the trajectory |
 | `ReferenceFrame` | No `Remove` | Equal frames share an id, and a frame is freed with what it is built on |
 | `Part` | `Direction` and `CenterOfMass` dropped | A part has no forward axis, and `Rotation` gives its axes |
+
+API review before the phase 1 PR. Every point was left as built. They are recorded for a later
+breaking-change pass.
+
+| Member | Point | Alternative |
+| --- | --- | --- |
+| `Control.Pitch`, `Yaw`, `Roll`, `Forward`, `Right`, `Up` | `int`, while SpaceCenter has `float` in [-1, 1]. Analog inputs later would change the wire type | `float`, accepting only -1, 0 and 1 for now |
+| `Orbit.TimeOfClosestApproach`, `DistanceAtClosestApproach` | NaN on every orbit except the vehicle's current one | Move to `Vehicle`, beside the target properties, or take the target orbit as SpaceCenter does |
+| `Vehicle.MaxGLoad`, `MaxDynamicPressure` | Break-up limits, but read as the highest value reached beside `PeakGLoad` | `GLoadLimit`, `DynamicPressureLimit`. The four load members could move to `Flight`, beside `GForce` and `DynamicPressure` |
+| `Vehicle.Engines`, `RCS`, `Decouplers`, ... | Flat on `Vehicle`, 16 lists by phase 7. 0.1.0 shipped `Vehicle.Parts` as a list, so a SpaceCenter-style `Parts` object is a breaking change | A `PartsByType` object |
+| `Flight.Prograde`, `Normal`, `Radial` | Relative to the surface, unlike SpaceCenter's orbital reading. `Normal` does not name its side of the plane | Point to `Vehicle.OrbitalReferenceFrame`, and state the side |
+| `KSA.SaveExists` | An exists check, with no way to list saves | A `Saves` list |
+| Closest approach, `TimeToSOIChange`, `BiomeAt` | "None" is NaN for events and `null` for references | Keep NaN for "no such event" in new members |
+| `Control.Pulse` | A bool for the game's `Direct` or `Pulse` mode | An enum, if the game adds a mode |
+| `Part.Velocity` | No `Part.AngularVelocity`. Parts share the vehicle's angular velocity | None needed |
+| `Decouple`, `Undock` | The return docs differ: "the vehicles that separated" and "the new vehicles" | One wording |
 
 ### 2. Propulsion and Fuel
 
@@ -210,6 +232,15 @@ Built differently:
 | `Kitten` | `GoOnEva()` for `EVA()`, `Board()` returns the vehicle | A method is a verb. `Board` boards the nearest free hatch within 1 m, as the board key does |
 | `KSA` | `ActiveKitten` (rw) added, `ActiveVehicle` is `null` while a kitten has control | Going on EVA hands control to the kitten |
 | `KSA` | `LaunchVehicle` rejects the three default kittens | The placement code divides by zero for them |
+| `KSA` | `Kittens` is a dictionary keyed by name, `GetKitten` dropped | Matches `Bodies`. `Kitten.RosterIndex` keeps the roster order |
+| `Kitten` | `Position` and `Velocity` work in a seat, from the seat's part | A script can follow a kitten without checking `OnEva` |
+
+Left for later, from the API review before the phase 4 PR:
+
+| Member | Why |
+| --- | --- |
+| `Kitten.ReferenceFrame` on EVA | Vehicles have three frames, a kitten on EVA has none |
+| EVA movement controls | The maneuvering unit and walking cannot be driven from a client |
 
 EVA and boarding go through the game's `EvaSpawnBuffer` and `KittenBoardBuffer`, which apply at the
 start of the next frame. Neither needs a deferral of its own. A kitten fresh out of the hatch is
@@ -258,15 +289,22 @@ Built differently:
 | --- | --- | --- |
 | `Camera` | `Azimuth` and `Elevation` in degrees, `Distance` in meters | The game stores radians, and the orbit distance as a multiple of the focused object's radius |
 | `Camera` | `FocusedVehicle`, `FocusedBody`, `FocusedKitten` (rw) | One property per type, as KSP's camera. Setting one leaves the active vehicle |
-| `KSA` | `Screenshot(scale, ui)` returns the file path | The game names the file by the time. It reduces the scale to fit graphics memory |
-| `KSA` | `Message(text, duration, warning)` | The game's two alert tones. It shows an alert for at least 2 s |
+| `KSA` | `TakeScreenshot(scale, ui)` returns the file path | The game names the file by the time. It reduces the scale to fit graphics memory |
+| `KSA` | `ShowMessage(text, duration, warning)` | The game's two alert tones. It shows an alert for at least 2 s |
 | `Vehicle` | `Recover()` and `CanRecover` added | The game's recover button, at rest on the home planet |
-| `VehicleDesign` | Replaces `Editor`: `KSA.VehicleDesigns`, with `PartCount`, `Mass`, `DryMass`, `DeltaV` | The editor's figures come from the design's part tree, loaded and freed without opening the editor |
+| `VehicleDesign` | Replaces `Editor`: `KSA.VehicleDesigns`, a dictionary keyed by name, with `PartCount`, `Mass`, `DryMass`, `DeltaV` | The editor's figures come from the design's part tree, loaded and freed without opening the editor |
 | `Debug` | The vehicle is the first parameter of each method | `ActiveVehicle` is `null` while a kitten has control |
 | `Debug` | `SetRotation` replaces `SetPitchHeadingRoll`, `SetLanded` has no altitude | Quaternions as `Vehicle.Rotation`. The game places a landed vehicle on the terrain |
 | `Debug` | `ShowVelocityArrows(visible)` replaces `VelocityArrows` | A service class holds static methods, not static properties |
 | `Debug` | `AddForce`, `InstantaneousForce` not built | `Disturbances.AddForceBody` was not verified |
 | `Debug` | `RunCommand` checks the command name | The console logs an unknown command, and most commands write to the log, not the console output |
+
+Left for later, from the API review before the phase 5 PR:
+
+| Member | Why |
+| --- | --- |
+| `Debug.SetResourceAmount(vehicle, name, amount)` | No game event sets one substance. It writes each tank's mole state and redoes the game's mass bookkeeping |
+| `VelocityArrows` (rw) on a top-level `Debug` service | Replaces `ShowVelocityArrows` once `Debug` is its own service and can hold static properties |
 
 Teleports go through the game's `TeleportInputBuffer`. A vehicle's cached position and velocity
 refresh at the start of the frame after the teleport applies, so each `Debug` teleport waits one
