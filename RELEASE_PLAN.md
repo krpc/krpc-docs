@@ -135,10 +135,10 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 
 ### Fixes and smaller items
 
-Everything but the `RemoveStream` change, the Ctrl-C fix, the testee stubs, the connection binding audit and the
-stream ending docs can ship in a 0.7.x release if 0.8 is far off. The `RemoveStream` change breaks the `KRPC`
-service, the Ctrl-C fix depends on the single connection, and the testee stubs, the audit and the ending docs depend
-on the conformance suite.
+Everything but the `RemoveStream` change, the Ctrl-C fix, the testee stubs, the portable tool bundles, the connection
+binding audit and the stream ending docs can ship in a 0.7.x release if 0.8 is far off. The `RemoveStream` change breaks the `KRPC`
+service, the Ctrl-C fix depends on the single connection, and the testee stubs, the bundles, the audit and the ending docs
+depend on the conformance suite.
 
 | | Item | GitHub | Labels | Design doc |
 | --- | --- | --- | --- | --- |
@@ -152,6 +152,7 @@ on the conformance suite.
 | ⬜ | Python: Ctrl-C during a call on Windows, with the single connection | **To file**: [python-ctrl-c-windows.md](issues/python-ctrl-c-windows.md) | bug, client:python | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | ⬜ | Python: trim client frames from server error tracebacks | **To file**: [python-traceback-trim.md](issues/python-traceback-trim.md) | enhancement, client:python | — |
 | ⬜ | Conformance testee stubs from the full TestServer definitions, with `TestService2` | **To file**: [test-service-full-definitions.md](issues/test-service-full-definitions.md) | enhancement, tools | [client-conformance/harness.md](design/client-conformance/harness.md) |
+| ⬜ | Publish the bundled TestServer and ServiceDefinitions for every platform, so `krpc-conformance` and `servicedefs` run on Windows | **To file**: [portable-dotnet-tools.md](issues/portable-dotnet-tools.md) | enhancement, tools | — |
 | ⬜ | Client guides: how streams and events end | **To file**: [stream-and-event-ending-docs.md](issues/stream-and-event-ending-docs.md) | docs, client | — |
 | ⬜ | Run clang-format and clang-tidy over every C and C++ source | [#1177](https://github.com/krpc/krpc/issues/1177) | enhancement, client:cpp, client:cnano | — |
 | ⬜ | Audit how each client binds static methods and streams to a connection | [#1195](https://github.com/krpc/krpc/issues/1195) | enhancement, client:python, client:cpp, client:lua, client:csharp, client:java, client:cnano | [client-conformance/defects.md](design/client-conformance/defects.md) |
