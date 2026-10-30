@@ -111,8 +111,8 @@ the finished tree instead, so each one is the spec of one area plus the tests th
 
 | PR | Scope |
 | --- | --- |
-| WebSockets frame length | On main: a frame longer than `int.MaxValue` closes the connection with status 1009. Split out of the single connection. |
-| Codec and clientgen fixes | Bytes default arguments in generated C#, C++ and Lua code, a C# nullable enum return, and a C++ short tuple. |
+| WebSockets frame length | Merged in #1193. A frame longer than `int.MaxValue` closes the connection with status 1009. Split out of the single connection. |
+| Codec and clientgen fixes | Merged in #1194. Bytes default arguments in generated C#, C++ and Lua code, a C# nullable enum return, and a C++ short tuple. |
 | Single connection | [protocol/single-connection.md](../protocol/single-connection.md), with the settable stall timeout. |
 | Infrastructure | Driver, `testee.proto`, the six testees and the clientgen dispatch, the `TestService` additions and `ConformanceService`, the multi-transport TestServer, specgen, the spec index, coverage and testee protocol pages, and the driver in the TestServer archive. Two smoke tests, `connection-connect` and `calls-procedure`. |
 | Calls, values, codec | Tests, pages and expected failures for those areas. |

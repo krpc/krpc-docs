@@ -3,8 +3,8 @@
 **Status:** done, merged in [PR #1142](https://github.com/krpc/krpc/pull/1142) with
 [Lua 5.4 and lua-protobuf](lua-5.4-and-lua-protobuf.md). The test luasocket is pinned to the head of
 [lunarmodules/luasocket#469](https://github.com/lunarmodules/luasocket/pull/469), which is open and
-unmerged. Moving to a release is drafted in
-[issues/luasocket-release-pin.md](../../issues/luasocket-release-pin.md).
+unmerged. Moving to a release is
+[#1203](https://github.com/krpc/krpc/issues/1203).
 
 ## Problem
 

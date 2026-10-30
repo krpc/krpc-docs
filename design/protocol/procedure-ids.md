@@ -1,7 +1,7 @@
 # Procedure ids from names
 
-**Status:** proposal, for 0.8 with [protocol version 2](protocol-version.md). Issue to file:
-[procedure-ids-from-names.md](../../issues/procedure-ids-from-names.md).
+**Status:** proposal, for 0.8 with [protocol version 2](protocol-version.md). Issue:
+[#1196](https://github.com/krpc/krpc/issues/1196).
 
 ## Problem
 

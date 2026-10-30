@@ -1,7 +1,9 @@
 # Design proposal: extending the autopilot to aerodynamic flight
 
-**Status:** in progress for [#526](https://github.com/krpc/krpc/issues/526). Phase 1 measurements
-done (2026-10-24); the first set of changes is ported and tested (2026-10-25), not yet in a PR. See
+**Status:** done in [PR #1191](https://github.com/krpc/krpc/pull/1191), fixing
+[#526](https://github.com/krpc/krpc/issues/526). The [Still open](#still-open-1) items under Port
+findings were not part of it. Phase 1 measurements done (2026-10-24); the first set of changes
+ported and tested (2026-10-25). See
 [Phase 1 findings](#phase-1-findings-2026-10-24) and [Port findings](#port-findings-2026-10-25),
 which supersede parts of sections A, D, E and the roadmap below.
 **Scope:** `service/SpaceCenter/src/AutoPilot/` (AttitudeController, OscillationDetectors,

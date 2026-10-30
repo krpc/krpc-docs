@@ -1,6 +1,6 @@
 # Allow XML doc crefs to exceptions
 
-**Status:** in review, draft PR [#1185](https://github.com/krpc/krpc/pull/1185). Issue
+**Status:** done in PR [#1185](https://github.com/krpc/krpc/pull/1185). Issue
 [#1183](https://github.com/krpc/krpc/issues/1183). The PR grew into a general pass over the
 client API docs: crefs link in the generated code of every client, and Doxygen, javadoc and
 Sphinx check each client's docs in its test suite.

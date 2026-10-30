@@ -23,6 +23,7 @@ oscillation layer damps structural modes the inner loop would otherwise excite.
 | Special maneuvers | [antipodal-flip.md](antipodal-flip.md) | Deterministic 180° flip handling and the out-of-plane-instability fix. |
 | Testing | [test-plan.md](test-plan.md) | The KSP-in-the-loop test craft matrix, metrics, and corner-case catalog. *(In progress.)* |
 | Update timing | [update-timing.md](update-timing.md) | Where in a physics tick the loop runs relative to a program's calls, and the modes that choose it. *(Done, [PR #1070](https://github.com/krpc/krpc/pull/1070).)* |
+| Aerodynamic flight | [aero-extension.md](aero-extension.md) | Extending the controller to aircraft: roll linearization, the aero rate cap, and the Phase 1 and port findings. *(Done, [PR #1191](https://github.com/krpc/krpc/pull/1191), fixing #526.)* |
 
 ## Proposed extensions (not built)
 
@@ -30,7 +31,6 @@ Each is an independently-buildable future change, kept as its own doc.
 
 | Doc | Status | What it proposes |
 | --- | --- | --- |
-| [aero-extension.md](aero-extension.md) | in progress | Extending the controller to aerodynamic flight. Phase 1 findings recorded; first changes being ported for #526. |
 | [bank-to-turn.md](bank-to-turn.md) | proposal | Bank-to-turn control for asymmetric-authority craft. |
 | [heterogeneous-actuators.md](heterogeneous-actuators.md) | not planned | Fast/slow actuator allocation across mixed effectors. Left to user scripts. |
 | [sign-convention-refactor.md](sign-convention-refactor.md) | proposal | Move the inner loop to a right-handed sign convention. |

@@ -138,7 +138,7 @@ The rest do not apply to a game server:
 | gRPC feature | Why it does not matter |
 | --- | --- |
 | Concurrent execution | RPCs run on the game thread. Pipelining from 0.8 gives the latency benefit |
-| Flow control, backpressure | Latest-wins streams and reverse streams, plus TCP. SerialIO flow control is its own draft ([serialio-streams.md](../../issues/serialio-streams.md)) |
+| Flow control, backpressure | Latest-wins streams and reverse streams, plus TCP. SerialIO flow control is its own issue ([#1204](https://github.com/krpc/krpc/issues/1204)) |
 | TLS, authentication | [#11](https://github.com/krpc/krpc/issues/11): use a proxy or tunnel. The bridge could add TLS if needed |
 | Compression | Messages are small and traffic mostly local |
 | Metadata, interceptors, tracing | Service middleware, with no user need here |

@@ -51,7 +51,7 @@ case. No real use case needs a connection without streams.
 | Approval | `AutoAcceptConnections` defaults to true for new installs. An existing settings file keeps its value. **Breaking:** changelog entry. |
 | Client threads | Callers read the socket in turn, under a reader role. A reader thread reads only while streams are open and no call waits. A dispatcher runs callbacks and the writes a reader queues. |
 | Client API | `stream_port`/`stream_path` and counterparts removed, no shims. `rpc_port`/`rpc_path` and counterparts renamed `port`/`path`. A handshake timeout on every connect function but cnano's. |
-| SerialIO streams | Unsupported and undefined behavior; no server check. Additive later, after flow control ([draft issue](../../issues/serialio-streams.md)). |
+| SerialIO streams | Unsupported. The server accepts the stream and event RPCs, and C-nano fails a call with a protocol error when an update arrives. Additive later, after flow control ([#1204](https://github.com/krpc/krpc/issues/1204)). |
 
 ## Protocol
 
@@ -392,7 +392,7 @@ decoding through the `Message`).
 
 | Follow-up | Proposal |
 | --- | --- |
-| Streams over SerialIO | [Draft issue](../../issues/serialio-streams.md). Flow control first: a fast stream at 9600 baud fills the write buffer, which drops the connection. |
+| Streams over SerialIO | [#1204](https://github.com/krpc/krpc/issues/1204). Flow control first: a fast stream at 9600 baud fills the write buffer, which drops the connection. |
 | Ctrl-C in a Python call on Windows | [Draft issue](../../issues/python-ctrl-c-windows.md). A caller waiting on its slot may not be interruptible. |
 | Bounding the dispatcher queue | Unbounded in 0.8. Decide whether to bound it and what to drop. |
 | Batched `Request` with a yielding call | Fail a yielding call in a multi-call `Request`, so it completes in the update it is read. No wire change. |
