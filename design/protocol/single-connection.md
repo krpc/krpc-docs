@@ -4,6 +4,14 @@
 together with [request ids](request-ids.md) phase 1 and [protocol version](protocol-version.md) 2.
 Issue [#1174](https://github.com/krpc/krpc/issues/1174).
 
+Scope, from 2026-10-27: three rounds of review kept finding client corner cases, as no client spec
+existed to review against. The PR is held to a minimal bar. The server and the protocol are reviewed
+in full. The clients move to one connection, with no regression from 0.7. Client semantics beyond
+that, such as threading and stream `get`/`wait`, are defined by the
+[client conformance](../client-conformance/README.md) spec, which lands after this PR, and client
+fixes against it stack above the spec. A WebSockets frame length fix found here lands separately,
+ahead of this PR.
+
 Related: [protocol-compatibility.md](../protocol-compatibility.md) (the 1.0 additivity rules),
 [improvements.md](improvements.md) ([#906](https://github.com/krpc/krpc/issues/906)),
 [local-transports.md](local-transports.md),

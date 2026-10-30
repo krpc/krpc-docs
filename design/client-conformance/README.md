@@ -1,14 +1,13 @@
 # Client conformance
 
 **Status:** in progress, planned for 0.8 as [#1123](https://github.com/krpc/krpc/issues/1123).
-Proposed 2026-10-22 and reviewed 2026-10-23. C0 to C7 are built on a local branch, before their PR
-([harness.md](harness.md) "Built in C1" to "Built in C7", [client-tests.md](client-tests.md) "Built in
-C6"). A coverage pass after C6 closed most of the suite's gaps and deleted the client tests it
-covers ([client-tests.md](client-tests.md) "Built after C6"). Since C7 the tests are the source of
-the spec's requirement lists. Client defects the
-suite finds are recorded as expected failures, and fixed later as their own work. The single connection and request ids phase 1
-are built, which this work waited for. Facts below were surveyed on the single connection and
-client codegen branches (before their PRs). Re-check them when a phase starts.
+Proposed 2026-10-22 and reviewed 2026-10-23. C0 to C7 and a coverage pass are built ([harness.md](harness.md)
+"Built in C1" to "Built in C7", [client-tests.md](client-tests.md) "Built in C6" and "Built after
+C6"). On 2026-10-27 the work was regrouped into the PRs under "Pull requests" below, and the spec is
+now reviewed section by section before more client work. Since C7 the tests are the source of the
+spec's requirement lists. Client defects the suite finds are recorded as expected failures, and
+fixed after the spec lands. Facts below were surveyed on the single connection and client codegen
+branches (before their PRs). Re-check them when a phase starts.
 
 This folder replaces three earlier docs: the conformance sketch (`client-conformance.md`), the
 client testing standard (`client-testing.md`) and the client API parity audit
@@ -85,25 +84,52 @@ New in this revision:
 | Testee lifetime | One process per test session, with a fresh `Connect` per test. The driver restarts a testee that crashes or times out. `Counter` counts per client, so a fresh connection starts from clean state. |
 | Timeouts | The handshake and stall timeouts are `Connect` settings. The spec says clients SHOULD make both settable. |
 | Timing | Tests order events through `ConformanceService` (`SetValue`, `Block`, `TriggerEvent`) in place of wall-clock sleeps where they can. Tests that still race the clock are marked `@timing` ([harness.md](harness.md)). |
-| `TestService` | Renames and removals wait until the per-client comms tests are deleted (phase C6), so each moves once. Additions land with the tests that need them. |
+| `TestService` | Renames and removals wait until the per-client comms tests are deleted (the last PR), so each moves once. Additions land with the infrastructure. |
 | Defect rulings | Lua streams, the C++ dropped stream handle, waiting in a callback and Java stream creation are ruled in [defects.md](defects.md) "Decisions". |
 
 ## Sequencing
 
+Reviews of the single connection kept finding semantic gaps in the clients, because no agreed client
+spec existed to review against. The spec is therefore settled first, and the clients are fixed to
+match it afterwards, rather than the single connection chasing a moving target.
+
 | Step | Work |
 | --- | --- |
-| 1 | Land the single connection and request ids. |
-| 2 | Done in #1172. Client codegen G1, G3 and G5 ([client-codegen.md](../client-codegen.md)). Its exception tables and message format settle two client disagreements before the suite pins them. |
-| 3 | Conformance phases C0 to C7. |
-| 4 | 1.0 additions ([#903](https://github.com/krpc/krpc/issues/903), [#251](https://github.com/krpc/krpc/issues/251), [#905](https://github.com/krpc/krpc/issues/905)), each with conformance tests. The suite pins the client tolerance rules that keep them additive ([protocol-compatibility.md](../protocol-compatibility.md)). |
+| 1 | Small fixes found while building the suite, ahead of everything, on main. |
+| 2 | The single connection and request ids, held to a minimal bar: the server and protocol reviewed in full, the clients on one connection with no regression from 0.7. Client semantics beyond that are the spec's to define. |
+| 3 | Done in #1172. Client codegen G1, G3 and G5 ([client-codegen.md](../client-codegen.md)). |
+| 4 | The conformance infrastructure, then the spec one section at a time, each reviewed as requirement text. |
+| 5 | Client fixes against the spec, each removing expected failures. They stack above the spec, never folded back into the single connection. |
+| 6 | 1.0 additions ([#903](https://github.com/krpc/krpc/issues/903), [#251](https://github.com/krpc/krpc/issues/251), [#905](https://github.com/krpc/krpc/issues/905)), each with conformance tests. The suite pins the client tolerance rules that keep them additive ([protocol-compatibility.md](../protocol-compatibility.md)). |
 
-C0 to C2 can overlap with codegen. G1 must land before the first set's error tests, or they start
-as expected failures in most clients.
+0.8 is not released until the stack lands, so a later PR may still change client behavior or API.
+
+## Pull requests
+
+The suite was built in phases C0 to C7 (below), whose commits cut across areas. The PRs are cut from
+the finished tree instead, so each one is the spec of one area plus the tests that are its source.
+
+| PR | Scope |
+| --- | --- |
+| WebSockets frame length | On main: a frame longer than `int.MaxValue` closes the connection with status 1009. Split out of the single connection. |
+| Codec and clientgen fixes | Bytes default arguments in generated C#, C++ and Lua code, a C# nullable enum return, and a C++ short tuple. |
+| Single connection | [protocol/single-connection.md](../protocol/single-connection.md), with the settable stall timeout. |
+| Infrastructure | Driver, `testee.proto`, the six testees and the clientgen dispatch, the `TestService` additions and `ConformanceService`, the multi-transport TestServer, specgen, the spec index, coverage and testee protocol pages, and the driver in the TestServer archive. Two smoke tests, `connection-connect` and `calls-procedure`. |
+| Calls, values, codec | Tests, pages and expected failures for those areas. |
+| Errors, objects | As above. |
+| Connection | As above, including the serial transport. |
+| Streams, events, functions | As above. Server side functions come with events, as their page refers to events. |
+| Threading | As above. The section to settle with care: a design note on the reader and dispatcher, stream `get`/`wait`, the timeouts and the order of ending a connection comes first. |
+| Delete client tests | Every per-client test the suite covers, then the `EnumDefault` rename and the `EnumReturn` removal. |
+
+Review each section PR by its generated requirement text, not its test code. A client defect it
+finds becomes an expected failure, not a fix in that PR.
 
 ## Phases
 
-The harness and every testee come first, on a small first set of tests. Each area then grows on a
-harness that already runs all six clients.
+How the suite was built, before it was regrouped into the PRs above. The harness and every
+testee came first, on a small first set of tests. Each area then grew on a harness that already
+ran all six clients.
 
 | Phase | Scope |
 | --- | --- |
@@ -116,7 +142,7 @@ harness that already runs all six clients.
 | C6 | Delete the per-client tests the suite replaces ([client-tests.md](client-tests.md)), then the `TestService` renames and removals. |
 | C7 | Document the testee protocol, and ship the driver with the TestServer archive for third-party clients. |
 
-Each phase merges on its own. A spec page is published only once its tests run.
+A spec page is published only once its tests run.
 
 ### First set
 

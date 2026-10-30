@@ -110,6 +110,12 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 * **Thread safety goes with conformance.** The single connection changes client threading, and
   the conformance suite's threading tests are where the guarantees get pinned and checked across
   clients.
+* **Spec before client fixes.** The single connection lands to a minimal client bar, then the
+  conformance infrastructure, then the spec one section per PR, reviewed as requirement text.
+  Client fixes against the spec come after, so the single connection is not reworked to a spec
+  still being written ([client-conformance/](design/client-conformance/README.md) "Sequencing").
+* **Not released until the stack lands.** A later PR in the stack may still change client
+  behavior or API.
 * **A hard break.** The 0.8 server speaks only the single connection, with no transition period.
   Clients older than 0.8 cannot connect to it.
 
@@ -130,6 +136,8 @@ stubs and the audit depend on the conformance suite.
 
 | | Item | GitHub | Labels | Design doc |
 | --- | --- | --- | --- | --- |
+| ⬜ | Close a WebSockets connection whose frame is too large | **To open**, first in the 0.8 stack | bug, server | — |
+| ⬜ | Codec and clientgen fixes: bytes default arguments in generated code, a C# nullable enum return, a C++ short tuple | **To open**, second in the 0.8 stack | bug, client:csharp, client:cpp, tools | [client-conformance/](design/client-conformance/README.md) |
 | ⬜ | `RemoveStream` and `SetStreamRate` take a `Stream` | [#1178](https://github.com/krpc/krpc/issues/1178) | enhancement, protocol | — |
 | ⬜ | `KerbalAlarmClock.Alarm.PlaySound` has no effect | [#1179](https://github.com/krpc/krpc/issues/1179), **add milestone** | bug, service:kerbal-alarm-clock | [services/kac-remotetech-tests-and-api.md](design/services/kac-remotetech-tests-and-api.md) |
 | ⬜ | DockingCamera log spam | [#1180](https://github.com/krpc/krpc/issues/1180), **add milestone** | bug | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
