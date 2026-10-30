@@ -68,6 +68,14 @@ Related, outside this folder:
 | Prototype: server, `KSA` service, tests, docs, release scripts | Merged in PR #1190, released as `ksa-v0.1.0` |
 | Server window ([server.md](server.md)) | Built and checked in game, not yet in a PR |
 | Manual rotation and translation inputs ([api-coverage.md](api-coverage.md)) | Built and tested in game, not yet in a PR |
+| API phase 1, existing classes ([api-coverage.md](api-coverage.md)) | Built and tested in game, not yet in a PR |
+| Object store sweep ([api-coverage.md](api-coverage.md)) | Built and tested in game, not yet in a PR |
+| API phase 2, propulsion and fuel ([api-coverage.md](api-coverage.md)) | Built and tested in game, not yet in a PR |
+| API phase 3, power, lights and deployables ([api-coverage.md](api-coverage.md)) | Built and tested in game, not yet in a PR |
+| API phase 4, crew and EVA ([api-coverage.md](api-coverage.md)) | Built and tested in game, not yet in a PR |
+| API phase 5, camera, screenshots, debug and vehicle designs ([api-coverage.md](api-coverage.md)) | Built and tested in game, not yet in a PR |
+| API phase 6, drawing ([api-coverage.md](api-coverage.md)) | Built and tested in game, not yet in a PR |
+| API phase 7, UI ([api-coverage.md](api-coverage.md)) | Built and tested in game, not yet in a PR |
 | Unary gRPC server ([grpc.md](grpc.md)) | Built and tested in game on Linux, not yet in a PR |
 | Archive layout for Borea ([borea.md](borea.md)) | Built, not yet in a PR. Untested in a Borea instance |
 

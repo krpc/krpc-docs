@@ -84,6 +84,7 @@ on.
 | Class `C` | `message C { uint64 id = 1; }`; id 0 is null |
 | Enumeration `E`, value `V` | `enum E` with `E_V` at kRPC's number; `E_UNSPECIFIED = 0` if no value is 0 |
 | Tuple | `message Tuple_<types>`, item `i` as field `i + 1` |
+| Structure `T` | `message T`, field `i` as field `i + 1` in snake case; another service's from its own `.proto` |
 | List, set | `repeated` |
 | Dictionary | `map`, with a scalar key |
 | Nullable scalar, or scalar parameter with a default | `optional`; an absent argument takes its default |
@@ -102,8 +103,9 @@ Object ids come from the same object store as the kRPC protocol, so a gRPC clien
 see the same id for a vehicle.
 
 Both the generator and the server leave out types with no typed form: nested containers,
-structures, nullable scalars inside a container, and classes of another service. The KSA service
-uses none of them.
+nullable scalars or structures inside a container, and classes of another service. The KSA service
+uses none of them. Its drawing colors are `StdLib.ColorRGB`, so `KSA.proto` imports `StdLib.proto`,
+which the build also generates.
 
 ## Sessions and Threading
 
