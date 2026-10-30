@@ -37,8 +37,8 @@ writes changes back to it.
 
 * **The mod reads it from its own folder**, via the assembly location, so it is instance-safe for
   Borea ([borea.md](borea.md)).
-* **The release ships `settings.toml`.** A reinstall restoring working defaults is acceptable in an
-  alpha.
+* **The release ships `settings.toml`.** An update or reinstall restores the defaults. Before 1.0
+  this is deliberate, so a change to the settings format needs no migration.
 * **Server keys are unprefixed** (`address`, `rpc_port`, `port`), as the 0.7.0
   `Configuration.Server.Create` reads them. `port` is a device name for serial IO and a number for
   gRPC, so the edit form drops it on a switch between the two.

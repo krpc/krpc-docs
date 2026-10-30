@@ -52,9 +52,9 @@ grpc-dotnet runs on Kestrel and the `Microsoft.AspNetCore.App` shared framework.
    in the mod's `grpc/win-x64/` and `grpc/linux-x64/`, beside `KRPC.KSA.Grpc.dll` in `grpc/`.
  * The pack assemblies are ReadyToRun images stamped with one OS, and a Windows image throws
    `BadImageFormatException` on Linux. The mod carries both packs, about 28 MB each, and loads the
-   one for the platform it runs on. Borea installs one folder for every platform, so per-platform
-   archives are not an option yet. The Borea format discussion is
-   [content-manager-design#75](https://github.com/KSAModding/content-manager-design/discussions/75).
+   one for the platform it runs on. This is the packaging for releases. Borea supports one archive
+   for every platform with runtime selection, and defers per-platform downloads
+   ([content-manager-design#75](https://github.com/KSAModding/content-manager-design/discussions/75)).
  * The game loads its own copies of the `Microsoft.Extensions` assemblies that ASP.NET Core also
    uses. Sharing them fails with a `MissingMethodException`. `Addon` therefore loads the `grpc/`
    folders into their own `AssemblyLoadContext`. That context resolves the folder's assemblies
@@ -149,8 +149,8 @@ This list is the public seam `core` would need for a gRPC server outside it:
  * **No server reflection or gRPC-web.** `grpcurl` needs the `.proto` passed with `-proto`.
  * **Release size.** The release archive would carry the 55 MB `grpc/` folder, 25 MB zipped.
    `release.sh` is unchanged.
- * **Tested on Linux only.** `build.bat` does not fetch the runtime packs or build the gRPC
-   assembly, and there has been no Windows run.
+ * **Tested on Linux only.** `build.bat` fetches the runtime packs and builds the gRPC assembly,
+   but has not been run on Windows.
  * The gRPC server's `Protocol` value is outside the server core's enumeration, because the core
    has no gRPC protocol.
 

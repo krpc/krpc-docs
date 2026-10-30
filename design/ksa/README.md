@@ -2,7 +2,7 @@
 
 **Status:** in progress. The prototype, under `experimental/ksa/`, merged as
 [PR #1190](https://github.com/krpc/krpc/pull/1190) and released as `ksa-v0.1.0` against the kRPC
-0.7.0 release. The server window, manual controls and gRPC server are built, not yet in a PR.
+0.7.0 release. The server window, manual controls, gRPC server and Borea archive layout are built, not yet in a PR.
 
 kRPC for Kitten Space Agency (KSA) shares the protocol, `core`, the clients and the tools with kRPC
 for KSP. The repo, its build, CI, releases and docs all assume KSP is the only game. These docs plan
@@ -49,7 +49,7 @@ Related, outside this folder:
 
 | Question | Decision |
 | --- | --- |
-| Name | kRPC for KSA, mod id `kRPC.KSA` |
+| Name | kRPC for KSA. Mod id and folder `kRPC` from 0.2.0 (`kRPC.KSA` in 0.1.0), assemblies `KRPC.KSA.*` |
 | Service | A `KSA` service in KSA's terms, not a `SpaceCenter` subset ([api-coverage.md](api-coverage.md)) |
 | `core` | The latest kRPC release (0.7.0 now), until phase 1 builds against HEAD |
 | gRPC | An in-process server beside the kRPC protocol, never a replacement ([grpc.md](grpc.md)) |
@@ -69,7 +69,7 @@ Related, outside this folder:
 | Server window ([server.md](server.md)) | Built and checked in game, not yet in a PR |
 | Manual rotation and translation inputs ([api-coverage.md](api-coverage.md)) | Built and tested in game, not yet in a PR |
 | Unary gRPC server ([grpc.md](grpc.md)) | Built and tested in game on Linux, not yet in a PR |
-| Archive layout for Borea ([borea.md](borea.md)) | Not started, for `ksa-v0.2.0` |
+| Archive layout for Borea ([borea.md](borea.md)) | Built, not yet in a PR. Untested in a Borea instance |
 
 ## Phases
 
