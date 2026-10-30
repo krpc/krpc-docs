@@ -1,6 +1,15 @@
 # Relicense kRPC to MIT
 
-**Status:** proposal (2026-10-30). Target: 0.8.
+**Status:** negative result (2026-10-30). kRPC stays LGPL with GPL parts: a full move gains
+little for the effort. Instead:
+
+- The C++ and C-nano clients, and the Arduino library, move to MIT. Nobody else holds code
+  there beyond trivial lines.
+- The InfernalRobotics service becomes GPLv3, because of its copied `IRWrapper.cs`.
+- The kOS, MechJeb2 and HyperEdit code in SpaceCenter and Debug gets attribution.
+- The LICENSE explains why each part has its license.
+
+The audit below is kept for reference.
 
 kRPC moves from LGPLv3, with GPLv3 parts, to MIT. MIT is the most open of the common licenses, and
 is the usual choice in the KSP and KSA communities. It keeps the one condition that matters here:
