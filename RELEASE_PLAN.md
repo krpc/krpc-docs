@@ -223,6 +223,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | CI lite and merge queue | [build-tools/ci-lite-merge-queue.md](design/build-tools/ci-lite-merge-queue.md) |
 | CI remote cache | [build-tools/ci-remote-cache.md](design/build-tools/ci-remote-cache.md) |
 | Constructor calls ([#898](https://github.com/krpc/krpc/issues/898)), closed: static class methods cover it | [protocol/inheritance.md](design/protocol/inheritance.md#constructors) |
+| Streams and events of a function with parameters, the arguments fixed when added: wrap it in a function with no parameters that calls it with constants. Doing that in the clients was also rejected: no constant node for collections, tuples or structs, and the server keeps every constant for the life of the connection | [server-side-functions/server-side-functions.md](design/server-side-functions/server-side-functions.md#function-arguments) |
 
 ## Updating GitHub
 
