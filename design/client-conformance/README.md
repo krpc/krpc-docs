@@ -21,6 +21,7 @@ client testing standard (`client-testing.md`) and the client API parity audit
 | [test-service.md](test-service.md) | `TestService` as it stands, the changes, and the new `ConformanceService` |
 | [client-tests.md](client-tests.md) | What stays in each client's own suite, and what the suite replaces |
 | [defects.md](defects.md) | Open client defects from the audits, each with the requirement that catches it |
+| [open-items.md](open-items.md) | Client, spec and docs items found while the client guides were rewritten |
 
 Generating the exception mapping and the service list is a separate piece of work that lands
 first: [client-codegen.md](../client-codegen.md). Its G1, G3 and G5 merged in
