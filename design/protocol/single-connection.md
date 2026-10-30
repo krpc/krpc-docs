@@ -16,6 +16,7 @@ Related: [protocol-compatibility.md](../protocol-compatibility.md) (the 1.0 addi
 [improvements.md](improvements.md) ([#906](https://github.com/krpc/krpc/issues/906)),
 [local-transports.md](local-transports.md),
 [client-disconnect-cleanup.md](client-disconnect-cleanup.md).
+Open review findings: [single-connection-review.md](single-connection-review.md).
 
 ## Problem
 
