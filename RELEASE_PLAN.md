@@ -135,9 +135,10 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 
 ### Fixes and smaller items
 
-Everything but the `RemoveStream` change, the Ctrl-C fix, the testee stubs and the connection binding audit can ship in a 0.7.x release if 0.8 is far off. The
-`RemoveStream` change breaks the `KRPC` service, the Ctrl-C fix depends on the single connection, and the testee
-stubs and the audit depend on the conformance suite.
+Everything but the `RemoveStream` change, the Ctrl-C fix, the testee stubs, the connection binding audit and the
+stream ending docs can ship in a 0.7.x release if 0.8 is far off. The `RemoveStream` change breaks the `KRPC`
+service, the Ctrl-C fix depends on the single connection, and the testee stubs, the audit and the ending docs depend
+on the conformance suite.
 
 | | Item | GitHub | Labels | Design doc |
 | --- | --- | --- | --- | --- |
@@ -151,6 +152,7 @@ stubs and the audit depend on the conformance suite.
 | ⬜ | Python: Ctrl-C during a call on Windows, with the single connection | **To file**: [python-ctrl-c-windows.md](issues/python-ctrl-c-windows.md) | bug, client:python | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | ⬜ | Python: trim client frames from server error tracebacks | **To file**: [python-traceback-trim.md](issues/python-traceback-trim.md) | enhancement, client:python | — |
 | ⬜ | Conformance testee stubs from the full TestServer definitions, with `TestService2` | **To file**: [test-service-full-definitions.md](issues/test-service-full-definitions.md) | enhancement, tools | [client-conformance/harness.md](design/client-conformance/harness.md) |
+| ⬜ | Client guides: how streams and events end | **To file**: [stream-and-event-ending-docs.md](issues/stream-and-event-ending-docs.md) | docs, client | — |
 | ⬜ | Run clang-format and clang-tidy over every C and C++ source | [#1177](https://github.com/krpc/krpc/issues/1177) | enhancement, client:cpp, client:cnano | — |
 | ⬜ | Audit how each client binds static methods and streams to a connection | [#1195](https://github.com/krpc/krpc/issues/1195) | enhancement, client:python, client:cpp, client:lua, client:csharp, client:java, client:cnano | [client-conformance/defects.md](design/client-conformance/defects.md) |
 | ⬜ | Documentation crefs use the C# service name | [#1188](https://github.com/krpc/krpc/issues/1188) | bug, server | — |
@@ -207,6 +209,8 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | Vessel state and staging prediction; parts may be covered by the stage API | [#311](https://github.com/krpc/krpc/issues/311) | enhancement, service:space-center | — |
 | ⬜ | Lua: documentation for the dynamically built services | [#1182](https://github.com/krpc/krpc/issues/1182) | enhancement, client:lua | — |
 | ⬜ | Lua: pre-generated service stubs, LuaCATS annotations first | [#1201](https://github.com/krpc/krpc/issues/1201) | enhancement, client:lua | — |
+| ⬜ | C#: target .NET Standard 2.0 and modern .NET, as well as .NET Framework 4.7.2 | **To file**: [csharp-client-target-framework.md](issues/csharp-client-target-framework.md) | enhancement, client:csharp | — |
+| ⬜ | Java: publish the client to Maven Central | **To file**: [java-client-maven-central.md](issues/java-client-maven-central.md) | enhancement, tools, client:java | — |
 
 ### Fixes, tests and tooling
 
@@ -218,8 +222,13 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | 🚧 | Autopilot test-plan gaps | **To file**: [autopilot-test-gaps.md](issues/autopilot-test-gaps.md) | tools, service:space-center | [autopilot/test-plan.md](design/autopilot/test-plan.md) |
 | 🚧 | Mod compatibility tests | **To file**: [mod-compat-tests.md](issues/mod-compat-tests.md) | tools, mod-compatibility | [services/mod-compat-test-coverage.md](design/services/mod-compat-test-coverage.md), [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ⬜ | NUnit 5 | **To file**: [nunit-5-migration.md](issues/nunit-5-migration.md) | enhancement, tools | [build-tools/nunit-5-migration.md](design/build-tools/nunit-5-migration.md) |
+| ⬜ | Race points for the C# and Python clients, for the conformance `races` profile | **To file**: [conformance-forced-races.md](issues/conformance-forced-races.md) | enhancement, tools, client:csharp, client:python | [client-conformance/harness.md](design/client-conformance/harness.md) |
 | ⬜ | Lua API docs on sphinx-lua-ls, when luadomain breaks on a Sphinx bump | [#1202](https://github.com/krpc/krpc/issues/1202) | enhancement, docs, client:lua | — |
 | ⬜ | luasocket release pin, blocked upstream | [#1203](https://github.com/krpc/krpc/issues/1203) | bug, client:lua | [build-tools/lua-socket-unix-on-windows.md](design/build-tools/lua-socket-unix-on-windows.md) |
+| ⬜ | Generate the client API references from the client sources | **To file**: [client-api-reference-autodoc.md](issues/client-api-reference-autodoc.md) | docs, tools, client | — |
+| ⬜ | Client spec: one callback thread per connection | **To file**: [spec-callback-thread-per-connection.md](issues/spec-callback-thread-per-connection.md) | enhancement, client | [client-conformance/spec.md](design/client-conformance/spec.md) |
+| ⬜ | Lua: `platform.sleep` busy-waits, to whole seconds | **To file**: [lua-platform-sleep.md](issues/lua-platform-sleep.md) | bug, client:lua | — |
+| ⬜ | Lua 5.1: `math.huge` stands for the largest integer, so 2^63 - 1 reads as infinity | **To file**: [lua-51-math-huge.md](issues/lua-51-math-huge.md) | bug, client:lua | — |
 
 ### Negative results
 
