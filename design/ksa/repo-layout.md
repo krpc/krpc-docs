@@ -1,6 +1,6 @@
 # Repository layout
 
-**Status:** proposal, 2026-10-26. Part of [KSA as a first-class game](README.md).
+**Status:** proposal, 2026-10-26. Part of [kRPC for KSA](README.md).
 
 ## One repo
 
@@ -37,6 +37,7 @@ ksp/
 ksa/
   server/      StarMap entry point (was experimental/ksa/server/)
   service/     KSA service
+  grpc/        gRPC server and .proto generator
   testing/     TestingTools service and test vehicles
   test/        in-game tests and the harness backend for KSA
   examples/    client scripts
@@ -59,16 +60,17 @@ into Bazel next to the KSP mod.
 | --- | --- | --- |
 | `KRPC.Core` | the 0.7.0 `krpctools` package | `//core:KRPC.Core.net10` |
 | Game assemblies | `KSA_DIR` | `@ksa`, stub assemblies, as `@ksp` comes from `krpc/ksp-lib` |
-| StarMap API, Harmony | NuGet | NuGet through `rules_dotnet`, like the existing packages |
+| StarMap API, Harmony, grpc-dotnet | NuGet | NuGet through `rules_dotnet`, like the existing packages |
+| ASP.NET Core runtime packs | NuGet download in `build.sh` | `http_archive` pins, one per platform ([grpc.md](grpc.md)) |
 | C# rules | `.csproj` | `csharp_library` from `//tools/build:csharp.bzl`, so the culture analyzers run |
 | KSA version pin | `versions.sh` | `config.bzl`, beside `ksp_version_*` |
 | Targets | `build.sh` | `//ksa:mod`, beside `//ksp:mod` (was `//:krpc`) |
 
 * **`core` keeps building for both runtimes.** It must stay within the net472 API, which the
   net472 build enforces.
-* **`core` fixes found on KSA land in `core`.** The disconnect `NullReferenceException`
-  ([#1189](https://github.com/krpc/krpc/issues/1189)) is worked around with a Harmony finalizer in
-  the prototype. Once KSA builds against HEAD, the fix goes in `core` and the finalizer goes.
+* **`core` fixes found on KSA land in `core`.** Once KSA builds against HEAD, each workaround in
+  [server.md](server.md) is replaced by its fix in `core`, such as the disconnect
+  `NullReferenceException` ([#1189](https://github.com/krpc/krpc/issues/1189)).
 * **`kRPC.sln` holds both games.** `//:csproj` stages the generated sources and stub assemblies for
   each.
 * **KSA is pre-alpha**, so the `@ksa` pin moves often. Each bump is one commit to `MODULE.bazel`

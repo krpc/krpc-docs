@@ -1,6 +1,6 @@
 # CI
 
-**Status:** proposal, 2026-10-26. Part of [KSA as a first-class game](README.md).
+**Status:** proposal, 2026-10-26. Part of [kRPC for KSA](README.md).
 
 ## What CI checks for KSP today
 

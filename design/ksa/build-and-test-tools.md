@@ -1,6 +1,6 @@
 # Build and test tools
 
-**Status:** proposal, 2026-10-26. Part of [KSA as a first-class game](README.md).
+**Status:** proposal, 2026-10-26. Part of [kRPC for KSA](README.md).
 
 Most tools are already game-agnostic. The in-game test harness and the service lists are the two
 that assume KSP.
@@ -13,6 +13,7 @@ that assume KSP.
 | `krpc-servicedefs` | Copies the KSP assemblies | Takes the game's reference directory |
 | `tools/krpctools/services.bzl` | One list, KSP services included | A shared list plus one list per game |
 | clientgen, docgen | none | none |
+| `experimental/ksa/grpc/protogen.py` | KSA | A Bazel target writing the `.proto` from the service definitions |
 | `TestServer`, conformance suite | none | none |
 | `experimental/ksa/*.sh`, `*.bat` | KSA | Replaced by Bazel targets and the release scripts |
 

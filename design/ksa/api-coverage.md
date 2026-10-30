@@ -1,13 +1,27 @@
 # KSA API coverage
 
-**Status:** proposal, 2026-10-26. Part of [KSA as a first-class game](README.md). Audited against
-KSA build 2026.10.19.5638 and the `KSA` service in PR #1190 plus its manual control inputs.
+**Status:** in progress. Part of [kRPC for KSA](README.md). The service merged in PR #1190. The
+manual control inputs are built and tested in game, not yet in a PR. Audited against KSA build
+2026.10.19.5638.
 
 The `KSA` service covers flight basics. KSP's `SpaceCenter`, `Drawing` and `UI` services go much
 further. This doc lists the gaps that KSA can fill today, and orders them into phases.
 
-The service keeps two rules from PR #1190. Members use KSA terms (`Vehicle`, `Body`, `Sequence`),
-not KSP names. A member with no game counterpart is dropped, never approximated.
+## Service Rules
+
+* **One `KSA` service, in KSA's terms** (`Vehicle`, `Body`, `Sequence`, KSA's eight `Situation`
+  values), not KSP names.
+* **A member with no game counterpart is dropped**, never approximated.
+* **`TestingTools`** is a second service, for the in-game tests only.
+
+The original proposal was a strict subset of `SpaceCenter`, with kRPC's signatures, so KSP scripts
+would run unchanged. It was dropped on the prototype's findings:
+
+* Much of KSP's API has no exact KSA meaning. Rotation inputs are on/off keys, and `MET` and
+  `Vessel.Thrust` have no counterpart.
+* Stubs of the same name would collide with KSP's `SpaceCenter` stubs in the static clients.
+* C-nano calls by procedure id, numbered in scan order, so a subset gets different ids from KSP's
+  until [procedure-ids.md](../protocol/procedure-ids.md) lands.
 
 ## Method
 
@@ -50,7 +64,7 @@ not KSP names. A member with no game counterpart is dropped, never approximated.
 | Editor | Yes | `VehicleEditor.LoadVehicle`, `Build` | `LaunchVehicle` only | 5 |
 | Drawing | Yes | `GizmosRenderer`, ImGui draw lists | None | 6 |
 | UI | Yes | ImGui windows (as in the server window) | None | 7 |
-| Manual controls | Yes | `ManualControlInputs` | On/off axes, `Pulse` | Done |
+| Manual controls | Yes | `ManualControlInputs`, `FlightComputer.ManualThrustMode` | `Pitch`, `Yaw`, `Roll`, `Forward`, `Right`, `Up` as -1, 0 or 1, and `Pulse` | Done, not yet in a PR |
 | Auto-pilot | Yes | `FlightComputer` | `AutoPilot` | Done |
 
 ### Absent in KSA

@@ -1,6 +1,6 @@
 # Releases and versioning
 
-**Status:** proposal, 2026-10-26. Part of [KSA as a first-class game](README.md).
+**Status:** proposal, 2026-10-26. Part of [kRPC for KSA](README.md).
 
 ## Problem
 
@@ -43,6 +43,7 @@ build their services when they connect, and need no stubs.
 | `KRPC`, `StdLib` | every client | part of the protocol |
 | KSP services | the client packages, as now | KSP changes rarely, so client releases for KSP are rare. Users keep one package |
 | `KSA` | the KSA release archive, as the prototype does | KSA is pre-alpha. Bundling would tie client releases on every channel to KSA's pace |
+| `KSA.proto` for gRPC | the KSA release archive, beside the stubs | Generated from the same service definitions ([grpc.md](grpc.md)) |
 
 * **A new KSA API reaches C#, C++, C-nano and Java users** the day the KSA mod ships.
 * **KSA stubs can fold into the client packages** once the KSA API settles.

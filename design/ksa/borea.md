@@ -1,6 +1,6 @@
 # Listing on Borea
 
-**Status:** proposal, 2026-10-26. Part of [KSA as a first-class game](README.md). Target: the
+**Status:** proposal, 2026-10-26. Part of [kRPC for KSA](README.md). Target: the
 `ksa-v0.2.0` release. `ksa-v0.1.0` is not listed.
 
 [Borea](https://github.com/KSAModding/Borea) is the community mod manager for KSA. It installs
@@ -105,7 +105,11 @@ krpc/krpc (RFC 0038). It covers every listing that points at the repo. A marker 
 
 ## Open questions
 
-* **Settings across updates.** `settings.toml` lives in the mod folder. Check whether a Borea update
-  replaces the folder and loses the user's edits. If so, keep the defaults in code and ship no
-  `settings.toml`, or name it in `[install] manages`.
+* **Settings across updates.** `settings.toml` lives in the mod folder, and the server window
+  writes the user's edits to it ([server.md](server.md)). The release keeps shipping it, so a
+  reinstall restores working defaults. Check whether a Borea update replaces the folder. If so,
+  a routine update also loses the edits, and `[install] manages` may be the fix.
+* **gRPC packaging.** The gRPC server needs a 28 MB ASP.NET Core runtime pack per platform, and
+  Borea installs one folder for every platform ([grpc.md](grpc.md)). Shipping both packs, or an
+  optional gRPC download, is open.
 * **SpaceDock.** Whether to upload there too, and which host is the authority.
