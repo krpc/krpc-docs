@@ -78,7 +78,7 @@ One PR.
 | `core` | `ServiceSignature` computes the id from the name, sharing the hash with `TypeUtils.GetServiceId`; the scanner reports collisions and 0 |
 | `core` tests | Pin a few known ids, e.g. `KRPC.GetStatus` is `2007570979`, so a change to the hash fails a test |
 | `tools/krpctools` | Regenerate the C-nano clientgen goldens |
-| `doc/src/communication-protocols/messages.rst` | State the id rule, and drop "the identifiers may change between server versions" |
+| `doc/src/communication-protocols/messages.rst` | Under Anatomy of a Request, state the id rule, and drop the sentence "They can change between server versions." that follows the integer identifiers' size advantage |
 | Changelogs | Server and C-nano: procedure ids are stable across releases that add procedures |
 | [Protocol version 2](protocol-version.md) | Listed in its change column |
 
