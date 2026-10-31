@@ -163,7 +163,7 @@ The labels of each group share a color.
 | --- | --- | --- | --- |
 | Kind | `bug`, `feature`, `question`, `dependencies` | Exactly one | One mid-strength hue each, `dependencies` grey |
 | Component | `server`, `protocol`, `service`, `client`, `tools`, `build`, `docs` | `server` covers `core` and each mod's server plugin. `client` covers any client change | One pale green |
-| Game | `ksp`, `ksa` | The game a change is specific to. A `core` change takes both. Client and tool changes take neither | Kerbal green and kitten ginger, white text |
+| Game | `ksp`, `ksa` | The game a change is specific to. `core`, client and tool changes take neither | Kerbal green and kitten ginger, white text |
 | Language | `python`, `cpp`, `cnano`, `csharp`, `java`, `lua` | The client a change is specific to, with `client` | A pale tint of the language's GitHub color |
 | Mods | `mod-compatibility` | Added to the kind for a change that concerns another mod | Pale teal |
 | Triage | `needs-triage` | Set on new issues by the issue templates, removed once triaged | Dark red |
