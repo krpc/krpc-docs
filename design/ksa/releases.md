@@ -161,18 +161,21 @@ The labels of each group share a color.
 
 | Group | Labels | Rule | Color |
 | --- | --- | --- | --- |
-| Kind | `bug`, `feature`, `question`, `dependencies` | Exactly one | One mid-strength hue each, `dependencies` grey |
+| Kind | `bug`, `feature`, `enhancement`, `question` | Exactly one. `feature` is a new capability. `enhancement` improves what exists, and covers dependency updates, refactoring, cleanup and maintenance | One mid-strength hue each |
 | Component | `server`, `protocol`, `service`, `client`, `tools`, `build`, `docs` | `server` covers `core` and each mod's server plugin. `client` covers any client change | One pale green |
 | Game | `ksp`, `ksa` | The game a change is specific to. `core`, client and tool changes take neither | Kerbal green and kitten ginger, white text |
 | Language | `python`, `cpp`, `cnano`, `csharp`, `java`, `lua` | The client a change is specific to, with `client` | A pale tint of the language's GitHub color |
 | Mods | `mod-compatibility` | Added to the kind for a change that concerns another mod | Pale teal |
+| Dependencies | `dependencies` | Added to the kind for a dependency update. Dependabot sets it | Grey |
 | Triage | `needs-triage` | Set on new issues by the issue templates, removed once triaged | Dark red |
 
 * **`client` and `build` are kept** beyond the base set. Every client change needs a component, and
   CI and build rules carry no milestone, so need a label apart from `tools`.
-* **`dependencies` is kept** because Dependabot applies it.
+* **`enhancement` is a kind of its own**, added back on 2026-10-31. Labeling an improvement, a
+  dependency update or a cleanup `feature` misleads, and leaving it without a kind hides it.
+* **`dependencies` is kept** because Dependabot applies it. It goes with `enhancement`.
 * **`mod-compatibility` goes with the kind**, marking a change that depends on another mod's work.
-* **No `tests` kind.** A test change takes `feature`, or `bug` for a broken test. It can be added
+* **No `tests` kind.** A test change takes `enhancement`, or `bug` for a broken test. It can be added
   later if test work needs filtering.
 * **Per-service labels are dropped.** `ksp` with `service` covers SpaceCenter, and
   `mod-compatibility` covers the mod services.
@@ -184,7 +187,7 @@ the merges relabeled them.
 
 | Existing | New | How | State |
 | --- | --- | --- | --- |
-| `enhancement` | `feature` | rename | done |
+| `enhancement` | `feature` | rename, then `enhancement` added back as its own kind | done |
 | `client:python`, `client:cpp`, `client:cnano`, `client:csharp`, `client:java`, `client:lua` | `python`, `cpp`, `cnano`, `csharp`, `java`, `lua` | rename | done |
 | `build-scripts` | `build` | rename | done |
 | `server:api`, `server:ui` | `server` | merge | done |
@@ -195,8 +198,8 @@ the merges relabeled them.
   issue was a KSP one.
 * **The renamed language labels lack `client`.** Issues carrying one still need `client` added.
 * **References:** the pull request rule in the `krpc` `CLAUDE.md` and the labels column of
-  [RELEASE_PLAN.md](../../RELEASE_PLAN.md) are updated. The feature request issue template still
-  sets `enhancement`.
+  [RELEASE_PLAN.md](../../RELEASE_PLAN.md) are updated. The feature request issue template sets
+  `feature`.
 
 ## Changelogs
 

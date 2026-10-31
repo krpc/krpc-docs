@@ -94,7 +94,7 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 | ✅ | Client thread safety: define and document what is thread-safe | [#427](https://github.com/krpc/krpc/issues/427), fixed by #1225 | feature, docs | — |
 | ⬜ | C-nano: every transport compiled in, chosen at run time, so vcpkg ships them all | [#1176](https://github.com/krpc/krpc/issues/1176) | feature, client, cnano | — |
 | ⬜ | Streams of calls and server side functions that return no value, run for their side effects | [#1198](https://github.com/krpc/krpc/issues/1198) | feature, server, protocol, client | — |
-| ⬜ | `GetStatus` returns a kRPC struct in place of the `KRPC.Status` protobuf message | [#1197](https://github.com/krpc/krpc/issues/1197) | feature, server, protocol, client | — |
+| ⬜ | `GetStatus` returns a kRPC struct in place of the `KRPC.Status` protobuf message | [#1197](https://github.com/krpc/krpc/issues/1197), **relabel** | enhancement, server, protocol, client | — |
 | ⬜ | DockingCamera on the public Docking Camera (KURS) release; with the LIDAR deprecation, supersedes #674 | [#1232](https://github.com/krpc/krpc/issues/1232) | feature, mod-compatibility, service, ksp | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ⬜ | Deprecate LIDAR in favor of `SpaceCenter.RaycastDistance`, and raycasts ignore trigger colliders; folds in #1181 | [#1233](https://github.com/krpc/krpc/issues/1233) | feature, mod-compatibility, service, ksp | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 
@@ -149,16 +149,16 @@ connection, and the bundles and the audit depend on the conformance suite.
 | --- | --- | --- | --- | --- |
 | ✅ | Close a WebSockets connection whose frame is too large | #1193 | bug, server | — |
 | ✅ | Codec and clientgen fixes: bytes default arguments in generated code, a C# nullable enum return, a C++ short tuple | #1194 | bug, client, tools, cpp, csharp, lua | [client-conformance/](design/client-conformance/README.md) |
-| ⬜ | `RemoveStream` and `SetStreamRate` take a `Stream` | [#1178](https://github.com/krpc/krpc/issues/1178) | feature, server, protocol, client | — |
+| ⬜ | `RemoveStream` and `SetStreamRate` take a `Stream` | [#1178](https://github.com/krpc/krpc/issues/1178), **relabel** | enhancement, server, protocol, client | — |
 | ⬜ | `KerbalAlarmClock.Alarm.PlaySound` has no effect | [#1179](https://github.com/krpc/krpc/issues/1179) | bug, mod-compatibility, service, ksp | [services/kac-remotetech-tests-and-api.md](design/services/kac-remotetech-tests-and-api.md) |
 | ⬜ | DockingCamera log spam | [#1180](https://github.com/krpc/krpc/issues/1180) | bug, mod-compatibility, service, ksp | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ⬜ | LIDAR docstrings name LaserDist | [#1181](https://github.com/krpc/krpc/issues/1181) | bug, mod-compatibility, service, docs, ksp | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
-| ⬜ | Raise the default receive timeout | **To file**: [recv-timeout-default.md](issues/recv-timeout-default.md) | feature, server | [server/recv-timeout-cliff.md](design/server/recv-timeout-cliff.md) |
+| ⬜ | Raise the default receive timeout | **To file**: [recv-timeout-default.md](issues/recv-timeout-default.md) | enhancement, server | [server/recv-timeout-cliff.md](design/server/recv-timeout-cliff.md) |
 | ⬜ | Python: Ctrl-C during a call on Windows, with the single connection | **To file**: [python-ctrl-c-windows.md](issues/python-ctrl-c-windows.md) | bug, client, python | [protocol/single-connection.md](design/protocol/single-connection.md) |
-| ⬜ | Python: trim client frames from server error tracebacks | **To file**: [python-traceback-trim.md](issues/python-traceback-trim.md) | feature, client, python | — |
+| ⬜ | Python: trim client frames from server error tracebacks | **To file**: [python-traceback-trim.md](issues/python-traceback-trim.md) | enhancement, client, python | — |
 | ⬜ | Publish the bundled TestServer and ServiceDefinitions for every platform, so `krpc-conformance` and `servicedefs` run on Windows | [#1228](https://github.com/krpc/krpc/issues/1228), **add milestone** | feature, tools | — |
-| ⬜ | Run clang-format and clang-tidy over every C and C++ source | [#1177](https://github.com/krpc/krpc/issues/1177) | feature, client, build, cpp, cnano | — |
-| ⬜ | Audit how each client binds static methods and streams to a connection | [#1195](https://github.com/krpc/krpc/issues/1195) | feature, client, python, cpp, cnano, csharp, java, lua | [client-conformance/defects.md](design/client-conformance/defects.md) |
+| ⬜ | Run clang-format and clang-tidy over every C and C++ source | [#1177](https://github.com/krpc/krpc/issues/1177), **relabel** | enhancement, client, build, cpp, cnano | — |
+| ⬜ | Audit how each client binds static methods and streams to a connection | [#1195](https://github.com/krpc/krpc/issues/1195), **relabel** | enhancement, client, python, cpp, cnano, csharp, java, lua | [client-conformance/defects.md](design/client-conformance/defects.md) |
 | ⬜ | Documentation crefs use the C# service name | [#1188](https://github.com/krpc/krpc/issues/1188) | bug, server | — |
 | ⬜ | Client disconnect during a yielding call stops the server on .NET | [#1189](https://github.com/krpc/krpc/issues/1189) | bug, server, ksa | — |
 | ⬜ | Server window does not resize to fit its content | [#1186](https://github.com/krpc/krpc/issues/1186) | bug, server, ksp | — |
@@ -221,18 +221,18 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | --- | --- | --- | --- | --- |
 | ⬜ | Windows CI: C++ local socket test hangs, any release | [#1078](https://github.com/krpc/krpc/issues/1078) | bug, client, cpp | — |
 | ⬜ | Windows CI: Python stream test flake, any release | [#1138](https://github.com/krpc/krpc/issues/1138) | bug, client, python | — |
-| ⬜ | Windows CI: C-nano serial transport tests, over a named pipe | [#1200](https://github.com/krpc/krpc/issues/1200) | feature, client, build, cnano | — |
-| 🚧 | Autopilot test-plan gaps | **To file**: [autopilot-test-gaps.md](issues/autopilot-test-gaps.md) | feature, service, tools, ksp | [autopilot/test-plan.md](design/autopilot/test-plan.md) |
-| 🚧 | Mod compatibility tests | **To file**: [mod-compat-tests.md](issues/mod-compat-tests.md) | feature, mod-compatibility, tools | [services/mod-compat-test-coverage.md](design/services/mod-compat-test-coverage.md), [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
-| ⬜ | NUnit 5 | **To file**: [nunit-5-migration.md](issues/nunit-5-migration.md) | feature, tools | [build-tools/nunit-5-migration.md](design/build-tools/nunit-5-migration.md) |
-| ⬜ | Race points for the C# and Python clients, for the conformance `races` profile | **To file**: [conformance-forced-races.md](issues/conformance-forced-races.md) | feature, client, tools, python, csharp | [client-conformance/harness.md](design/client-conformance/harness.md) |
-| ⬜ | Conformance: wait for the serial link instead of a fixed second | **To file**: [conformance-serial-settle-time.md](issues/conformance-serial-settle-time.md) | feature, tools | [client-conformance/harness.md](design/client-conformance/harness.md) |
-| ⬜ | Conformance: wake waits on the testee's notifications | **To file**: [conformance-wait-until-polls.md](issues/conformance-wait-until-polls.md) | feature, tools | [client-conformance/harness.md](design/client-conformance/harness.md) |
-| ⬜ | Conformance: a race point for a value queued during a first call | **To file**: [conformance-queued-value-race-point.md](issues/conformance-queued-value-race-point.md) | feature, tools | [client-conformance/harness.md](design/client-conformance/harness.md) |
-| ⬜ | Conformance: a driver helper for a callback that runs a command on itself | **To file**: [conformance-self-removing-callback.md](issues/conformance-self-removing-callback.md) | feature, tools | [client-conformance/harness.md](design/client-conformance/harness.md) |
-| ⬜ | Lua API docs on sphinx-lua-ls, when luadomain breaks on a Sphinx bump | [#1202](https://github.com/krpc/krpc/issues/1202) | feature, client, docs, lua | — |
+| ⬜ | Windows CI: C-nano serial transport tests, over a named pipe | [#1200](https://github.com/krpc/krpc/issues/1200), **relabel** | enhancement, client, build, cnano | — |
+| 🚧 | Autopilot test-plan gaps | **To file**: [autopilot-test-gaps.md](issues/autopilot-test-gaps.md) | enhancement, service, tools, ksp | [autopilot/test-plan.md](design/autopilot/test-plan.md) |
+| 🚧 | Mod compatibility tests | **To file**: [mod-compat-tests.md](issues/mod-compat-tests.md) | enhancement, mod-compatibility, tools | [services/mod-compat-test-coverage.md](design/services/mod-compat-test-coverage.md), [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
+| ⬜ | NUnit 5 | **To file**: [nunit-5-migration.md](issues/nunit-5-migration.md) | enhancement, tools | [build-tools/nunit-5-migration.md](design/build-tools/nunit-5-migration.md) |
+| ⬜ | Race points for the C# and Python clients, for the conformance `races` profile | **To file**: [conformance-forced-races.md](issues/conformance-forced-races.md) | enhancement, client, tools, python, csharp | [client-conformance/harness.md](design/client-conformance/harness.md) |
+| ⬜ | Conformance: wait for the serial link instead of a fixed second | **To file**: [conformance-serial-settle-time.md](issues/conformance-serial-settle-time.md) | enhancement, tools | [client-conformance/harness.md](design/client-conformance/harness.md) |
+| ⬜ | Conformance: wake waits on the testee's notifications | **To file**: [conformance-wait-until-polls.md](issues/conformance-wait-until-polls.md) | enhancement, tools | [client-conformance/harness.md](design/client-conformance/harness.md) |
+| ⬜ | Conformance: a race point for a value queued during a first call | **To file**: [conformance-queued-value-race-point.md](issues/conformance-queued-value-race-point.md) | enhancement, tools | [client-conformance/harness.md](design/client-conformance/harness.md) |
+| ⬜ | Conformance: a driver helper for a callback that runs a command on itself | **To file**: [conformance-self-removing-callback.md](issues/conformance-self-removing-callback.md) | enhancement, tools | [client-conformance/harness.md](design/client-conformance/harness.md) |
+| ⬜ | Lua API docs on sphinx-lua-ls, when luadomain breaks on a Sphinx bump | [#1202](https://github.com/krpc/krpc/issues/1202), **relabel** | enhancement, client, docs, lua | — |
 | ⬜ | luasocket release pin, blocked upstream | [#1203](https://github.com/krpc/krpc/issues/1203) | bug, client, lua | [build-tools/lua-socket-unix-on-windows.md](design/build-tools/lua-socket-unix-on-windows.md) |
-| ⬜ | Generate the client API references from the client sources | **To file**: [client-api-reference-autodoc.md](issues/client-api-reference-autodoc.md) | feature, client, tools, docs | — |
+| ⬜ | Generate the client API references from the client sources | **To file**: [client-api-reference-autodoc.md](issues/client-api-reference-autodoc.md) | enhancement, client, tools, docs | — |
 | ⬜ | Client spec: one callback thread per connection | **To file**: [spec-callback-thread-per-connection.md](issues/spec-callback-thread-per-connection.md) | feature, client | [client-conformance/spec.md](design/client-conformance/spec.md) |
 | ⬜ | Lua: `platform.sleep` busy-waits, to whole seconds | **To file**: [lua-platform-sleep.md](issues/lua-platform-sleep.md) | bug, client, lua | — |
 | ⬜ | Lua 5.1: `math.huge` stands for the largest integer, so 2^63 - 1 reads as infinity | **To file**: [lua-51-math-huge.md](issues/lua-51-math-huge.md) | bug, client, lua | — |
