@@ -156,21 +156,22 @@ One GitHub milestone per train release, named as its tag, e.g. `clients-v1.2.0`,
 
 ### Labels
 
-An issue or pull request takes one kind, at least one component, and the game and language labels
-that apply. The labels of each group share a color.
+An issue or pull request takes one kind, at least one component, and the other labels that apply.
+The labels of each group share a color.
 
 | Group | Labels | Rule | Color |
 | --- | --- | --- | --- |
-| Kind | `bug`, `feature`, `question`, `mod-compatibility`, `dependencies` | Exactly one | One mid-strength hue each, `dependencies` grey |
+| Kind | `bug`, `feature`, `question`, `dependencies` | Exactly one | One mid-strength hue each, `dependencies` grey |
 | Component | `server`, `protocol`, `service`, `client`, `tools`, `build`, `docs` | `server` covers `core` and each mod's server plugin. `client` covers any client change | One pale green |
 | Game | `ksp`, `ksa` | The game a change is specific to. A `core` change takes both. Client and tool changes take neither | Kerbal green and kitten ginger, white text |
 | Language | `python`, `cpp`, `cnano`, `csharp`, `java`, `lua` | The client a change is specific to, with `client` | A pale tint of the language's GitHub color |
+| Mods | `mod-compatibility` | Added to the kind for a change that concerns another mod | Pale teal |
 | Triage | `needs-triage` | Set on new issues by the issue templates, removed once triaged | Dark red |
 
 * **`client` and `build` are kept** beyond the base set. Every client change needs a component, and
   CI and build rules carry no milestone, so need a label apart from `tools`.
 * **`dependencies` is kept** because Dependabot applies it.
-* **`mod-compatibility` is the kind** for a change to a mod service, in place of `feature` or `bug`.
+* **`mod-compatibility` goes with the kind**, marking a change that depends on another mod's work.
 * **No `tests` kind.** A test change takes `feature`, or `bug` for a broken test. It can be added
   later if test work needs filtering.
 * **Per-service labels are dropped.** `ksp` with `service` covers SpaceCenter, and
