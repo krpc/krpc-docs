@@ -1,6 +1,6 @@
 # Releases and versioning
 
-**Status:** proposal, 2026-10-26, revised 2026-10-31 (stub packages and their dependencies, milestones, labels, `core` changelog, CKAN and KSP-AVC, version strings). Part of
+**Status:** proposal, 2026-10-26, revised 2026-10-31 (stub packages and their dependencies, milestones, labels, `core` changelog, CKAN and KSP-AVC, version strings; label migration done apart from the service labels). Part of
 [kRPC for KSA](README.md).
 
 ## Problem
@@ -60,7 +60,7 @@ Package files keep their ecosystem's name: `krpc-1.2.3.tar.gz`, `KRPC.Client.1.2
 | Docs URL paths | `/0.5.4/`, `/0.7.0/` | `/ksp/v1.0.0/`, `/ksa/v0.2.0/`, as [docs-website.md](docs-website.md) plans. Old snapshots stay |
 | KSA release readme and docs (`@VERSION@`) | "kRPC for KSA 0.2.0" | "kRPC for KSA v0.2.0", as the release title |
 | KSA compatibility popup | "kRPC 0.2.0 was built for KSA ..." | "kRPC v0.2.0 ..." |
-| `krpc` `CLAUDE.md` | The changelog header form `## [X.Y.Z]` and milestone `0.6.0` | `## [vX.Y.Z]` and `ksp-v0.8.0` |
+| `krpc` `CLAUDE.md` | The changelog header form `## [X.Y.Z]` | `## [vX.Y.Z]` |
 
 Already consistent: the tags, the GitHub release titles ("kRPC v0.7.0", "kRPC for KSA v0.2.0"), the
 changelog headers, the KSP server window title, the `v<version>-docs` branches, and the CKAN version.
@@ -157,42 +157,45 @@ One GitHub milestone per train release, named as its tag, e.g. `clients-v1.2.0`,
 ### Labels
 
 An issue or pull request takes one kind, at least one component, and the game and language labels
-that apply.
+that apply. The labels of each group share a color.
 
-| Group | Labels | Rule |
-| --- | --- | --- |
-| Game | `ksp`, `ksa` | The game a change is specific to. A `core` change takes both. Client and tool changes take neither |
-| Component | `server`, `protocol`, `service`, `client`, `tools`, `build`, `docs` | `server` covers `core` and each mod's server plugin. `client` is a change across clients |
-| Kind | `feature`, `bug`, `tests`, `question`, `mod-compatibility`, `dependencies` | One per issue or pull request |
-| Language | `python`, `cpp`, `cnano`, `csharp`, `java`, `lua` | The client a change is specific to |
-| Triage | `needs-triage` | Set on new issues by the issue templates, removed once triaged |
+| Group | Labels | Rule | Color |
+| --- | --- | --- | --- |
+| Kind | `bug`, `feature`, `question`, `mod-compatibility`, `dependencies` | Exactly one | One mid-strength hue each, `dependencies` grey |
+| Component | `server`, `protocol`, `service`, `client`, `tools`, `build`, `docs` | `server` covers `core` and each mod's server plugin. `client` covers any client change | One pale green |
+| Game | `ksp`, `ksa` | The game a change is specific to. A `core` change takes both. Client and tool changes take neither | Kerbal green and kitten ginger, white text |
+| Language | `python`, `cpp`, `cnano`, `csharp`, `java`, `lua` | The client a change is specific to, with `client` | A pale tint of the language's GitHub color |
+| Triage | `needs-triage` | Set on new issues by the issue templates, removed once triaged | Dark red |
 
-* **`client` and `build` are kept** beyond the base set. Cross-client changes, such as the
-  conformance suite, need a component, and CI and build rules carry no milestone, so need a label
-  apart from `tools`.
+* **`client` and `build` are kept** beyond the base set. Every client change needs a component, and
+  CI and build rules carry no milestone, so need a label apart from `tools`.
 * **`dependencies` is kept** because Dependabot applies it.
+* **`mod-compatibility` is the kind** for a change to a mod service, in place of `feature` or `bug`.
+* **No `tests` kind.** A test change takes `feature`, or `bug` for a broken test. It can be added
+  later if test work needs filtering.
 * **Per-service labels are dropped.** `ksp` with `service` covers SpaceCenter, and
   `mod-compatibility` covers the mod services.
 
 ### Label migration
 
-A one-to-one rename keeps the label on its issues. A merge relabels them.
+Done on 2026-10-31, apart from the `service:*` labels. Renames kept each label on its issues, and
+the merges relabeled them.
 
-| Existing | New | How |
-| --- | --- | --- |
-| `enhancement` | `feature` | rename |
-| `client:python`, `client:cpp`, `client:cnano`, `client:csharp`, `client:java`, `client:lua` | `python`, `cpp`, `cnano`, `csharp`, `java`, `lua` | rename |
-| `build-scripts` | `build` | rename |
-| `server:api`, `server:ui` | `server` | merge |
-| `service:space-center`, `service:ui`, `service:drawing`, `service:debug` | `service`, `ksp` | merge |
-| `service:infernal-robotics`, `service:kerbal-alarm-clock`, `service:remote-tech` | `service`, `ksp`, `mod-compatibility` | merge |
-| `bug`, `question`, `docs`, `tools`, `protocol`, `server`, `service`, `client`, `mod-compatibility`, `dependencies`, `ksa`, `needs-triage` | unchanged | none |
+| Existing | New | How | State |
+| --- | --- | --- | --- |
+| `enhancement` | `feature` | rename | done |
+| `client:python`, `client:cpp`, `client:cnano`, `client:csharp`, `client:java`, `client:lua` | `python`, `cpp`, `cnano`, `csharp`, `java`, `lua` | rename | done |
+| `build-scripts` | `build` | rename | done |
+| `server:api`, `server:ui` | `server` | merge | done |
+| `service:space-center`, `service:ui`, `service:drawing`, `service:debug` | `service`, `ksp` | merge | open |
+| `service:infernal-robotics`, `service:kerbal-alarm-clock`, `service:remote-tech` | `service`, `ksp`, `mod-compatibility` | merge | open |
 
 * **`ksp` is not added to older issues** apart from the former service labels. Before KSA, every
   issue was a KSP one.
-* **References to update with the migration:** the issue templates (`enhancement`), the pull
-  request labeling rule in the `krpc` `CLAUDE.md`, and the labels column of
-  [RELEASE_PLAN.md](../../RELEASE_PLAN.md).
+* **The renamed language labels lack `client`.** Issues carrying one still need `client` added.
+* **References:** the pull request rule in the `krpc` `CLAUDE.md` and the labels column of
+  [RELEASE_PLAN.md](../../RELEASE_PLAN.md) are updated. The feature request issue template still
+  sets `enhancement`.
 
 ## Changelogs
 
