@@ -213,7 +213,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | Lua: documentation for the dynamically built services | [#1182](https://github.com/krpc/krpc/issues/1182) | enhancement, client:lua | — |
 | ⬜ | Lua: pre-generated service stubs, LuaCATS annotations first | [#1201](https://github.com/krpc/krpc/issues/1201) | enhancement, client:lua | — |
 | ⬜ | C#: target .NET Standard 2.0 and modern .NET, as well as .NET Framework 4.7.2 | [#1230](https://github.com/krpc/krpc/issues/1230) | enhancement, client:csharp | — |
-| ⬜ | Java: publish the client to Maven Central | **To file**: [java-client-maven-central.md](issues/java-client-maven-central.md) | enhancement, tools, client:java | — |
+| ⬜ | Java: publish the client to Maven Central | [#1231](https://github.com/krpc/krpc/issues/1231), **add label tools** | enhancement, tools, client:java | — |
 
 ### Fixes, tests and tooling
 
