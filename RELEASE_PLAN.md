@@ -86,17 +86,17 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 | --- | --- | --- | --- | --- |
 | ✅ | Single connection: RPC and stream connections merged | [#1174](https://github.com/krpc/krpc/issues/1174), fixed by #1219 | feature, protocol | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | ✅ | Protocol version 2, with the single connection | Part of the single connection issue, #1219 | — | [protocol/protocol-version.md](design/protocol/protocol-version.md) |
-| 🚧 | Procedure ids derived from names, with protocol version 2 | [#1196](https://github.com/krpc/krpc/issues/1196) | bug, server, client, cnano | [protocol/procedure-ids.md](design/protocol/procedure-ids.md) |
-| 🚧 | Scanner errors disable only the broken members, listed with warnings in one popup | [#1227](https://github.com/krpc/krpc/issues/1227), **add milestone** | feature, server | [server/service-scanner-errors.md](design/server/service-scanner-errors.md) |
+| 🚧 | Procedure ids derived from names, with protocol version 2 | [#1196](https://github.com/krpc/krpc/issues/1196) | bug, server, client, ksp, ksa, cnano | [protocol/procedure-ids.md](design/protocol/procedure-ids.md) |
+| 🚧 | Scanner errors disable only the broken members, listed with warnings in one popup | [#1227](https://github.com/krpc/krpc/issues/1227), **add milestone** | feature, server, ksp, ksa | [server/service-scanner-errors.md](design/server/service-scanner-errors.md) |
 | ✅ | Request ids (phase 1), on the single connection branch | [#1175](https://github.com/krpc/krpc/issues/1175), fixed by #1219 | feature, protocol | [protocol/request-ids.md](design/protocol/request-ids.md) |
 | ✅ | Client codegen: the exception mapping and the service list, generated | #1172 | feature, client, tools | [client-codegen.md](design/client-codegen.md) |
 | ✅ | Client conformance tests and runtime specification | [#1123](https://github.com/krpc/krpc/issues/1123), fixed by #1220 | feature, client | [client-conformance/](design/client-conformance/README.md) |
 | ✅ | Client thread safety: define and document what is thread-safe | [#427](https://github.com/krpc/krpc/issues/427), fixed by #1225 | feature, docs | — |
 | ⬜ | C-nano: every transport compiled in, chosen at run time, so vcpkg ships them all | [#1176](https://github.com/krpc/krpc/issues/1176) | feature, client, cnano | — |
-| ⬜ | Streams of calls and server side functions that return no value, run for their side effects | [#1198](https://github.com/krpc/krpc/issues/1198) | feature, server, protocol, client | — |
-| ⬜ | `GetStatus` returns a kRPC struct in place of the `KRPC.Status` protobuf message | [#1197](https://github.com/krpc/krpc/issues/1197) | feature, server, protocol, client | — |
-| ⬜ | DockingCamera on the public Docking Camera (KURS) release; with the LIDAR deprecation, supersedes #674 | [#1232](https://github.com/krpc/krpc/issues/1232) | feature, mod-compatibility, service | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
-| ⬜ | Deprecate LIDAR in favor of `SpaceCenter.RaycastDistance`, and raycasts ignore trigger colliders; folds in #1181 | [#1233](https://github.com/krpc/krpc/issues/1233) | feature, mod-compatibility, service | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
+| ⬜ | Streams of calls and server side functions that return no value, run for their side effects | [#1198](https://github.com/krpc/krpc/issues/1198) | feature, server, protocol, client, ksp, ksa | — |
+| ⬜ | `GetStatus` returns a kRPC struct in place of the `KRPC.Status` protobuf message | [#1197](https://github.com/krpc/krpc/issues/1197) | feature, server, protocol, client, ksp, ksa | — |
+| ⬜ | DockingCamera on the public Docking Camera (KURS) release; with the LIDAR deprecation, supersedes #674 | [#1232](https://github.com/krpc/krpc/issues/1232) | feature, mod-compatibility, service, ksp | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
+| ⬜ | Deprecate LIDAR in favor of `SpaceCenter.RaycastDistance`, and raycasts ignore trigger colliders; folds in #1181 | [#1233](https://github.com/krpc/krpc/issues/1233) | feature, mod-compatibility, service, ksp | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 
 * **Single connection first.** It changes connection setup and threading in every client, so the
   conformance suite is written against it rather than rewritten after it.
@@ -149,19 +149,19 @@ connection, and the bundles and the audit depend on the conformance suite.
 | --- | --- | --- | --- | --- |
 | ✅ | Close a WebSockets connection whose frame is too large | #1193 | bug, server | — |
 | ✅ | Codec and clientgen fixes: bytes default arguments in generated code, a C# nullable enum return, a C++ short tuple | #1194 | bug, client, tools, cpp, csharp, lua | [client-conformance/](design/client-conformance/README.md) |
-| ⬜ | `RemoveStream` and `SetStreamRate` take a `Stream` | [#1178](https://github.com/krpc/krpc/issues/1178) | feature, protocol | — |
-| ⬜ | `KerbalAlarmClock.Alarm.PlaySound` has no effect | [#1179](https://github.com/krpc/krpc/issues/1179) | bug, service:kerbal-alarm-clock | [services/kac-remotetech-tests-and-api.md](design/services/kac-remotetech-tests-and-api.md) |
-| ⬜ | DockingCamera log spam | [#1180](https://github.com/krpc/krpc/issues/1180) | bug | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
-| ⬜ | LIDAR docstrings name LaserDist | [#1181](https://github.com/krpc/krpc/issues/1181) | bug, docs | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
+| ⬜ | `RemoveStream` and `SetStreamRate` take a `Stream` | [#1178](https://github.com/krpc/krpc/issues/1178) | feature, server, protocol, client, ksp, ksa | — |
+| ⬜ | `KerbalAlarmClock.Alarm.PlaySound` has no effect | [#1179](https://github.com/krpc/krpc/issues/1179) | bug, mod-compatibility, service, ksp | [services/kac-remotetech-tests-and-api.md](design/services/kac-remotetech-tests-and-api.md) |
+| ⬜ | DockingCamera log spam | [#1180](https://github.com/krpc/krpc/issues/1180) | bug, mod-compatibility, service, ksp | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
+| ⬜ | LIDAR docstrings name LaserDist | [#1181](https://github.com/krpc/krpc/issues/1181) | bug, mod-compatibility, service, docs, ksp | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ⬜ | Raise the default receive timeout | **To file**: [recv-timeout-default.md](issues/recv-timeout-default.md) | feature, server | [server/recv-timeout-cliff.md](design/server/recv-timeout-cliff.md) |
 | ⬜ | Python: Ctrl-C during a call on Windows, with the single connection | **To file**: [python-ctrl-c-windows.md](issues/python-ctrl-c-windows.md) | bug, client, python | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | ⬜ | Python: trim client frames from server error tracebacks | **To file**: [python-traceback-trim.md](issues/python-traceback-trim.md) | feature, client, python | — |
 | ⬜ | Publish the bundled TestServer and ServiceDefinitions for every platform, so `krpc-conformance` and `servicedefs` run on Windows | [#1228](https://github.com/krpc/krpc/issues/1228), **add milestone** | feature, tools | — |
-| ⬜ | Run clang-format and clang-tidy over every C and C++ source | [#1177](https://github.com/krpc/krpc/issues/1177) | feature, client, cpp, cnano | — |
+| ⬜ | Run clang-format and clang-tidy over every C and C++ source | [#1177](https://github.com/krpc/krpc/issues/1177) | feature, client, build, cpp, cnano | — |
 | ⬜ | Audit how each client binds static methods and streams to a connection | [#1195](https://github.com/krpc/krpc/issues/1195) | feature, client, python, cpp, cnano, csharp, java, lua | [client-conformance/defects.md](design/client-conformance/defects.md) |
-| ⬜ | Documentation crefs use the C# service name | [#1188](https://github.com/krpc/krpc/issues/1188) | bug, server | — |
+| ⬜ | Documentation crefs use the C# service name | [#1188](https://github.com/krpc/krpc/issues/1188) | bug, server, ksp, ksa | — |
 | ⬜ | Client disconnect during a yielding call stops the server on .NET | [#1189](https://github.com/krpc/krpc/issues/1189) | bug, server, ksa | — |
-| ⬜ | Server window does not resize to fit its content | [#1186](https://github.com/krpc/krpc/issues/1186) | bug, server | — |
+| ⬜ | Server window does not resize to fit its content | [#1186](https://github.com/krpc/krpc/issues/1186) | bug, server, ksp | — |
 
 ## 1.0: remaining protocol improvements, server side function follow-ups
 
@@ -196,21 +196,21 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | | Feature | GitHub | Labels | Design doc |
 | --- | --- | --- | --- | --- |
 | ⬜ | Per-client receive patience | **To file**: [recv-patience.md](issues/recv-patience.md) | feature, server | [server/recv-timeout-cliff.md](design/server/recv-timeout-cliff.md) |
-| 🚧 | RemoteTech API bindings and KAC alarm actions | **To file**: [remotetech-kac-api.md](issues/remotetech-kac-api.md) | feature, service:remote-tech, service:kerbal-alarm-clock | [services/kac-remotetech-tests-and-api.md](design/services/kac-remotetech-tests-and-api.md) |
-| ⬜ | InfernalRobotics input linking and sun tracking | **To file**: [infernal-robotics-input-linking.md](issues/infernal-robotics-input-linking.md) | feature, service:infernal-robotics | [services/infernal-robotics-input-linking.md](design/services/infernal-robotics-input-linking.md) |
+| 🚧 | RemoteTech API bindings and KAC alarm actions | **To file**: [remotetech-kac-api.md](issues/remotetech-kac-api.md) | feature, mod-compatibility, service, ksp | [services/kac-remotetech-tests-and-api.md](design/services/kac-remotetech-tests-and-api.md) |
+| ⬜ | InfernalRobotics input linking and sun tracking | **To file**: [infernal-robotics-input-linking.md](issues/infernal-robotics-input-linking.md) | feature, mod-compatibility, service, ksp | [services/infernal-robotics-input-linking.md](design/services/infernal-robotics-input-linking.md) |
 | ⬜ | Autopilot extensions: bank-to-turn, heterogeneous actuators, output filter knobs, sign convention refactor | — | — | [autopilot/bank-to-turn.md](design/autopilot/bank-to-turn.md), [autopilot/heterogeneous-actuators.md](design/autopilot/heterogeneous-actuators.md), [autopilot/output-filter-manual-knobs.md](design/autopilot/output-filter-manual-knobs.md), [autopilot/sign-convention-refactor.md](design/autopilot/sign-convention-refactor.md) |
 | ⬜ | Trajectories service | — | — | [services/trajectories-service.md](design/services/trajectories-service.md) |
 | ⬜ | Nullable set elements and dictionary keys, parked and likely dropped | — | — | [protocol/nullable-keys-and-set-elements.md](design/protocol/nullable-keys-and-set-elements.md) |
 | ⬜ | Python: asyncio conveniences over `submit`, after the single connection | **To file**: [python-asyncio-client.md](issues/python-asyncio-client.md) | feature, client, python | [protocol/request-ids.md](design/protocol/request-ids.md) |
-| ⬜ | Streams and events over serial IO, after the single connection; needs flow control | [#1204](https://github.com/krpc/krpc/issues/1204) | feature, server, client, cnano | [protocol/single-connection.md](design/protocol/single-connection.md) |
+| ⬜ | Streams and events over serial IO, after the single connection; needs flow control | [#1204](https://github.com/krpc/krpc/issues/1204) | feature, server, protocol, client, ksp, ksa, cnano | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | ✅ | More communication protocols; local sockets landed in 0.7, gRPC moved to #1187 | [#899](https://github.com/krpc/krpc/issues/899) | feature, protocol | [protocol/local-transports.md](design/protocol/local-transports.md) |
-| ⬜ | gRPC support, possibly through an external bridge; the game's runtime cannot host it | [#1187](https://github.com/krpc/krpc/issues/1187) | feature, server | [protocol/grpc-support.md](design/protocol/grpc-support.md) |
+| ⬜ | gRPC support, possibly through an external bridge; the game's runtime cannot host it | [#1187](https://github.com/krpc/krpc/issues/1187) | feature, server, protocol | [protocol/grpc-support.md](design/protocol/grpc-support.md) |
 | ⬜ | Inheritance for remote objects; additive, UI and Drawing first, then robotics and #900 modules | [#905](https://github.com/krpc/krpc/issues/905) | feature, protocol | [protocol/inheritance.md](design/protocol/inheritance.md) |
-| 🚧 | Principia support; phase 1 shipped as a docs page, phases 2 and 3 wait on upstream | [#767](https://github.com/krpc/krpc/issues/767) | feature, mod-compatibility, service:space-center | [services/principia-service.md](design/services/principia-service.md) |
-| ⬜ | MechJeb2 and Kerbal Engineer Redux services | [#288](https://github.com/krpc/krpc/issues/288) | feature, mod-compatibility | — |
-| ⬜ | Raster Prop Monitor integration and camera views | [#375](https://github.com/krpc/krpc/issues/375), [#424](https://github.com/krpc/krpc/issues/424) | feature, mod-compatibility | — |
-| ⬜ | Vessel state and staging prediction; parts may be covered by the stage API | [#311](https://github.com/krpc/krpc/issues/311) | feature, service:space-center | — |
-| ⬜ | Lua: documentation for the dynamically built services | [#1182](https://github.com/krpc/krpc/issues/1182) | feature, client, lua | — |
+| 🚧 | Principia support; phase 1 shipped as a docs page, phases 2 and 3 wait on upstream | [#767](https://github.com/krpc/krpc/issues/767) | feature, mod-compatibility, service, ksp | [services/principia-service.md](design/services/principia-service.md) |
+| ⬜ | MechJeb2 and Kerbal Engineer Redux services | [#288](https://github.com/krpc/krpc/issues/288) | feature, mod-compatibility, service, ksp | — |
+| ⬜ | Raster Prop Monitor integration and camera views | [#375](https://github.com/krpc/krpc/issues/375), [#424](https://github.com/krpc/krpc/issues/424) | feature, mod-compatibility, service, ksp | — |
+| ⬜ | Vessel state and staging prediction; parts may be covered by the stage API | [#311](https://github.com/krpc/krpc/issues/311) | feature, service, ksp | — |
+| ⬜ | Lua: documentation for the dynamically built services | [#1182](https://github.com/krpc/krpc/issues/1182) | feature, client, docs, lua | — |
 | ⬜ | Lua: pre-generated service stubs, LuaCATS annotations first | [#1201](https://github.com/krpc/krpc/issues/1201) | feature, client, lua | — |
 | ⬜ | C#: target .NET Standard 2.0 and modern .NET, as well as .NET Framework 4.7.2 | [#1230](https://github.com/krpc/krpc/issues/1230) | feature, client, csharp | — |
 | ⬜ | Java: publish the client to Maven Central | [#1231](https://github.com/krpc/krpc/issues/1231) | feature, client, java | — |
@@ -221,8 +221,8 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | --- | --- | --- | --- | --- |
 | ⬜ | Windows CI: C++ local socket test hangs, any release | [#1078](https://github.com/krpc/krpc/issues/1078) | bug, client, cpp | — |
 | ⬜ | Windows CI: Python stream test flake, any release | [#1138](https://github.com/krpc/krpc/issues/1138) | bug, client, python | — |
-| ⬜ | Windows CI: C-nano serial transport tests, over a named pipe | [#1200](https://github.com/krpc/krpc/issues/1200) | feature, client, tools, cnano | — |
-| 🚧 | Autopilot test-plan gaps | **To file**: [autopilot-test-gaps.md](issues/autopilot-test-gaps.md) | feature, service:space-center, tools | [autopilot/test-plan.md](design/autopilot/test-plan.md) |
+| ⬜ | Windows CI: C-nano serial transport tests, over a named pipe | [#1200](https://github.com/krpc/krpc/issues/1200) | feature, client, build, cnano | — |
+| 🚧 | Autopilot test-plan gaps | **To file**: [autopilot-test-gaps.md](issues/autopilot-test-gaps.md) | feature, service, tools, ksp | [autopilot/test-plan.md](design/autopilot/test-plan.md) |
 | 🚧 | Mod compatibility tests | **To file**: [mod-compat-tests.md](issues/mod-compat-tests.md) | feature, mod-compatibility, tools | [services/mod-compat-test-coverage.md](design/services/mod-compat-test-coverage.md), [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ⬜ | NUnit 5 | **To file**: [nunit-5-migration.md](issues/nunit-5-migration.md) | feature, tools | [build-tools/nunit-5-migration.md](design/build-tools/nunit-5-migration.md) |
 | ⬜ | Race points for the C# and Python clients, for the conformance `races` profile | **To file**: [conformance-forced-races.md](issues/conformance-forced-races.md) | feature, client, tools, python, csharp | [client-conformance/harness.md](design/client-conformance/harness.md) |
