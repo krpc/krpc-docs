@@ -1,8 +1,8 @@
 # Service scanner errors
 
 **Status:** in progress, for 0.8. Core and the KSP server implemented locally (2026-10-31), not yet
-a PR. KSA waits for a kRPC release with the new core API. Issue: to file, draft
-[issues/service-scanner-errors.md](../../issues/service-scanner-errors.md).
+a PR. KSA waits for a kRPC release with the new core API. Issue:
+[#1227](https://github.com/krpc/krpc/issues/1227).
 
 | Part | State |
 | --- | --- |
