@@ -16,7 +16,7 @@ The **GitHub** column says how the issue on GitHub stands against this plan:
 | | Release | Theme | Progress |
 | --- | --- | --- | --- |
 | ✅ | 0.7 | Server-side functions, streams and events, protocol additions, service improvements | Tagged 2026-10-21 |
-| 🚧 | 0.8 | Single connection, client codegen, then client conformance testing and thread safety | 1 of 10 done: client codegen |
+| 🚧 | 0.8 | Single connection, client codegen, then client conformance testing and thread safety | 5 of 10 done: single connection, request ids, client codegen, conformance tests, thread safety docs |
 | ⬜ | 1.0 | Remaining protocol improvements (#906), server side function follow-ups | 0 of 9 done; tick control has a 0.7 stopgap |
 
 ## 0.7: server-side functions, streams and events, service improvements
@@ -84,14 +84,14 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 
 | | Feature | GitHub | Labels | Design doc |
 | --- | --- | --- | --- | --- |
-| ⬜ | Single connection: RPC and stream connections merged | [#1174](https://github.com/krpc/krpc/issues/1174) | enhancement, protocol | [protocol/single-connection.md](design/protocol/single-connection.md) |
-| ⬜ | Protocol version 2, with the single connection | Part of the single connection issue | — | [protocol/protocol-version.md](design/protocol/protocol-version.md) |
-| ⬜ | Procedure ids derived from names, with protocol version 2 | [#1196](https://github.com/krpc/krpc/issues/1196) | bug, server, client:cnano | [protocol/procedure-ids.md](design/protocol/procedure-ids.md) |
-| ⬜ | Scanner errors disable only the broken members, listed with warnings in one popup | **To file**: [draft](issues/service-scanner-errors.md) | enhancement, server | [server/service-scanner-errors.md](design/server/service-scanner-errors.md) |
-| ⬜ | Request ids (phase 1), on the single connection branch | [#1175](https://github.com/krpc/krpc/issues/1175) | enhancement, protocol | [protocol/request-ids.md](design/protocol/request-ids.md) |
+| ✅ | Single connection: RPC and stream connections merged | [#1174](https://github.com/krpc/krpc/issues/1174), fixed by #1219 | enhancement, protocol | [protocol/single-connection.md](design/protocol/single-connection.md) |
+| ✅ | Protocol version 2, with the single connection | Part of the single connection issue, #1219 | — | [protocol/protocol-version.md](design/protocol/protocol-version.md) |
+| 🚧 | Procedure ids derived from names, with protocol version 2 | [#1196](https://github.com/krpc/krpc/issues/1196) | bug, server, client:cnano | [protocol/procedure-ids.md](design/protocol/procedure-ids.md) |
+| 🚧 | Scanner errors disable only the broken members, listed with warnings in one popup | **To file**: [draft](issues/service-scanner-errors.md) | enhancement, server | [server/service-scanner-errors.md](design/server/service-scanner-errors.md) |
+| ✅ | Request ids (phase 1), on the single connection branch | [#1175](https://github.com/krpc/krpc/issues/1175), fixed by #1219 | enhancement, protocol | [protocol/request-ids.md](design/protocol/request-ids.md) |
 | ✅ | Client codegen: the exception mapping and the service list, generated | #1172 | enhancement, client, tools | [client-codegen.md](design/client-codegen.md) |
-| ⬜ | Client conformance tests and runtime specification | [#1123](https://github.com/krpc/krpc/issues/1123) | enhancement, client | [client-conformance/](design/client-conformance/README.md) |
-| ⬜ | Client thread safety: define and document what is thread-safe | [#427](https://github.com/krpc/krpc/issues/427) | docs | — |
+| ✅ | Client conformance tests and runtime specification | [#1123](https://github.com/krpc/krpc/issues/1123), fixed by #1220 | enhancement, client | [client-conformance/](design/client-conformance/README.md) |
+| ✅ | Client thread safety: define and document what is thread-safe | [#427](https://github.com/krpc/krpc/issues/427), fixed by #1225 | docs | — |
 | ⬜ | C-nano: every transport compiled in, chosen at run time, so vcpkg ships them all | [#1176](https://github.com/krpc/krpc/issues/1176) | enhancement, client:cnano | — |
 | ⬜ | Streams of calls and server side functions that return no value, run for their side effects | [#1198](https://github.com/krpc/krpc/issues/1198) | enhancement, protocol, server, client | — |
 | ⬜ | `GetStatus` returns a kRPC struct in place of the `KRPC.Status` protobuf message | [#1197](https://github.com/krpc/krpc/issues/1197) | enhancement, protocol, server, client | — |
@@ -133,6 +133,9 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 | ✅ | Bazel sandbox in CI, in the processwrapper sandbox, and a slimmer build image | #1184 | — |
 | ✅ | Refuse an enumeration default the enumeration does not declare | #1192 | — |
 | ✅ | Compare stream values by their encoding | #1199 | — |
+| ✅ | Client guides restructured, one guide per client; developer documentation brought up to date (fixes #427) | #1225 | — |
+| ✅ | New logo, README refresh, license fixes | #1221 | — |
+| ✅ | Build and CI: Python autodoc timeout, Lua lint in CI, doc serve staging, third-party C++ disk cache, vcpkg cache per runner image | #1208, #1218, #1224, #1226 | — |
 
 ### Fixes and smaller items
 
@@ -159,7 +162,7 @@ depend on the conformance suite.
 | ⬜ | Run clang-format and clang-tidy over every C and C++ source | [#1177](https://github.com/krpc/krpc/issues/1177) | enhancement, client:cpp, client:cnano | — |
 | ⬜ | Audit how each client binds static methods and streams to a connection | [#1195](https://github.com/krpc/krpc/issues/1195) | enhancement, client:python, client:cpp, client:lua, client:csharp, client:java, client:cnano | [client-conformance/defects.md](design/client-conformance/defects.md) |
 | ⬜ | Documentation crefs use the C# service name | [#1188](https://github.com/krpc/krpc/issues/1188) | bug, server | — |
-| ⬜ | Client disconnect during a yielding call stops the server on .NET | [#1189](https://github.com/krpc/krpc/issues/1189) | bug, server | — |
+| ⬜ | Client disconnect during a yielding call stops the server on .NET | [#1189](https://github.com/krpc/krpc/issues/1189) | bug, server, ksa | — |
 | ⬜ | Server window does not resize to fit its content | [#1186](https://github.com/krpc/krpc/issues/1186) | bug, server:ui | — |
 | ⬜ | Routine server messages show in KSA's in-game console: object store sweep, listener exceptions | **To file**: [server-log-levels.md](issues/server-log-levels.md) | bug, server | — |
 
