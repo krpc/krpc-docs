@@ -141,10 +141,9 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 
 ### Fixes and smaller items
 
-Everything but the `RemoveStream` change, the Ctrl-C fix, the testee stubs, the portable tool bundles, the CI time, the connection
-binding audit and the stream ending docs can ship in a 0.7.x release if 0.8 is far off. The `RemoveStream` change breaks the `KRPC`
-service, the Ctrl-C fix depends on the single connection, and the testee stubs, the bundles, the CI time, the audit and the ending docs
-depend on the conformance suite.
+Everything but the `RemoveStream` change, the Ctrl-C fix, the portable tool bundles and the connection binding audit can ship in a
+0.7.x release if 0.8 is far off. The `RemoveStream` change breaks the `KRPC` service, the Ctrl-C fix depends on the single
+connection, and the bundles and the audit depend on the conformance suite.
 
 | | Item | GitHub | Labels | Design doc |
 | --- | --- | --- | --- | --- |
