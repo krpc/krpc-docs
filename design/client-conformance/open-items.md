@@ -177,7 +177,7 @@ Written as fixed, though the client still fails the test:
     program supplies the `krpc_connection_t` and `krpc_connection_config_t` typedefs.
 
 18. **C# target framework.** The guide keeps ".NET Framework 4.7.2 or later", and the package
-    targets net472 only. [csharp-client-target-framework.md](../../issues/csharp-client-target-framework.md)
+    targets net472 only. [#1230](https://github.com/krpc/krpc/issues/1230)
     covers this.
 
 19. **Doc examples run (2026-10-29).** The Python client guide examples ran against KSP, through
