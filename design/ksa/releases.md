@@ -1,6 +1,6 @@
 # Releases and versioning
 
-**Status:** proposal, 2026-10-26, revised 2026-10-31 (stub packages and their dependencies, milestones, labels, `core` changelog). Part of
+**Status:** proposal, 2026-10-26, revised 2026-10-31 (stub packages and their dependencies, milestones, labels, `core` changelog, CKAN and KSP-AVC, version strings). Part of
 [kRPC for KSA](README.md).
 
 ## Problem
@@ -34,6 +34,36 @@ release versions are free to move apart.
   the new version.
 * The docs gain a compatibility table keyed on protocol version: which client, KSP and KSA releases
   speak each one.
+
+## Version strings
+
+**A version people read carries a `v`: `v1.2.3`.** A version in a field whose format is a bare
+number stays bare: `1.2.3`.
+
+| Form | Where |
+| --- | --- |
+| `v1.2.3` | Tags, release titles, milestones, changelog headers, archive and file names we choose, docs URL paths and switcher labels, in-game window titles and messages, the CKAN version |
+| `1.2.3` | `config.bzl` and `tools/krpc-version.sh`, assembly versions, the KSP-AVC `VERSION` fields, the version the server reports to clients, and package versions on PyPI, NuGet, Maven, vcpkg, LuaRocks and Arduino |
+| Not ours | Borea reads `ksa-v0.2.0` through `tag_prefix = "ksa-v"` and shows `0.2.0` |
+
+Package files keep their ecosystem's name: `krpc-1.2.3.tar.gz`, `KRPC.Client.1.2.3.nupkg`,
+`krpc-java-1.2.3.jar`, `krpc-1.2.3-0.rockspec`.
+
+### Inconsistencies today
+
+| Place | Today | Consistent |
+| --- | --- | --- |
+| KSP mod archive (`BUILD.bazel`) | `krpc-0.7.0.zip` | `krpc-ksp-v1.0.0.zip` |
+| KSA mod archive (`experimental/ksa/release.sh`) | `kRPC-KSA-0.1.0.zip`, then `krpc-ksa-0.2.0.zip` | `krpc-ksa-v1.0.0.zip` |
+| Other release assets | `krpc-cpp-0.7.0.zip`, `krpc-cnano-0.7.0.zip`, `krpc-lua-0.7.0.zip`, `krpc-genfiles-0.7.0.zip`, `krpc-doc-0.7.0.pdf`, `TestServer-0.7.0.zip`, `SHA256SUMS-0.7.0.txt` | `v1.2.3` in each |
+| Milestones | `0.1.2` to `0.7.0` bare; `ksp-v0.8.0`, `ksp-v1.0.0`, `ksa-v0.2.0` carry the `v` | The `v` form. Old milestones stay |
+| Docs URL paths | `/0.5.4/`, `/0.7.0/` | `/ksp/v1.0.0/`, `/ksa/v0.2.0/`, as [docs-website.md](docs-website.md) plans. Old snapshots stay |
+| KSA release readme and docs (`@VERSION@`) | "kRPC for KSA 0.2.0" | "kRPC for KSA v0.2.0", as the release title |
+| KSA compatibility popup | "kRPC 0.2.0 was built for KSA ..." | "kRPC v0.2.0 ..." |
+| `krpc` `CLAUDE.md` | The changelog header form `## [X.Y.Z]` and milestone `0.6.0` | `## [vX.Y.Z]` and `ksp-v0.8.0` |
+
+Already consistent: the tags, the GitHub release titles ("kRPC v0.7.0", "kRPC for KSA v0.2.0"), the
+changelog headers, the KSP server window title, the `v<version>-docs` branches, and the CKAN version.
 
 ## Client packages
 
@@ -107,7 +137,8 @@ installs the client package by hand.
 
 ### Milestones
 
-One GitHub milestone per train release, e.g. `clients-1.2.0`, `ksp-1.0.1`, `ksa-0.2.0`.
+One GitHub milestone per train release, named as its tag, e.g. `clients-v1.2.0`, `ksp-v1.0.1`,
+`ksa-v0.2.0`.
 
 | Pull request touches | Milestone |
 | --- | --- |
@@ -190,8 +221,41 @@ unreleased header. Each game publishes the entry at its next release.
 | `tools/release/*` | Each script takes the train, and runs only the steps for its channels. The game trains publish their stub packages to the client channels |
 | `30-tag.py`, `80-bump-version.py` | Tag and bump one train |
 | `.github/workflows/docs.yml` | Triggers on the `ksp-v*` and `ksa-v*` tags, freezing that game's docs. It stops triggering on bare `v*` |
+| `BUILD.bazel`, `40-build-assets.py`, `70-announcements.py` | The mod archives are `krpc-ksp-v1.0.0.zip` and `krpc-ksa-v1.0.0.zip`, replacing `krpc-0.7.0.zip` |
+| `tools/release/lib.py` | `TAG = "v" + VERSION` becomes one tag per train |
+| `68-release-ckan.py` | Waits for `kRPC-v1.0.0.ckan`, named for the CKAN version (see below), not the tag |
 
 Releases before the split keep their `v*` tags.
+
+## CKAN and KSP-AVC
+
+The KSP train's new tag and archive names break the CKAN indexing. The
+[NetKAN entry](https://github.com/KSP-CKAN/NetKAN/blob/master/NetKAN/kRPC.netkan) needs a pull
+request to KSP-CKAN/NetKAN, merged before the first `ksp-v` release:
+
+```json
+"$kref": "#/ckan/github/krpc/krpc/asset_match/^krpc-ksp-v[0-9]+\\.[0-9]+\\.[0-9]+\\.zip$",
+"x_netkan_version_edit": "^ksp-(?<version>v.+)$",
+```
+
+* **The current `asset_match` misses the new archive.** `krpc-[0-9]+\.[0-9]+\.[0-9]+\.zip` needs a
+  digit after `krpc-`. The indexer skips a release with no matching asset, so it would never index a
+  `ksp-v` release.
+* **The new pattern is anchored.** The old one would match a Lua `krpc-1.0.0.zip` on a `clients-v`
+  release. Neither `krpc-ksa-v` archives nor client archives match the new one.
+* **The version needs its prefix stripped.** CKAN versions the mod from the tag, and takes only the
+  KSP compatibility range from the `.version` file (`$vref: ksp-avc`). CKAN compares versions
+  Debian-style, and `ksp-v1.0.0` sorts below `v0.7.0`, so CKAN would never offer the upgrade. The
+  edit keeps the series going as `v1.0.0`.
+* **`version_from_asset` does not help.** It gives `1.0.0`, which also sorts below `v0.7.0`.
+
+KSP-AVC (`kRPC.version`, generated in `BUILD.bazel`):
+
+* **`VERSION` and the `ksp-avc.cybutek.net` URL do not depend on the tag.** The manual bump on
+  KSP-AVC online stays.
+* **`DOWNLOAD` must name the release.** It points at `releases/latest`, and GitHub marks one release
+  as latest across all three trains. It becomes `https://github.com/krpc/krpc/releases/tag/ksp-v<version>`,
+  generated from the KSP version.
 
 ## Versions at the split
 
