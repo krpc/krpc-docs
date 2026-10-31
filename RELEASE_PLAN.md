@@ -162,7 +162,6 @@ depend on the conformance suite.
 | ⬜ | Documentation crefs use the C# service name | [#1188](https://github.com/krpc/krpc/issues/1188) | bug, server | — |
 | ⬜ | Client disconnect during a yielding call stops the server on .NET | [#1189](https://github.com/krpc/krpc/issues/1189) | bug, server, ksa | — |
 | ⬜ | Server window does not resize to fit its content | [#1186](https://github.com/krpc/krpc/issues/1186) | bug, server:ui | — |
-| ⬜ | Routine server messages show in KSA's in-game console: object store sweep, listener exceptions | **To file**: [server-log-levels.md](issues/server-log-levels.md) | bug, server | — |
 
 ## 1.0: remaining protocol improvements, server side function follow-ups
 
