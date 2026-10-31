@@ -1,7 +1,16 @@
 # Service scanner errors
 
-**Status:** proposal, for 0.8 with [procedure ids from names](../protocol/procedure-ids.md).
-Issue: to file, draft [issues/service-scanner-errors.md](../../issues/service-scanner-errors.md).
+**Status:** in progress, for 0.8. Core and the KSP server implemented locally (2026-10-31), not yet
+a PR. KSA waits for a kRPC release with the new core API. Issue: to file, draft
+[issues/service-scanner-errors.md](../../issues/service-scanner-errors.md).
+
+| Part | State |
+| --- | --- |
+| Scanner: partial load, type cascade, duplicates, service id warnings | Implemented |
+| KSP popup listing errors and warnings | Implemented |
+| KSA popup | Deferred: KSA builds against the released `KRPC.Core`, which has no `ServiceProblems` |
+| Call to a disabled member returns its error | Dropped, see below |
+| "Ignore" button | Dropped: the popup shows on each launch with a problem |
 
 ## Problem
 
@@ -31,9 +40,11 @@ one popup. The game keeps loading.
 | Kind | Examples | Effect |
 | --- | --- | --- |
 | **Error** | Invalid parameter or return type, a procedure outside a service, a duplicate name, a struct containing itself | The member is disabled: absent from `KRPC.GetServices` and not callable |
-| **Warning** | A shared id, a hashed id of 0 ([procedure-ids.md](../protocol/procedure-ids.md#collisions)) | The member loads, callable by name only |
+| **Warning** | A shared id, a hashed id of 0 ([procedure-ids.md](../protocol/procedure-ids.md#collisions)), extension members in a class that is not public | kRPC keeps running. An id warning leaves the member callable by name only, and the class's extension members are skipped, as before |
 
-`Scanner.GetServices` returns both lists. `HandleError` becomes `HandleProblem` with a severity.
+`Scanner.GetServices` takes an error list and a warning list. A null warning list makes warnings
+errors, and a null error list makes the first problem throw. The public `ServiceProblems` class gives
+the server the lists from the scan `Services` ran.
 
 ### What an error disables
 
@@ -52,13 +63,19 @@ clients pointing at a class that does not exist. Disabling a struct can disable 
 class, which can disable a struct field. So the pass repeats until nothing changes.
 
 **Duplicate names disable both members**, as a shared id leaves both without one. Keeping the first
-one scanned would make the outcome depend on assembly load order.
+one scanned would make the outcome depend on assembly load order. One exception: an extension member
+that clashes with a member of the class itself is disabled, and the class keeps its own member. The
+class's members are always scanned first, so the outcome is fixed, and a mod cannot remove a
+member of another service by declaring a clashing extension.
+
+**A removed class takes its static methods with it.** They have no parameter of the class type, so
+the cascade also checks each procedure's declaring `KRPCClass`.
 
 ### Calling a disabled member
 
-A call to a disabled member returns its scanner error, e.g. "`SpaceCenter.Vessel_get_Foo` is
-disabled: `Foo` is not a valid Procedure return type". `Services` keeps the disabled members' names
-and errors for this. A name that never existed still gets the existing "procedure not found" error.
+Dropped. A member that fails validation never gets a procedure name, so only the cascade and the
+duplicate removals could report one. A call to a disabled member gets "procedure not found", and the
+popup and the log give the reason.
 
 ### The popup
 
@@ -69,7 +86,7 @@ unavailable:"). The full messages go to the log, and the popup gives the log's p
 | Server | Popup |
 | --- | --- |
 | KSP | `ServicesChecker` keeps its `PopupDialog`, now with a scrolling list. `OK` stays false only for the whole-kRPC failures above. |
-| KSA | The scanner problems join the game compatibility breakages in `CompatibilityPopup`, which becomes the one problems popup. Its "ignore" button records a hash of the problem list, so the popup returns when the list changes. |
+| KSA | A popup of its own, beside `CompatibilityPopup`, once KSA builds against a core with `ServiceProblems`. Until then a scanner error still throws out of startup. |
 
 ### Mod authors
 
@@ -86,11 +103,11 @@ One PR, after procedure ids, which adds the first warnings.
 | Area | Change |
 | --- | --- |
 | `core` scanner | Errors and warnings with a severity; the type cascade; a whole-kRPC failure flag |
-| `core` `Services` | Built from the partial scan; keeps disabled members and their errors for the call error |
+| `core` `Services` | Built from the partial scan; logs each problem; services without an id left out of `ServicesById`; public `ServiceProblems` |
 | `server` (KSP) | `ServicesChecker` lists the problems in its popup and disables kRPC only on a whole-kRPC failure |
-| KSA server | `Services` initialized with the problem list; problems merged into `CompatibilityPopup` |
-| `tools/ServiceDefinitions` | Fails on warnings too |
-| Docs | Extending kRPC: what a player sees for a broken service, and that servicedefs is the author's check |
+| KSA server | Later: a problems popup, once on a core release with `ServiceProblems` |
+| `tools/ServiceDefinitions` | Unchanged: it passes no lists, so it fails on any error or warning |
+| Docs | Extending kRPC: an Errors and Warnings section, and the reserved service id range |
 | Changelogs | Server: a broken service member disables that member, with a popup naming it |
 
 ## Alternatives
