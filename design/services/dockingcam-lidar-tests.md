@@ -6,9 +6,9 @@ lightweight tests (option 3) are unblocked and recommended. Drafted as issues in
 [#1180](https://github.com/krpc/krpc/issues/1180) (logging) and
 [#1181](https://github.com/krpc/krpc/issues/1181) (docstrings). The LiDAR service was renamed LIDAR in [PR #1149](https://github.com/krpc/krpc/pull/1149).
 Decided 2026-10-25: option 4. DockingCamera binds to the public 1.3.9 release by reflection, and
-LIDAR is deprecated in favor of `SpaceCenter.RaycastDistance`. Drafted as
-[issues/dockingcam-public-release.md](../../issues/dockingcam-public-release.md) and
-[issues/lidar-deprecation.md](../../issues/lidar-deprecation.md).
+LIDAR is deprecated in favor of `SpaceCenter.RaycastDistance`. Issues
+[#1232](https://github.com/krpc/krpc/issues/1232) (DockingCamera) and
+[#1233](https://github.com/krpc/krpc/issues/1233) (LIDAR), for 0.8.
 Two sibling services, `service/LiDAR/` and `service/DockingCamera/`, have shipped since v0.5.0
 with **zero tests** — no `test/` directory, no lint or integration coverage, and both are absent from
 the top-level `//:test` and `//:lint` suites (they appear in `BUILD.bazel` only in the release
