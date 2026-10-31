@@ -46,8 +46,8 @@ services included.
 | List | Services | Used by |
 | --- | --- | --- |
 | Shared | `KRPC`, `StdLib`, `TestService` | every client, the client tests |
-| KSP | `SpaceCenter`, `Drawing`, `UI`, mod services | KSP stubs bundled in the clients, KSP docs |
-| KSA | `KSA` | the KSA stubs archive, KSA docs |
+| KSP | `SpaceCenter`, `Drawing`, `UI`, mod services | the KSP stub packages, KSP docs |
+| KSA | `KSA` | the KSA stub packages, KSA docs |
 
 See [releases.md](releases.md) for where each list's stubs ship.
 

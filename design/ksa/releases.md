@@ -1,6 +1,7 @@
 # Releases and versioning
 
-**Status:** proposal, 2026-10-26. Part of [kRPC for KSA](README.md).
+**Status:** proposal, 2026-10-26, revised 2026-10-31 (stub packages, milestones). Part of
+[kRPC for KSA](README.md).
 
 ## Problem
 
@@ -15,14 +16,15 @@ release versions are free to move apart.
 
 | Train | Contents | Tag | Channels |
 | --- | --- | --- | --- |
-| Clients and tools | every client runtime, KSP stubs bundled; `krpctools`; `krpctest`; the `TestServer` image | `clients-v1.2.0` | GitHub (Java), PyPI, NuGet, vcpkg, Arduino, LuaRocks, ghcr.io |
-| KSP | the KSP mod and its services, KSP API docs | `ksp-v1.0.3` | GitHub, CKAN |
-| KSA | the KSA mod, the KSA stubs archive, KSA API docs | `ksa-v0.2.0` | GitHub, SpaceDock, Borea ([borea.md](borea.md)) |
+| Clients and tools | every client runtime, with the `KRPC` and `StdLib` stubs; `krpctools`; `krpctest`; the `TestServer` image | `clients-v1.2.0` | GitHub (Java), PyPI, NuGet, vcpkg, Arduino, LuaRocks, ghcr.io |
+| KSP | the KSP mod and its services, the KSP stub package for each client, KSP API docs | `ksp-v1.0.3` | GitHub, CKAN, and the client channels for the stubs |
+| KSA | the KSA mod and its services, the KSA stub package for each client, `KSA.proto`, KSA API docs | `ksa-v0.2.0` | GitHub, SpaceDock, Borea ([borea.md](borea.md)), and the client channels for the stubs |
 | Protocol | an integer in the handshake | none | none |
 
 * **The clients release in lockstep.** They share the protocol version. One version per language
   would mean about eight release pipelines for little gain. A language can split out later if one
   really diverges.
+* **Stub packages release with their game.** KSP stubs `1.0.3` are generated from KSP mod `1.0.3`.
 * **`core` is not a train.** Each mod ships the `core` it was built with, and `krpctools` ships it
   for third-party servers.
 * **A `core` change reaches a game in that game's next release.** It gets a KSP patch release only
@@ -32,37 +34,69 @@ release versions are free to move apart.
 * The docs gain a compatibility table keyed on protocol version: which client, KSP and KSA releases
   speak each one.
 
-## Client stubs
+## Client packages
 
-The C#, C++, C-nano and Java clients compile against generated service stubs. Today the client
-packages bundle the stubs for every KSP service (`tools/krpctools/services.bzl`). Python and Lua
-build their services when they connect, and need no stubs.
+Each client splits into three packages:
 
-| Stubs | Ship in | Why |
-| --- | --- | --- |
-| `KRPC`, `StdLib` | every client | part of the protocol |
-| KSP services | the client packages, as now | KSP changes rarely, so client releases for KSP are rare. Users keep one package |
-| `KSA` | the KSA release archive, as the prototype does | KSA is pre-alpha. Bundling would tie client releases on every channel to KSA's pace |
-| `KSA.proto` for gRPC | the KSA release archive, beside the stubs | Generated from the same service definitions ([grpc.md](grpc.md)) |
+| Package | Contents | Version | Example (Python) |
+| --- | --- | --- | --- |
+| Client | the runtime, with the `KRPC` and `StdLib` stubs | clients train | `krpc` |
+| KSP stubs | the KSP service stubs | KSP train | `krpc-ksp` |
+| KSA stubs | the KSA service stubs | KSA train | `krpc-ksa` |
 
-* **A new KSA API reaches C#, C++, C-nano and Java users** the day the KSA mod ships.
-* **KSA stubs can fold into the client packages** once the KSA API settles.
-* **C-nano stubs match one exact server build** until procedure ids come from names
-  ([procedure-ids.md](../protocol/procedure-ids.md), 0.8). After that, bundled C-nano stubs work
-  across releases, like the others.
+* **Which clients have stubs.** C#, C++, C-nano and Java compile against generated stubs. Python
+  loads its generated stubs when present and builds the other services at connect time, so its stub
+  packages add types and IDE completion. Lua builds every service at connect time, and gains stub
+  packages if pre-generated Lua stubs land ([#1201](https://github.com/krpc/krpc/issues/1201)).
+* **A new game API reaches users the day the mod ships**, with no client release.
+* **A stub package depends on the client runtime.** It declares the range of client versions whose
+  generated-code interface it targets. That interface stays stable within a client major version.
+  A change to it is a breaking client release, and the stub packages regenerate against it.
+* **C-nano stubs work across server builds**, since procedure ids come from names
+  ([procedure-ids.md](../protocol/procedure-ids.md), 0.8).
 * **Stubs and server can be out of step.** A stub for a procedure the server lacks fails at call
   time with an error, as a name-based call does.
+* **`KSA.proto` for gRPC** stays in the KSA release archive. It is generated from the same service
+  definitions ([grpc.md](grpc.md)).
+* **Until the split**, the client packages bundle the KSP stubs as now
+  (`tools/krpctools/services.bzl`), and the KSA stubs ship in the KSA release archive, as the
+  prototype does.
+
+## Milestones
+
+One GitHub milestone per train release, e.g. `clients-1.2.0`, `ksp-1.0.1`, `ksa-0.2.0`.
+
+| Pull request touches | Milestone |
+| --- | --- |
+| A client, `krpctools`, `krpctest`, `TestServer` | clients |
+| KSP services, the KSP mod | KSP |
+| KSA services, the KSA mod | KSA |
+| `core`, CI, build rules, repo tooling | none, labeled `core` or `build-scripts` |
+
+* **A pull request has one milestone.** `core` changes are rare, and reach every game's next
+  release anyway, so they get none. The label marks them as triaged.
+* **A pull request spanning trains is split** where it can be. A breaking protocol change cannot be,
+  and takes the clients milestone.
+* **Until the split**, KSA builds against the `KRPC.Core.dll` released in `krpctools`. A `core`
+  change takes the KSP milestone, and a separate KSA pull request picks it up.
+
+## Changelogs
+
+The per-component files stay. `doc/src/changelog.rst` groups them by train.
+
+**Open question:** where `core` entries go. `core` has no version, and the two game trains pick up a
+`core` change at different releases. One answer: `core/CHANGELOG.md` keeps an unreleased list, and
+tagging a game train copies the entries new since that train's previous tag into the game's
+release notes.
 
 ## Release scripts
 
 | Area | Change |
 | --- | --- |
 | `config.bzl`, `tools/krpc-version.sh` | One version per train. `krpc-version.sh` takes the train |
-| `tools/release/*` | Each script takes the train, and runs only the steps for its channels |
+| `tools/release/*` | Each script takes the train, and runs only the steps for its channels. The game trains publish their stub packages to the client channels |
 | `30-tag.py`, `80-bump-version.py` | Tag and bump one train |
 | `.github/workflows/docs.yml` | Triggers on the `ksp-v*` and `ksa-v*` tags, freezing that game's docs. It stops triggering on bare `v*` |
-| Changelogs | The per-component files stay. `doc/src/changelog.rst` groups them by train |
-| Milestones | One GitHub milestone per train release, e.g. `ksp-1.0.1`, `ksa-0.2.0` |
 
 Releases before the split keep their `v*` tags.
 
@@ -71,5 +105,5 @@ Releases before the split keep their `v*` tags.
 | Train | First version |
 | --- | --- |
 | Clients and tools | 1.0, with kRPC 1.0 |
-| KSP | 1.0, with kRPC 1.0 |
-| KSA | continues from the prototype's 0.x |
+| KSP, and the KSP stub packages | 1.0, with kRPC 1.0 |
+| KSA, and the KSA stub packages | continues from the prototype's 0.x |
