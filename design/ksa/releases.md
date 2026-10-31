@@ -1,6 +1,6 @@
 # Releases and versioning
 
-**Status:** proposal, 2026-10-26, revised 2026-10-31 (stub packages, milestones). Part of
+**Status:** proposal, 2026-10-26, revised 2026-10-31 (stub packages, milestones, `core` changelog). Part of
 [kRPC for KSA](README.md).
 
 ## Problem
@@ -25,8 +25,9 @@ release versions are free to move apart.
   would mean about eight release pipelines for little gain. A language can split out later if one
   really diverges.
 * **Stub packages release with their game.** KSP stubs `1.0.3` are generated from KSP mod `1.0.3`.
-* **`core` is not a train.** Each mod ships the `core` it was built with, and `krpctools` ships it
-  for third-party servers.
+* **`core` is not a train, and has no version.** Each mod builds in `core` as it stands on `main`
+  when that mod is released. `krpctools` ships `core` for third-party servers in the same way, as it
+  stands at the clients release.
 * **A `core` change reaches a game in that game's next release.** It gets a KSP patch release only
   when KSP users would notice it.
 * **A breaking protocol change bumps all three trains**, since every client and both servers move to
@@ -84,10 +85,20 @@ One GitHub milestone per train release, e.g. `clients-1.2.0`, `ksp-1.0.1`, `ksa-
 
 The per-component files stay. `doc/src/changelog.rst` groups them by train.
 
-**Open question:** where `core` entries go. `core` has no version, and the two game trains pick up a
-`core` change at different releases. One answer: `core/CHANGELOG.md` keeps an unreleased list, and
-tagging a game train copies the entries new since that train's previous tag into the game's
-release notes.
+**`core` changes are logged in each game's Server section, at pull request time.** A `core` pull
+request adds its user-facing entry to the Server changelog of each game, under that game's
+unreleased header. Each game publishes the entry at its next release.
+
+* **`core/CHANGELOG.md` is removed.** `core` does not appear in the release notes. A release page
+  lists Server, then each service.
+* **Until the split**, the `core` pull request adds the KSP entry, and the KSA pull request that
+  picks up the new `core` adds the KSA one.
+
+| Alternative | Rejected because |
+| --- | --- |
+| A `core` version train, with each game's notes appending the `core` sections it picked up | A fourth train to tag and bump, and `core` shown to users as a component |
+| One entry in `core/CHANGELOG.md`, copied into each game's notes when that game is tagged | The tag script must track which entries each game has already released |
+| Server entries written by hand just before each release | Depends on remembering `core` changes merged months earlier |
 
 ## Release scripts
 
