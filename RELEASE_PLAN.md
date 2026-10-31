@@ -157,7 +157,6 @@ depend on the conformance suite.
 | ⬜ | Python: trim client frames from server error tracebacks | **To file**: [python-traceback-trim.md](issues/python-traceback-trim.md) | enhancement, client:python | — |
 | ⬜ | Conformance testee stubs from the full TestServer definitions, with `TestService2` | **To file**: [test-service-full-definitions.md](issues/test-service-full-definitions.md) | enhancement, tools | [client-conformance/harness.md](design/client-conformance/harness.md) |
 | ⬜ | Publish the bundled TestServer and ServiceDefinitions for every platform, so `krpc-conformance` and `servicedefs` run on Windows | [#1228](https://github.com/krpc/krpc/issues/1228), **add milestone** | enhancement, tools | — |
-| ⬜ | Client guides: how streams and events end | **To file**: [stream-and-event-ending-docs.md](issues/stream-and-event-ending-docs.md) | docs, client | — |
 | ⬜ | Run clang-format and clang-tidy over every C and C++ source | [#1177](https://github.com/krpc/krpc/issues/1177) | enhancement, client:cpp, client:cnano | — |
 | ⬜ | Audit how each client binds static methods and streams to a connection | [#1195](https://github.com/krpc/krpc/issues/1195) | enhancement, client:python, client:cpp, client:lua, client:csharp, client:java, client:cnano | [client-conformance/defects.md](design/client-conformance/defects.md) |
 | ⬜ | Documentation crefs use the C# service name | [#1188](https://github.com/krpc/krpc/issues/1188) | bug, server | — |
