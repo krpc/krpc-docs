@@ -15,9 +15,9 @@ The **GitHub** column says how the issue on GitHub stands against this plan:
 
 | | Release | Theme | Progress |
 | --- | --- | --- | --- |
-| ✅ | 0.7 | Server-side functions, streams and events, protocol additions, service improvements | Tagged 2026-10-21 |
-| 🚧 | 0.8 | Single connection, client codegen, then client conformance testing and thread safety | 5 of 10 done: single connection, request ids, client codegen, conformance tests, thread safety docs |
-| ⬜ | 1.0 | Remaining protocol improvements (#906), server side function follow-ups | 0 of 9 done; tick control has a 0.7 stopgap |
+| ✅ | [0.7](#07-server-side-functions-streams-and-events-service-improvements) | Server-side functions, streams and events, protocol additions, service improvements | Tagged 2026-10-21 |
+| 🚧 | [0.8](#08-single-connection-client-codegen-then-client-conformance-and-thread-safety) | Single connection, client codegen, then client conformance testing and thread safety | 5 of 10 done: single connection, request ids, client codegen, conformance tests, thread safety docs |
+| ⬜ | [1.0](#10-remaining-protocol-improvements-server-side-function-follow-ups) | Remaining protocol improvements (#906), server side function follow-ups | 0 of 9 done; tick control has a 0.7 stopgap |
 
 ## 0.7: server-side functions, streams and events, service improvements
 
