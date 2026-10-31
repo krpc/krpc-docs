@@ -1,7 +1,17 @@
 # Procedure ids from names
 
-**Status:** proposal, for 0.8 with [protocol version 2](protocol-version.md). Issue:
-[#1196](https://github.com/krpc/krpc/issues/1196).
+**Status:** in progress, for 0.8 with [protocol version 2](protocol-version.md). Implemented
+locally (2026-10-31), stacked on [service scanner errors](../server/service-scanner-errors.md), not
+yet a PR. Issue: [#1196](https://github.com/krpc/krpc/issues/1196).
+
+| Part | State |
+| --- | --- |
+| Hashed procedure ids, shared hash with service ids | Implemented |
+| `Id` on `KRPCProcedure` and `KRPCMethod`; `GetterId` and `SetterId` on `KRPCProperty` | Implemented. An id for an accessor the property lacks, or on a struct field, is an error |
+| Shared or 0 procedure ids left unassigned, with a warning | Implemented |
+| C-nano clientgen goldens, protocol and extending docs | Done |
+| Reserved service id range | Documented only, not enforced |
+| Conformance test: a call by id reaches the named procedure | Not started |
 
 ## Problem
 
