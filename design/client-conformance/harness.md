@@ -3,7 +3,7 @@
 How the suite runs a test against a client. C1 built the driver, the scripted server, the Bazel
 macro and the Python testee. C2 built the other five testees and the dispatch generators, C3
 the calls, values, codec, errors and objects, and C4 the streams, events, threads and connection
-tests with `ConformanceService` (local branch, before its PR).
+tests with `ConformanceService` (merged in #1220).
 
 ### Built in C1
 

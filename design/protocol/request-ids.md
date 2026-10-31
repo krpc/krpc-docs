@@ -1,10 +1,9 @@
 # Request ids and asynchronous RPCs
 
-**Status:** in progress (2026-10-22): phase 1 implemented locally with the single connection, not yet
-in a PR. Built together with the
-[single connection](single-connection.md) for 0.8, as part of
-[protocol version](protocol-version.md) 2. Phases 2 and 3 are later additions, each negotiated in
-the handshake. Issue [#1175](https://github.com/krpc/krpc/issues/1175).
+**Status:** in progress. Phase 1 done, merged with the [single connection](single-connection.md)
+as [PR #1219](https://github.com/krpc/krpc/pull/1219) for 0.8, as part of
+[protocol version](protocol-version.md) 2, fixing [#1175](https://github.com/krpc/krpc/issues/1175).
+Phases 2 and 3 are later additions, each negotiated in the handshake.
 
 Related: [single-connection.md](single-connection.md) (its "Client reader" section specifies the
 client side of phase 1), [improvements.md](improvements.md) (meta-issue

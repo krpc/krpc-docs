@@ -1,13 +1,13 @@
 # Client conformance
 
-**Status:** in progress, planned for 0.8 as [#1123](https://github.com/krpc/krpc/issues/1123).
-Proposed 2026-10-22 and reviewed 2026-10-23. C0 to C7 and a coverage pass are built ([harness.md](harness.md)
-"Built in C1" to "Built in C7", [client-tests.md](client-tests.md) "Built in C6" and "Built after
-C6"). On 2026-10-27 the work was regrouped into the PRs under "Pull requests" below, and the spec is
-now reviewed section by section before more client work. Since C7 the tests are the source of the
-spec's requirement lists. Client defects the suite finds are recorded as expected failures, and
-fixed after the spec lands. Facts below were surveyed on the single connection and client codegen
-branches (before their PRs). Re-check them when a phase starts.
+**Status:** done, merged as [PR #1220](https://github.com/krpc/krpc/pull/1220) for 0.8, fixing
+[#1123](https://github.com/krpc/krpc/issues/1123). Proposed 2026-10-22 and reviewed 2026-10-23. C0
+to C7 and a coverage pass are built ([harness.md](harness.md) "Built in C1" to "Built in C7",
+[client-tests.md](client-tests.md) "Built in C6" and "Built after C6"). The PRs planned under "Pull
+requests" below merged as one, #1220. Since C7 the tests are the source of the spec's requirement
+lists. Client defects the suite finds are recorded as expected failures, and fixing them is
+follow-up work ([defects.md](defects.md), [open-items.md](open-items.md)). Facts below were
+surveyed before the single connection (#1219) and client codegen (#1172) merged.
 
 This folder replaces three earlier docs: the conformance sketch (`client-conformance.md`), the
 client testing standard (`client-testing.md`) and the client API parity audit
@@ -67,7 +67,7 @@ Settled earlier, and kept:
 - **The spec is published in `krpc`**, with the protocol docs. `krpc-docs` holds only this plan.
 - **Third-party clients can run the suite later**, so the testee protocol is versioned from the
   start.
-- **The single connection and request ids land first.** Done on its branch. The suite pins 0.8
+- **The single connection and request ids land first.** Merged in #1219. The suite pins 0.8
   behavior, and only additive 1.0 work follows it.
 
 New in this revision:
@@ -81,7 +81,7 @@ New in this revision:
 | Codec vectors | Move into the suite as `Encode`/`Decode` commands. A NaN must decode from either sign and encode to some NaN, which ends the vector drift. |
 | Testee values | Cross as a `testee.proto` `Value` of plain protobuf fields, never as kRPC wire bytes. A codec bug that is symmetric in one client would otherwise cancel out in the testee. See [harness.md](harness.md) "Values". |
 | Python is not the reference | The spec is. Where clients disagree, the spec picks, and the losing clients get expected failures until fixed. |
-| Thread safety ([#427](https://github.com/krpc/krpc/issues/427)) | Answered by the spec's threading page, and pinned by the `threads` profile. |
+| Thread safety ([#427](https://github.com/krpc/krpc/issues/427)) | Answered by the spec's threading page, and pinned by the `threads` profile. Documented in each client guide by #1225, which closed #427. |
 | Testee lifetime | One process per test session, with a fresh `Connect` per test. The driver restarts a testee that crashes or times out. `Counter` counts per client, so a fresh connection starts from clean state. |
 | Timeouts | The handshake and stall timeouts are `Connect` settings. The spec says clients SHOULD make both settable. |
 | Timing | Tests order events through `ConformanceService` (`SetValue`, `Block`, `TriggerEvent`) in place of wall-clock sleeps where they can. Tests that still race the clock are marked `@timing` ([harness.md](harness.md)). |
@@ -109,12 +109,13 @@ match it afterwards, rather than the single connection chasing a moving target.
 
 The suite was built in phases C0 to C7 (below), whose commits cut across areas. The PRs are cut from
 the finished tree instead, so each one is the spec of one area plus the tests that are its source.
+In the end, the rows from Infrastructure to Delete client tests merged together as #1220.
 
 | PR | Scope |
 | --- | --- |
 | WebSockets frame length | Merged in #1193. A frame longer than `int.MaxValue` closes the connection with status 1009. Split out of the single connection. |
 | Codec and clientgen fixes | Merged in #1194. Bytes default arguments in generated C#, C++ and Lua code, a C# nullable enum return, and a C++ short tuple. |
-| Single connection | [protocol/single-connection.md](../protocol/single-connection.md), with the settable stall timeout. |
+| Single connection | Merged in #1219. [protocol/single-connection.md](../protocol/single-connection.md), with the settable stall timeout. |
 | Infrastructure | Driver, `testee.proto`, the six testees and the clientgen dispatch, the `TestService` additions and `ConformanceService`, the multi-transport TestServer, specgen, the spec index, coverage and testee protocol pages, and the driver in the TestServer archive. Two smoke tests, `connection-connect` and `calls-procedure`. |
 | Calls, values, codec | Tests, pages and expected failures for those areas. |
 | Errors, objects | As above. |

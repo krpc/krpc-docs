@@ -1,8 +1,9 @@
 # Protocol version
 
 **Status:** in progress. Phase 1, version 1, merged as [PR #1162](https://github.com/krpc/krpc/pull/1162)
-in 0.7.0. Version 2 is implemented for 0.8 with the [single connection](single-connection.md), not
-yet in a PR.
+in 0.7.0. Phase 2, version 2, merged with the [single connection](single-connection.md) as
+[PR #1219](https://github.com/krpc/krpc/pull/1219) for 0.8. Phase 3 waits for the first additive
+feature, in 1.0.
 
 ## Problem
 

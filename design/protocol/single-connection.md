@@ -1,8 +1,8 @@
 # A single bidirectional connection
 
-**Status:** implemented (2026-10-22), not yet in a PR. Planned for 0.8 as a hard break, built
-together with [request ids](request-ids.md) phase 1 and [protocol version](protocol-version.md) 2.
-Issue [#1174](https://github.com/krpc/krpc/issues/1174).
+**Status:** done, merged as [PR #1219](https://github.com/krpc/krpc/pull/1219) for 0.8, fixing
+[#1174](https://github.com/krpc/krpc/issues/1174). A hard break, built together with
+[request ids](request-ids.md) phase 1 and [protocol version](protocol-version.md) 2.
 
 Scope, from 2026-10-27: three rounds of review kept finding client corner cases, as no client spec
 existed to review against. The PR is held to a minimal bar. The server and the protocol are reviewed
