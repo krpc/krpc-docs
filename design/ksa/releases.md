@@ -1,6 +1,6 @@
 # Releases and versioning
 
-**Status:** proposal, 2026-10-26, revised 2026-10-31 (stub packages, milestones, labels, `core` changelog). Part of
+**Status:** proposal, 2026-10-26, revised 2026-10-31 (stub packages and their dependencies, milestones, labels, `core` changelog). Part of
 [kRPC for KSA](README.md).
 
 ## Problem
@@ -50,9 +50,6 @@ Each client splits into three packages:
   packages add types and IDE completion. Lua builds every service at connect time, and gains stub
   packages if pre-generated Lua stubs land ([#1201](https://github.com/krpc/krpc/issues/1201)).
 * **A new game API reaches users the day the mod ships**, with no client release.
-* **A stub package depends on the client runtime.** It declares the range of client versions whose
-  generated-code interface it targets. That interface stays stable within a client major version.
-  A change to it is a breaking client release, and the stub packages regenerate against it.
 * **C-nano stubs work across server builds**, since procedure ids come from names
   ([procedure-ids.md](../protocol/procedure-ids.md), 0.8).
 * **Stubs and server can be out of step.** A stub for a procedure the server lacks fails at call
@@ -62,6 +59,49 @@ Each client splits into three packages:
 * **Until the split**, the client packages bundle the KSP stubs as now
   (`tools/krpctools/services.bzl`), and the KSA stubs ship in the KSA release archive, as the
   prototype does.
+
+### Stub package dependencies
+
+A stub package depends on the client package, with a version range:
+
+```toml
+# krpc-ksp/pyproject.toml
+[project]
+name = "krpc-ksp"
+version = "1.0.3"
+dependencies = ["krpc>=1.2,<2"]
+```
+
+`pip install krpc-ksp` then installs the stubs and a client recent enough for them. A user never
+installs the client package by hand.
+
+* **The lower bound is the client release the stubs were generated against**, the latest clients
+  release when the game is tagged.
+* **The upper bound is the next client major version.** The interface between generated code and
+  the client runtime stays stable within a client major version. A change to it is a breaking
+  client release, and the next game releases regenerate their stubs against it.
+* **A range, never an exact pin.** Client fixes reach users without a game release, and `krpc-ksp`
+  and `krpc-ksa` installed together resolve to one client.
+* **Generated code on `main` may need a client runtime change that is not released yet.** The
+  clients train then releases before the game, so the lower bound names a published version.
+* **Every channel expresses the same range:**
+
+| Channel | Client | Dependency in the stub package |
+| --- | --- | --- |
+| PyPI | Python | `dependencies = ["krpc>=1.2,<2"]` |
+| NuGet | C# | `<PackageReference Include="KRPC.Client" Version="[1.2,2.0)" />` |
+| Maven Central, GitHub | Java | `<version>[1.2,2.0)</version>` |
+| vcpkg | C++, C-nano | `"dependencies": [{"name": "krpc", "version>=": "1.2.0"}]`, no upper bound |
+| Arduino | C-nano | `depends=kRPC (>=1.2.0)`, no upper bound |
+
+* **vcpkg and Arduino have no upper bound.** A client major version release coincides with new
+  stub releases of both games, so the gap only reaches users who upgrade the client alone.
+* **The Python client finds stubs from a separate package.** Today `krpc/services/__init__.py`
+  imports a fixed list of generated modules. A stub package installs its own top-level module, and
+  registers it with the client under a `krpc.services` entry point group. The client loads every
+  registered module, and builds the other services at connect time.
+* **The other clients need no discovery.** A program names the stub types it uses, and the build
+  links the stub package.
 
 ## Milestones and labels
 
