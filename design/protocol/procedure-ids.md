@@ -39,8 +39,11 @@ A procedure id is a hash of the procedure's name, by the rule service ids alread
   `uint32`.** The name is the wire name, e.g. `GetStatus` or `Vessel_get_Flight`.
 * **Ids are per service**, as now (`Services.ProceduresById`). Names are unique within a service,
   so the hash input is the name alone.
-* **The scanner rejects a collision within a service, and an id of 0** (0 means "use the name").
-  The error names both procedures. The fix is a rename.
+* **An author can set an id by hand**, with `Id` on `[KRPCProcedure]`, `[KRPCMethod]` and
+  `[KRPCProperty]`, as `[KRPCService]` already allows. This is the fallback for a collision the
+  author finds before release.
+* **A shared id, or a hashed id of 0, leaves the members callable by name only**
+  ([Collisions](#collisions)). 0 means "use the name".
 * **Explicit service ids stay.** Only the procedure counter changes.
 * **The ids reach clients the same way.** They are in the service definitions JSON, which clientgen
   reads. `KRPC.GetServices` carries no procedure id, so the dynamic clients are unaffected.
@@ -49,7 +52,37 @@ An id is then as stable as the name, which is exactly the guarantee the string-b
 Renaming a procedure breaks both kinds of client, and adding, removing or reordering members breaks
 neither.
 
-### Collisions and size
+### Collisions
+
+Services and procedures follow one rule: **an id that is 0, or shared by two members, is not
+assigned. Those members are callable by name only.** The scanner records a warning naming both, and
+the server keeps running ([service-scanner-errors.md](../server/service-scanner-errors.md)).
+
+| Case | Outcome |
+| --- | --- |
+| Two procedures of one service share an id, e.g. an extension member from another mod | Neither has an id |
+| Two services share an id, hashed or explicit | Neither service has an id, so C-nano cannot call either |
+| A hashed id is 0 | That member has no id |
+| A C-nano stub calls an id that is not assigned | "No procedure with this id" error, naming the clash when the id is a known one |
+
+**Neither member keeps the id.** Suppose a stub for mod B sends id X, and mod A also hashes to X.
+If A kept X, B's stub would call A's procedure, and succeed when the argument shapes match. Which
+member kept it would also depend on assembly load order. With neither keeping it, the stale stub
+gets an error, and every name-based client is unaffected.
+
+**Gaps closed in the service id code:**
+
+* `Services` builds `ServicesById` with `ServicesById [service.Id] = service`, so on a clash the last
+  service scanned wins. It now leaves both out.
+* A hashed service id of 0 is not checked today. It gets the same warning.
+* **Explicit ids 1 to 255 are reserved for the services that ship with kRPC.** The extending docs
+  tell mod authors to leave `Id` unset. A hashed id lands in that range with odds of about 2^-24, and
+  the clash rule covers it if it does.
+
+`tools/ServiceDefinitions` treats every warning as an error, so an author finds a clash within their
+own mod at build time. The graceful path covers clashes between mods, which no one author can see.
+
+### Size and collision odds
 
 Checked against the current service definitions (2419 procedures, 1464 of them in SpaceCenter):
 
@@ -75,9 +108,10 @@ One PR.
 
 | Area | Change |
 | --- | --- |
-| `core` | `ServiceSignature` computes the id from the name, sharing the hash with `TypeUtils.GetServiceId`; the scanner reports collisions and 0 |
+| `core` | `ServiceSignature` computes the id from the name, sharing the hash with `TypeUtils.GetServiceId`; `Id` on the member attributes; shared and 0 ids, service and procedure, left unassigned with a warning |
 | `core` tests | Pin a few known ids, e.g. `KRPC.GetStatus` is `2007570979`, so a change to the hash fails a test |
 | `tools/krpctools` | Regenerate the C-nano clientgen goldens |
+| Extending docs | The reserved service id range, the member `Id` override, and what a clash does |
 | `doc/src/communication-protocols/messages.rst` | Under Anatomy of a Request, state the id rule, and drop the sentence "They can change between server versions." that follows the integer identifiers' size advantage |
 | Changelogs | Server and C-nano: procedure ids are stable across releases that add procedures |
 | [Protocol version 2](protocol-version.md) | Listed in its change column |
@@ -91,8 +125,20 @@ name gives.
 small, and the file records removals, but every service needs one, third-party services included.
 Extension members from another assembly need ids coordinated with the target's file.
 
-**An explicit `Id` on every `[KRPCProcedure]`, `[KRPCMethod]` and `[KRPCProperty]`.** Rejected:
-about 2400 hand-assigned numbers, with the same coordination problem for extension members.
+**An explicit `Id` on every `[KRPCProcedure]`, `[KRPCMethod]` and `[KRPCProperty]`.** Rejected as
+the source of ids: about 2400 hand-assigned numbers, with the same coordination problem for extension
+members. It stays as an optional override.
+
+**The first member scanned keeps a shared id.** Rejected: a stale stub for the other member calls the
+wrong procedure silently, and the winner depends on assembly load order.
+
+**A collision as a scanner error.** Rejected: today one scanner error disables all of kRPC, and a
+clash between two mods is one the player cannot fix.
+
+**Every client calls by id.** Rejected. Names stay on the wire for the dynamic, websockets and
+hand-written clients, so ids would add a second path to test in every client and remove nothing. A
+call's size and lookup are not the bottleneck, and names keep wire captures readable. Only C-nano
+calls by id.
 
 **A 28-bit hash, for 4-byte varints.** Rejected. It saves one byte per call and raises the collision
 chance in SpaceCenter to about 0.4%.
