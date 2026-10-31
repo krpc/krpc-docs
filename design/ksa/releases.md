@@ -1,6 +1,6 @@
 # Releases and versioning
 
-**Status:** proposal, 2026-10-26, revised 2026-10-31 (stub packages, milestones, `core` changelog). Part of
+**Status:** proposal, 2026-10-26, revised 2026-10-31 (stub packages, milestones, labels, `core` changelog). Part of
 [kRPC for KSA](README.md).
 
 ## Problem
@@ -63,7 +63,9 @@ Each client splits into three packages:
   (`tools/krpctools/services.bzl`), and the KSA stubs ship in the KSA release archive, as the
   prototype does.
 
-## Milestones
+## Milestones and labels
+
+### Milestones
 
 One GitHub milestone per train release, e.g. `clients-1.2.0`, `ksp-1.0.1`, `ksa-0.2.0`.
 
@@ -72,7 +74,7 @@ One GitHub milestone per train release, e.g. `clients-1.2.0`, `ksp-1.0.1`, `ksa-
 | A client, `krpctools`, `krpctest`, `TestServer` | clients |
 | KSP services, the KSP mod | KSP |
 | KSA services, the KSA mod | KSA |
-| `core`, CI, build rules, repo tooling | none, labeled `core` or `build-scripts` |
+| `core`, CI, build rules, repo tooling | none, labeled `server` or `build` |
 
 * **A pull request has one milestone.** `core` changes are rare, and reach every game's next
   release anyway, so they get none. The label marks them as triaged.
@@ -80,6 +82,46 @@ One GitHub milestone per train release, e.g. `clients-1.2.0`, `ksp-1.0.1`, `ksa-
   and takes the clients milestone.
 * **Until the split**, KSA builds against the `KRPC.Core.dll` released in `krpctools`. A `core`
   change takes the KSP milestone, and a separate KSA pull request picks it up.
+
+### Labels
+
+An issue or pull request takes one kind, at least one component, and the game and language labels
+that apply.
+
+| Group | Labels | Rule |
+| --- | --- | --- |
+| Game | `ksp`, `ksa` | The game a change is specific to. A `core` change takes both. Client and tool changes take neither |
+| Component | `server`, `protocol`, `service`, `client`, `tools`, `build`, `docs` | `server` covers `core` and each mod's server plugin. `client` is a change across clients |
+| Kind | `feature`, `bug`, `tests`, `question`, `mod-compatibility`, `dependencies` | One per issue or pull request |
+| Language | `python`, `cpp`, `cnano`, `csharp`, `java`, `lua` | The client a change is specific to |
+| Triage | `needs-triage` | Set on new issues by the issue templates, removed once triaged |
+
+* **`client` and `build` are kept** beyond the base set. Cross-client changes, such as the
+  conformance suite, need a component, and CI and build rules carry no milestone, so need a label
+  apart from `tools`.
+* **`dependencies` is kept** because Dependabot applies it.
+* **Per-service labels are dropped.** `ksp` with `service` covers SpaceCenter, and
+  `mod-compatibility` covers the mod services.
+
+### Label migration
+
+A one-to-one rename keeps the label on its issues. A merge relabels them.
+
+| Existing | New | How |
+| --- | --- | --- |
+| `enhancement` | `feature` | rename |
+| `client:python`, `client:cpp`, `client:cnano`, `client:csharp`, `client:java`, `client:lua` | `python`, `cpp`, `cnano`, `csharp`, `java`, `lua` | rename |
+| `build-scripts` | `build` | rename |
+| `server:api`, `server:ui` | `server` | merge |
+| `service:space-center`, `service:ui`, `service:drawing`, `service:debug` | `service`, `ksp` | merge |
+| `service:infernal-robotics`, `service:kerbal-alarm-clock`, `service:remote-tech` | `service`, `ksp`, `mod-compatibility` | merge |
+| `bug`, `question`, `docs`, `tools`, `protocol`, `server`, `service`, `client`, `mod-compatibility`, `dependencies`, `ksa`, `needs-triage` | unchanged | none |
+
+* **`ksp` is not added to older issues** apart from the former service labels. Before KSA, every
+  issue was a KSP one.
+* **References to update with the migration:** the issue templates (`enhancement`), the pull
+  request labeling rule in the `krpc` `CLAUDE.md`, and the labels column of
+  [RELEASE_PLAN.md](../../RELEASE_PLAN.md).
 
 ## Changelogs
 
