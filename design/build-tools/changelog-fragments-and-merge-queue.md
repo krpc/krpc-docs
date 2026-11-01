@@ -405,8 +405,15 @@ Phase 3, on a fork with the same settings:
   moved to rulesets first. The `merge_group` run passed, and `main` moved to the commit it tested.
   The `push` run took 2 minutes: the cache jobs hit their keys, the build and test jobs were
   skipped, and `copy-artifacts` copied all 12 artifacts.
-* **Open:** the batching and failure cases of phase 3 and the merge limits, a direct push, a
-  `MODULE.bazel` change, and the first release with fragments.
+* **A direct push**, the hints fix, ran only the cache jobs in 2 minutes. `copy-artifacts`
+  reported no merge queue run, and the run had no artifacts.
+* **Two PRs queued together**, #1244 and #1243, 5 seconds apart. With build concurrency 1 and a
+  minimum group size of 1, the queue tested them one at a time: #1244 on `main`, then #1243 on
+  #1244, 14 and 13 minutes. `main` moved to each tested commit, and each push run copied the 12
+  artifacts of its own queue run. Batching needs a minimum group size above 1, at the cost of the
+  wait for a lone PR.
+* **Open:** the failure cases of phase 3 and the merge limits, a `MODULE.bazel` change, and the
+  first release with fragments.
 
 ## Trade-offs
 
