@@ -56,7 +56,7 @@ changelog.d/single-connection.md
 - Accept clients over one connection (#1219)
 ```
 
-* **Component:** a `## <dir>` heading, where `<dir>/CHANGELOG.md` exists. One fragment covers every
+* **Component:** a `## <dir>` heading naming a release component, below. One fragment covers every
   component the PR touches.
 * **Entries:** the `CHANGELOG.md` bullet syntax, markers and wrapping rules, unchanged.
 * **Topics:** a top-level bullet with sub-items is a topic, as in `CHANGELOG.md` today. Topics with
@@ -75,6 +75,26 @@ commit is no longer needed.
 Two PRs with the same branch name, such as the web editor's `patch-1`, add the same file. GitHub
 shows the second as conflicting, and renaming its fragment resolves it. A fragment stays until the
 release, so a branch name reused within a release cycle collides the same way.
+
+### Components
+
+Fragments are for the components on the kRPC release version, the ones whose `CHANGELOG.md` has a
+`## [vX.Y.Z] - unreleased` header taken from `config.bzl`. The rule is the version a component
+releases on, not whether its changelog is public.
+
+| Component | Fragments | Changelog on the docs site |
+| --- | --- | --- |
+| `server`, `core`, `service/*`, `client/*`, `tools/krpctools` | Yes | Yes |
+| `tools/krpctest` | Yes. It releases with kRPC, and its unreleased section conflicts the same way | No |
+| `tools/buildenv` | No. Its own version in `VERSION.txt`, and a change edits `CHANGELOG.md` with the version bump | No |
+| `experimental/ksa` | No. Its own process, until it joins the trains after 1.0 | No |
+
+The list lives once, in the shared module, built from `lib.changelogs()` plus `tools/krpctest`, the
+set `strip_unreleased()` already covers. The heading check, the hints and the fold read it.
+`changeloggen` renders the subset its `doc/BUILD.bazel` dictionary names, as today, and
+`changes.py` the subset in the release notes.
+
+After 1.0, each train's components take fragments, and the list maps each component to its train.
 
 ### Rendering unreleased entries
 
@@ -143,7 +163,7 @@ A `py_test` in `//:test` checks every file in `changelog.d/`, not only the `*.md
 misnamed file such as `fix-wait.txt` or `fix-wait.MD` cannot sit there unread:
 
 * the name matches `^[A-Za-z0-9._-]+\.md$`
-* each `##` heading names a directory with a `CHANGELOG.md`
+* each `##` heading names a release component
 * the body parses, with no text outside a component section
 
 ### Failure handling
@@ -169,12 +189,12 @@ comment instead. The hints never fail CI.
 
 | Hint | Posted when |
 | --- | --- |
-| No fragment. Check whether the change needs an entry | The PR changes files under a component with a `CHANGELOG.md` and adds no fragment |
+| No fragment. Check whether the change needs an entry | The PR changes files under a release component and adds no fragment |
 | `<component>` has changes but no entry | The PR's fragment has no section for a changed component |
 | `<component>` has an entry but no changes | The fragment has a section for a component the PR does not touch |
 | Add the PR or issue number | An entry in the PR's fragment has no `(#NNN)` |
 | `#NNN` is not related to this PR | An entry the PR adds or changes cites a number that is neither the PR, a `#NNN` in its description, nor one of its linked issues. Catches a typo or a wrong prediction |
-| Use a fragment in place of `CHANGELOG.md` | The PR edits a `CHANGELOG.md` and deletes no fragment. A release preparation PR deletes fragments, so it gets no hint |
+| Use a fragment in place of `CHANGELOG.md` | The PR edits a release component's `CHANGELOG.md` and deletes no fragment. A release preparation PR deletes fragments, so it gets no hint |
 
 * **One comment per PR**, found by a hidden marker (`<!-- changelog-hints -->`). Each push edits it,
   and deletes it once no hint applies.
@@ -317,7 +337,7 @@ Phase 1:
   `config.bzl` at the tag names the released version.
 * `publish-docs.py` for a released version with fragments present → no unreleased section.
 * A misnamed fragment, a file without the `.md` extension, a fragment with an unknown component,
-  and one that does not parse → the test and `//doc:html` both fail, naming the file and line.
+  one for `tools/buildenv`, and one that does not parse → the test and `//doc:html` both fail, naming the file and line.
 
 Phase 2, on a fork, as `pull_request_target` runs the workflow from the base branch:
 
@@ -356,13 +376,6 @@ Phase 3, on a fork with the same settings:
 * **Editing an entry from another PR** means editing its fragment. That edit can conflict, though
   rarely.
 * **Two CI runs per PR.** The second run is unattended, and it catches breakage between PRs.
-
-## Open questions
-
-* **Which components take fragments.** The dev changelog page covers the release components only.
-  `experimental/ksa`, `tools/buildenv` and `tools/krpctest` have a `CHANGELOG.md` but are not on the
-  page, and the root `CHANGELOG.md` is an index. The heading check, the rendering and the fold need
-  one list of the components that take fragments.
 
 ## Rejected alternatives
 
