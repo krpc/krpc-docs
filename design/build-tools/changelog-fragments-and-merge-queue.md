@@ -300,7 +300,7 @@ Repository settings, in the `main pull request required` ruleset on `main`:
 | Require merge queue | on |
 | Merge method | merge commit |
 | Grouping strategy | all entries must pass (`ALLGREEN`) |
-| Build concurrency | 2. The design called for 1, see [Cost](#cost) |
+| Build concurrency | 1, see [Cost](#cost) |
 | Group size | 1 to 3, with a 5 minute wait for the minimum |
 | Status check timeout | 60 minutes |
 
