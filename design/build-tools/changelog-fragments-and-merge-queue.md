@@ -240,11 +240,26 @@ later PR and queue runs restore.
 | Event | Jobs |
 | --- | --- |
 | `pull_request`, `merge_group` | All, as today |
-| `push` to `main` | Each cache-saving job checks its key with `lookup-only`. On a miss it builds what fills the cache and saves it. Every other job is skipped |
+| `push` to `main` | Each cache-saving job checks its key with `lookup-only`. On a miss it builds what fills the cache and saves it. The `copy-artifacts` job copies the build artifacts. Every other job is skipped |
 
 The cache-saving jobs are those that use `bazel-fetch`, `bazel-fetch-windows`, the vcpkg actions
 and the C++ disk cache. Most pushes hit every key, so the `push` run takes a minute or two. A key
 changes with a dependency or toolchain update, and the next `push` run fills the new cache once.
+
+**Build artifacts stay on `main`'s runs.** A `copy-artifacts` job runs on the `push` only. It
+finds the successful `merge_group` run of `ci` for the pushed commit, downloads its artifacts with
+`actions/download-artifact` (`run-id`, `github-token`, `actions: read`), and uploads them under the
+same names. A `main` run then lists the same artifacts as today, with no second build. The
+artifacts are not advertised. They are for pointing someone at a fix before it is released.
+
+```bash
+gh run list --workflow ci --event merge_group --commit "$GITHUB_SHA" --status success \
+  --limit 1 --json databaseId --jq '.[0].databaseId'
+```
+
+* **With batching**, `main` moves to the last commit of the batch, which the batch's run tested.
+* **A direct push** has no matching run. The job prints a notice and passes, and that `main` run has
+  no artifacts.
 
 A direct push to `main` gets no CI. Direct pushes are kept to files no build or test reads, such
 as `README.md` and `CLAUDE.md`. A change to code always goes through a PR.
@@ -280,9 +295,9 @@ the cost of the PR run. It is a separate decision, revisited once the queue is i
    the branch. The consolidated final commit and its amend-after-push rule are removed, and the
    `(#NNN)` prediction stays for the entry text. `CONTRIBUTING.md` gains the fragment format.
 2. **Changelog hints.** The workflow, `changelog_hints.py`, its test and the `no-changelog` label.
-3. **Merge queue.** The `merge_group` trigger, the cache-only `push` run, then the repository
-   settings. Fragments land first, as a changelog conflict would eject a PR from the
-   queue.
+3. **Merge queue.** The `merge_group` trigger, the cache-only `push` run with `copy-artifacts`,
+   then the repository settings. Fragments land first, as a changelog conflict would eject a PR
+   from the queue.
 
 ## Validation
 
@@ -322,6 +337,8 @@ Phase 3, on a fork with the same settings:
 * Record the number of runs and the wall time for a batch of three, and set the merge limits from
   it.
 * A merge with unchanged cache keys → the `push` run skips every build and finishes in minutes.
+* A merge, and a batch of three → the `push` run on `main` lists the artifacts of the `merge_group`
+  run for the same commit. A direct push → no artifacts, and the run passes.
 * A merge that changes `MODULE.bazel` → the `push` run saves the new repository cache, and the
   next PR run restores it.
 
@@ -340,9 +357,6 @@ Phase 3, on a fork with the same settings:
 
 ## Open questions
 
-* **Build artifacts from `main`.** The `push` run on `main` uploads the mod and client builds
-  today. The cache-only run drops them, and the `merge_group` runs upload them in their place. Who
-  uses them, and where they come from after the change, is to be designed.
 * **Which components take fragments.** The dev changelog page covers the release components only.
   `experimental/ksa`, `tools/buildenv` and `tools/krpctest` have a `CHANGELOG.md` but are not on the
   page, and the root `CHANGELOG.md` is an index. The heading check, the rendering and the fold need
@@ -362,3 +376,5 @@ Phase 3, on a fork with the same settings:
 | Hints for the other contributor rules: entry style, labels, tests | The rules guide maintainers, and a contributor need not follow them. Entry style is tidied in the release preparation PR. Where a test belongs needs an understanding of the change |
 | Danger or a GitHub App for the hints | An extra dependency or a hosted service. A workflow and a short script cover five rules |
 | Towncrier or changesets | Their formats and per-type sections differ from the existing files. The custom parser already exists, and the change is small |
+| A full build on the `push` to `main` for its artifacts | A third full run per PR, for a build identical to the queue run's |
+| A rolling `dev` pre-release on GitHub, or nightly packages | Dev builds should stay unadvertised, so users run the latest tested release. Bazel builds from source for anyone who wants `main`, and the release trains make small fix releases easy |
