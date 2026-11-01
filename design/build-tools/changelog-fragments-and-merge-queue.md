@@ -199,8 +199,10 @@ comment instead. The hints never fail CI.
 | Use a fragment in place of `CHANGELOG.md` | The PR edits a release component's `CHANGELOG.md` and deletes no fragment. A release preparation PR deletes fragments, so it gets no hint |
 
 * **One comment per PR**, found by a hidden marker (`<!-- changelog-hints -->`). Each push edits it,
-  and deletes it once no hint applies.
-* **A `no-changelog` label** removes the comment, for a PR that has been checked and needs no entry.
+  and once no hint applies, says the changelog looks good. A PR with no hints from the start gets
+  no comment.
+* **A `no-changelog` label** marks a PR that has been checked and needs no entry. The comment then
+  says so.
 * **Changed files under a component's `test/` directory** do not count as changes to the component.
 * **Related numbers** are the PR number, every `#NNN` in the description, and the linked issues
   from the GraphQL `closingIssuesReferences` field. Only the entries the PR's diff adds or changes
@@ -359,13 +361,13 @@ Phase 2, on a fork, as `pull_request_target` runs the workflow from the base bra
 
 * A PR from another fork changing `service/SpaceCenter/src` with no fragment → one comment with the
   no-fragment hint.
-* A push adding a fragment for `service/SpaceCenter` → the comment is deleted.
+* A push adding a fragment for `service/SpaceCenter` → the comment says the changelog looks good.
 * A fragment for `server` only → the missing-section and no-changes hints.
 * An edit to `client/python/CHANGELOG.md` → the fragment hint. A release preparation PR → no comment.
 * A fragment entry without `(#NNN)` → the number hint.
 * Entries citing the PR, an issue named in the description and a linked issue → no hint. An entry
   citing another number → the unrelated-number hint, which goes once the description names it.
-* The `no-changelog` label → the comment is deleted.
+* The `no-changelog` label → the comment says the PR needs no entry. Removing it restores the hints.
 
 Phase 3, on a fork with the same settings:
 
