@@ -147,22 +147,27 @@ comment instead. The hints never fail CI.
 | No fragment. Check whether the change needs an entry | The PR changes files under a component with a `CHANGELOG.md` and adds no fragment |
 | `<component>` has changes but no entry | The PR's fragment has no section for a changed component |
 | `<component>` has an entry but no changes | The fragment has a section for a component the PR does not touch |
-| Add the PR or issue number | An entry in the PR's fragment has no `(#NNN)`. The hint does not check which number is cited |
+| Add the PR or issue number | An entry in the PR's fragment has no `(#NNN)` |
+| `#NNN` is not related to this PR | An entry the PR adds or changes cites a number that is neither the PR, a `#NNN` in its description, nor one of its linked issues. Catches a typo or a wrong prediction |
 | Use a fragment in place of `CHANGELOG.md` | The PR edits a `CHANGELOG.md` and deletes no fragment. A fold PR deletes fragments, so it gets no hint |
 
 * **One comment per PR**, found by a hidden marker (`<!-- changelog-hints -->`). Each push edits it,
   and deletes it once no hint applies.
 * **A `no-changelog` label** removes the comment, for a PR that has been checked and needs no entry.
 * **Changed files under a component's `test/` directory** do not count as changes to the component.
+* **Related numbers** are the PR number, every `#NNN` in the description, and the linked issues
+  from the GraphQL `closingIssuesReferences` field. Only the entries the PR's diff adds or changes
+  are checked, so an older fragment edited in passing is left alone.
 
 The workflow runs on `pull_request_target`, as the token of a `pull_request` run from a fork cannot
-comment. It checks out the base branch only, and reads the PR's file list and fragment through the
-API as data. It runs no code from the PR.
+comment. It checks out the base branch only, and reads the PR's file list, diff, description,
+linked issues and fragment through the API as data. It runs no code from the PR.
 
 ```yaml
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    # edited: a new description can change the related numbers
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
 permissions:
   contents: read
   pull-requests: write
@@ -275,7 +280,9 @@ Phase 2, on a fork, as `pull_request_target` runs the workflow from the base bra
 * A push adding a fragment for `service/SpaceCenter` → the comment is deleted.
 * A fragment for `server` only → the missing-section and no-changes hints.
 * An edit to `client/python/CHANGELOG.md` → the fragment hint. A fold PR → no comment.
-* A fragment entry without `(#NNN)` → the number hint. One citing any number → no hint.
+* A fragment entry without `(#NNN)` → the number hint.
+* Entries citing the PR, an issue named in the description and a linked issue → no hint. An entry
+  citing another number → the unrelated-number hint, which goes once the description names it.
 * The `no-changelog` label → the comment is deleted.
 
 Phase 3, on a fork with the same settings:
@@ -294,8 +301,8 @@ Phase 3, on a fork with the same settings:
 * **Order follows the first `#NNN`.** A fragment citing an old issue before its PR number sorts
   early, and a topic first appears with the earliest fragment that uses it. The release
   preparation PR is where the order is curated.
-* **A wrong `(#NNN)` goes unnoticed.** The hint checks that a number is there, not which one. The
-  fold PR is the place to catch it.
+* **The unrelated-number hint is best effort.** An entry may rightly cite an issue the PR does not
+  mention, and the hint is then ignored. A wrong number that the description also cites passes.
 * **Editing an entry from another PR** means editing its fragment. That edit can conflict, though
   rarely.
 * **Two CI runs per PR.** The second run is unattended, and it catches breakage between PRs.
