@@ -297,5 +297,6 @@ Phase 3, on a fork with the same settings:
 | Changelog entries written by a bot from the PR description after merge | The text is no longer reviewed in the PR, and a bot commits to `main` |
 | `strict` off with auto-merge, and no queue | Cheaper, one run per PR, and equally hands-off. Breakage between PRs reaches `main` and is fixed by a follow-up PR. Kept as the fallback if the queue's second run proves too slow |
 | Changelog hints as a failing check | A change with no user-facing effect is common, and would need an override on every such PR |
+| Hints for the other contributor rules: entry style, labels, tests | The rules guide maintainers, and a contributor need not follow them. Entry style is tidied in the fold PR. Where a test belongs needs an understanding of the change |
 | Danger or a GitHub App for the hints | An extra dependency or a hosted service. A workflow and a short script cover four rules |
 | Towncrier or changesets | Their formats and per-type sections differ from the existing files. The custom parser already exists, and the change is small |
