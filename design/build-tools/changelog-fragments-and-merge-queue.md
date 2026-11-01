@@ -319,6 +319,8 @@ Implementation notes, where the code differs from or adds to the design:
 * The shared module is `tools/release/changelog.py`, exposed to Bazel as `//:changelog`. It holds
   `COMPONENTS` as a written list, as the Bazel actions cannot glob the tree. `10-preflight.py`
   checks the list against the `service/*` and `client/*` directories.
+* The release scripts stay numbered in the order a release runs them: the fold is
+  `01-fold-changelogs.py`, and the bump is renumbered `02-bump-version.py`.
 * A fragment must sit directly in `changelog.d/`. A file in a subdirectory fails the check.
 * `fold-changelogs.py` refuses to run on `main`, and checks that the folded files parse back to the
   merged entries. `10-preflight.py` and `30-tag.py` also fail on a commit with no section for the
