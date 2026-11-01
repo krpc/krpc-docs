@@ -262,7 +262,7 @@ later PR and queue runs restore.
 | Event | Jobs |
 | --- | --- |
 | `pull_request`, `merge_group` | All, as today |
-| `push` to `main` | Each cache-saving job checks its key with `lookup-only`. On a miss it builds what fills the cache and saves it. The `copy-artifacts` job copies the build artifacts. Every other job is skipped |
+| `push` to `main` | Each cache-saving job checks its key with `lookup-only`, except the Bazel repository cache, which is restored as the C++ disk cache key fetches repositories. On a miss it builds what fills the cache and saves it. The `copy-artifacts` job copies the build artifacts. Every other job is skipped |
 
 The cache-saving jobs are those that use `bazel-fetch`, `bazel-fetch-windows`, the vcpkg actions
 and the C++ disk cache. Most pushes hit every key, so the `push` run takes a minute or two. A key
