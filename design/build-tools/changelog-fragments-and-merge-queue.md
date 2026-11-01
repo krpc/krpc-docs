@@ -101,7 +101,8 @@ can be reordered and edited before tagging.
 
 ### Fragment checks
 
-A `py_test` in `//:test` checks every fragment:
+A `py_test` in `//:test` checks every file in `changelog.d/`, not only the `*.md` ones, so a
+misnamed file such as `fix-wait.md` or `1240-fix.MD` cannot sit there unread:
 
 * the name matches `^[0-9]+-[a-z0-9._-]+\.md$`
 * each `##` heading names a directory with a `CHANGELOG.md`
@@ -109,6 +110,28 @@ A `py_test` in `//:test` checks every fragment:
 
 A `ci.yml` step on `pull_request` checks that fragments the PR adds carry its PR number. A wrong
 prediction then fails the PR run before the PR can enter the queue.
+
+### Failure handling
+
+The parser is strict everywhere. A bad fragment fails with its file, line and the expected form,
+and is never skipped, as a skipped fragment drops its entries from the release without notice.
+
+| Where a bad fragment is caught | Effect |
+| --- | --- |
+| The PR run: the fragment test and `//doc:html` | `all-checks-passed` fails, so the PR cannot enter the queue |
+| The queue run | The PR is removed from the queue. This only happens for a fragment edited by a PR ahead of it |
+| `main`, after an administrator bypasses the queue | The `push` run and the docs workflow fail, and the dev docs stop updating until a follow-up PR fixes the fragment |
+| `fold-changelogs.py` and `10-preflight.py` | The release stops before tagging |
+
+An external contributor's PR fails the same check, with the message pointing at the format in
+`CONTRIBUTING.md`. As `CONTRIBUTING.md` already says for a missing entry, a maintainer may instead
+push the fix to the contributor's branch. Usually that is a rename to the PR number.
+
+The checks cannot catch three mistakes, which are left to review:
+
+* a user-facing change with no fragment
+* an entry under the wrong component
+* an entry added to `CHANGELOG.md` out of habit. It still renders, but it can conflict again
 
 ### Merge queue
 
@@ -170,6 +193,7 @@ the cost of the PR run. It is a separate decision, revisited once the queue is i
    `10-preflight.py`, `publish-docs.py`, the fragment checks and the PR number check. The changelog
    rules in the `krpc` `CLAUDE.md` change to: add a fragment, named `<PR>-<branch>.md`, with entries
    that omit `(#NNN)`. The consolidated final commit and its amend-after-push rule are removed.
+   `CONTRIBUTING.md` gains the fragment format.
 2. **Merge queue.** The `merge_group` trigger, then the repository settings. Fragments land first,
    as a changelog conflict would eject a PR from the queue.
 
@@ -182,7 +206,8 @@ Phase 1:
 * `fold-changelogs.py` on the same tree → the `CHANGELOG.md` files match the rendered page, and
   `changelog.d/` is empty.
 * `publish-docs.py` for a released version with fragments present → no unreleased section.
-* A misnamed fragment, and one with an unknown component → the test fails.
+* A misnamed fragment, a file without the `.md` extension, a fragment with an unknown component,
+  and one that does not parse → the test and `//doc:html` both fail, naming the file and line.
 
 Phase 2, on a fork with the same settings:
 
