@@ -79,8 +79,13 @@ release, so a branch name reused within a release cycle collides the same way.
 ### Rendering unreleased entries
 
 The unreleased section of a component is its `CHANGELOG.md` unreleased section followed by its
-fragments, ordered by the time of the commit that added each fragment. That order is close to the
-order the PRs were opened. A later edit to a fragment does not move it.
+fragments, sorted by their content alone:
+
+1. Fragments citing an issue or PR, by the first `#NNN` in the file. That is usually the PR number,
+   which gives the order the PRs were opened.
+2. Then fragments with no `#NNN`, by file name.
+
+The order is approximate. The fold PR at release is where entries are reordered by hand.
 
 * `doc/changeloggen.py` merges the fragments, so the dev docs show each entry once its PR merges.
   `doc/changelog.bzl` takes the fragments as one more input, through a `glob(["changelog.d/*.md"])`
@@ -92,20 +97,6 @@ order the PRs were opened. A later edit to a fragment does not move it.
 
 The fragment parser and the merge live in one Python module shared by `changeloggen.py`,
 `changes.py` and the fold script.
-
-### Fragment order
-
-`changeloggen` runs as a Bazel action, which has no access to the git history. The order reaches it
-through stamping:
-
-* A `workspace_status_command` prints `STABLE_CHANGELOG_ORDER`, the fragment names sorted by the
-  commit time from `git log --diff-filter=A -- changelog.d/`.
-* The `changeloggen` rule reads the stable status file when the build is stamped.
-* `docs.yml` builds with `--stamp`, and checks out with the history back to the last release tag.
-* An unstamped build, as in CI and most local builds, orders the fragments by name.
-
-`changes.py` and `fold-changelogs.py` run in a git checkout, and call the same `git log` directly.
-The fold writes that order into `CHANGELOG.md`.
 
 ### Folding at release
 
@@ -255,8 +246,7 @@ the cost of the PR run. It is a separate decision, revisited once the queue is i
 ## Phases
 
 1. **Fragments.** The shared module, `changeloggen.py`, `changes.py`, `fold-changelogs.py`,
-   `10-preflight.py`, `publish-docs.py`, the fragment checks, the stamped order and the `docs.yml`
-   checkout. The changelog rules in the `krpc` `CLAUDE.md` change to: add a fragment named after
+   `10-preflight.py`, `publish-docs.py` and the fragment checks. The changelog rules in the `krpc` `CLAUDE.md` change to: add a fragment named after
    the branch. The consolidated final commit and its amend-after-push rule are removed, and the
    `(#NNN)` prediction stays for the entry text. `CONTRIBUTING.md` gains the fragment format.
 2. **Changelog hints.** The workflow, `changelog_hints.py`, its test and the `no-changelog` label.
@@ -270,8 +260,8 @@ Phase 1:
 
 * `//doc:html` with two fragments that share a topic and a component, plus existing unreleased
   entries → one merged section, topics merged.
-* The same build with `--stamp`, the fragments added in two commits in the reverse of their name
-  order → the page follows the commit order. An edit to the older fragment does not move it.
+* Fragments citing `#1230` and `#1225` and one with no number → `#1225`, then `#1230`, then the
+  unnumbered one.
 * `fold-changelogs.py` on the same tree → the `CHANGELOG.md` files match the rendered page, and
   `changelog.d/` is empty.
 * `publish-docs.py` for a released version with fragments present → no unreleased section.
@@ -301,10 +291,9 @@ Phase 3, on a fork with the same settings:
 
 ## Trade-offs
 
-* **Topic order follows commit order.** A topic first appears with the oldest fragment that uses
-  it. The release preparation PR is where the order is curated.
-* **The dev docs need stamping for the order.** An unstamped build lists fragments by name, which
-  only affects local and CI builds.
+* **Order follows the first `#NNN`.** A fragment citing an old issue before its PR number sorts
+  early, and a topic first appears with the earliest fragment that uses it. The release
+  preparation PR is where the order is curated.
 * **A wrong `(#NNN)` goes unnoticed.** The hint checks that a number is there, not which one. The
   fold PR is the place to catch it.
 * **Editing an entry from another PR** means editing its fragment. That edit can conflict, though
@@ -317,8 +306,7 @@ Phase 3, on a fork with the same settings:
 | --- | --- |
 | A fragment directory per component, or a subdirectory per topic | One PR would write several files. A flat directory with one file per PR mirrors the PR |
 | The PR number in the fragment name, appended to entries by the generator | The number is unknown until the PR opens, so most outside contributions fail their first run |
-| Order by fragment name, with no git history | The order is arbitrary on the dev docs until the fold |
-| Order by the commit that last changed a fragment | A typo fix moves an entry to the end |
+| Order by the commit that added each fragment | The Bazel action has no git history. It needs stamping and a deeper checkout in the docs workflow, for an order the fold PR curates anyway |
 | `merge=union` in `.gitattributes` for `CHANGELOG.md` | GitHub's PR merge is not known to honor merge drivers (unverified), and a union merge can mangle the topic sub-lists |
 | Changelog entries written by a bot from the PR description after merge | The text is no longer reviewed in the PR, and a bot commits to `main` |
 | `strict` off with auto-merge, and no queue | Cheaper, one run per PR, and equally hands-off. Breakage between PRs reaches `main` and is fixed by a follow-up PR. Kept as the fallback if the queue's second run proves too slow |
