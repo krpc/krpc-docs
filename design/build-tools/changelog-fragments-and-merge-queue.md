@@ -304,7 +304,7 @@ Repository settings, in the `main pull request required` ruleset on `main`:
 | Merge method | merge commit |
 | Grouping strategy | all entries must pass (`ALLGREEN`) |
 | Build concurrency | 1, see [Cost](#cost) |
-| Group size | 1 to 3, with a 5 minute wait for the minimum |
+| Group size | 1, each PR tested and merged on its own |
 | Status check timeout | 60 minutes |
 
 ### Cost
@@ -313,9 +313,11 @@ Each PR now takes two full runs, its own and its queue run. The organization is 
 which allows 20 concurrent jobs. A run has 44 jobs, so one run already fills the runners, and a
 build concurrency above 1 mostly queues jobs.
 
-Throughput comes from batching instead. The merge limits let one passing run merge several queued
-PRs. The size of a batch and its effect on cost are measured during [validation](#validation)
-before settling on the limits.
+Each queued PR gets its own run, of `main` plus the PRs ahead of it plus itself. With all entries
+required to pass (`ALLGREEN`), a larger group saves no runs: it only merges several passing PRs at
+once. Only `HEADGREEN` lets one run cover several PRs, and then a PR whose own commit was never
+tested can merge. The queue is for unattended merging, not speed: queued PRs merge one at a time,
+about 14 minutes each, and a failing PR is removed while the rest go on. So the group size is 1.
 
 Skipping the Windows jobs on PR runs, phase 1 of [CI lite](ci-lite-merge-queue.md#phases), halves
 the cost of the PR run. It is a separate decision, revisited once the queue is in use.
@@ -410,9 +412,9 @@ Phase 3, on a fork with the same settings:
 * **Two PRs queued together**, #1244 and #1243, 5 seconds apart. With build concurrency 1 and a
   minimum group size of 1, the queue tested them one at a time: #1244 on `main`, then #1243 on
   #1244, 14 and 13 minutes. `main` moved to each tested commit, and each push run copied the 12
-  artifacts of its own queue run. Batching needs a minimum group size above 1, at the cost of the
-  wait for a lone PR.
-* **Open:** the failure cases of phase 3 and the merge limits, a `MODULE.bazel` change, and the
+  artifacts of its own queue run. The maximum group size was then set to 1, as `ALLGREEN` gives
+  each PR its own run whatever the group size.
+* **Open:** the failure cases of phase 3, a `MODULE.bazel` change, and the
   first release with fragments.
 
 ## Trade-offs
