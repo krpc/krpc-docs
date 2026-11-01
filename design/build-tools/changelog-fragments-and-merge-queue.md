@@ -128,11 +128,38 @@ An external contributor's PR fails the same check, with the message pointing at 
 `CONTRIBUTING.md`. As `CONTRIBUTING.md` already says for a missing entry, a maintainer may instead
 push the fix to the contributor's branch. Usually that is a rename to the PR number.
 
-The checks cannot catch three mistakes, which are left to review:
+### Changelog hints
 
-* a user-facing change with no fragment
-* an entry under the wrong component
-* an entry added to `CHANGELOG.md` out of habit. It still renders, but it can conflict again
+The checks cannot judge whether a change is user-facing. A workflow posts hints on the PR as a
+comment instead. The hints never fail CI.
+
+| Hint | Posted when |
+| --- | --- |
+| No fragment. Check whether the change needs an entry | The PR changes files under a component with a `CHANGELOG.md` and adds no fragment |
+| `<component>` has changes but no entry | The PR's fragment has no section for a changed component |
+| `<component>` has an entry but no changes | The fragment has a section for a component the PR does not touch |
+| Use a fragment in place of `CHANGELOG.md` | The PR edits a `CHANGELOG.md` and deletes no fragment. A fold PR deletes fragments, so it gets no hint |
+
+* **One comment per PR**, found by a hidden marker (`<!-- changelog-hints -->`). Each push edits it,
+  and deletes it once no hint applies.
+* **A `no-changelog` label** removes the comment, for a PR that has been checked and needs no entry.
+* **Changed files under a component's `test/` directory** do not count as changes to the component.
+
+The workflow runs on `pull_request_target`, as the token of a `pull_request` run from a fork cannot
+comment. It checks out the base branch only, and reads the PR's file list and fragment through the
+API as data. It runs no code from the PR.
+
+```yaml
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+permissions:
+  contents: read
+  pull-requests: write
+```
+
+The logic sits in `tools/ci/changelog_hints.py`, which uses `gh` and the shared fragment parser. A
+`py_test` in `//:test` covers the rules with canned file lists.
 
 ### Merge queue
 
@@ -213,7 +240,8 @@ the cost of the PR run. It is a separate decision, revisited once the queue is i
    rules in the `krpc` `CLAUDE.md` change to: add a fragment, named `<PR>-<branch>.md`, with entries
    that omit `(#NNN)`. The consolidated final commit and its amend-after-push rule are removed.
    `CONTRIBUTING.md` gains the fragment format.
-2. **Merge queue.** The `merge_group` trigger, the cache-only `push` run, `30-tag.py`, then the
+2. **Changelog hints.** The workflow, `changelog_hints.py`, its test and the `no-changelog` label.
+3. **Merge queue.** The `merge_group` trigger, the cache-only `push` run, `30-tag.py`, then the
    repository settings. Fragments land first, as a changelog conflict would eject a PR from the
    queue.
 
@@ -229,7 +257,16 @@ Phase 1:
 * A misnamed fragment, a file without the `.md` extension, a fragment with an unknown component,
   and one that does not parse → the test and `//doc:html` both fail, naming the file and line.
 
-Phase 2, on a fork with the same settings:
+Phase 2, on a fork, as `pull_request_target` runs the workflow from the base branch:
+
+* A PR from another fork changing `service/SpaceCenter/src` with no fragment → one comment with the
+  no-fragment hint.
+* A push adding a fragment for `service/SpaceCenter` → the comment is deleted.
+* A fragment for `server` only → the missing-section and no-changes hints.
+* An edit to `client/python/CHANGELOG.md` → the fragment hint. A fold PR → no comment.
+* The `no-changelog` label → the comment is deleted.
+
+Phase 3, on a fork with the same settings:
 
 * Queue three PRs → all merge without further action.
 * Queue three PRs, the middle one failing → it is removed, the other two merge.
@@ -259,4 +296,6 @@ Phase 2, on a fork with the same settings:
 | `merge=union` in `.gitattributes` for `CHANGELOG.md` | GitHub's PR merge is not known to honor merge drivers (unverified), and a union merge can mangle the topic sub-lists |
 | Changelog entries written by a bot from the PR description after merge | The text is no longer reviewed in the PR, and a bot commits to `main` |
 | `strict` off with auto-merge, and no queue | Cheaper, one run per PR, and equally hands-off. Breakage between PRs reaches `main` and is fixed by a follow-up PR. Kept as the fallback if the queue's second run proves too slow |
+| Changelog hints as a failing check | A change with no user-facing effect is common, and would need an override on every such PR |
+| Danger or a GitHub App for the hints | An extra dependency or a hosted service. A workflow and a short script cover four rules |
 | Towncrier or changesets | Their formats and per-type sections differ from the existing files. The custom parser already exists, and the change is small |
