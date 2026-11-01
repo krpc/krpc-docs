@@ -35,10 +35,10 @@ The changelog rules themselves are worth keeping:
 ### Fragments
 
 A PR adds one new file to a flat directory at the repository root, `changelog.d/`, named after its
-PR number and branch:
+branch:
 
 ```
-changelog.d/1219-single-connection.md
+changelog.d/single-connection.md
 ```
 
 ```markdown
@@ -46,13 +46,14 @@ changelog.d/1219-single-connection.md
 
 - Connections
   - **Breaking:** Connect over one connection, removing the `stream_port` and `stream_path`
-    parameters of `connect` and `connect_local`
+    parameters of `connect` and `connect_local` (#1219)
   - Add `handshake_timeout` and `stall_timeout` parameters to `connect` and `connect_local`
-- Fix `Stream.wait` returning before the timeout on Windows
+    (#1219)
+- Fix `Stream.wait` returning before the timeout on Windows (#1174)
 
 ## server
 
-- Accept clients over one connection
+- Accept clients over one connection (#1219)
 ```
 
 * **Component:** a `## <dir>` heading, where `<dir>/CHANGELOG.md` exists. One fragment covers every
@@ -60,20 +61,26 @@ changelog.d/1219-single-connection.md
 * **Entries:** the `CHANGELOG.md` bullet syntax, markers and wrapping rules, unchanged.
 * **Topics:** a top-level bullet with sub-items is a topic, as in `CHANGELOG.md` today. Topics with
   the same text merge across fragments.
-* **PR number:** taken from the file name and appended as `(#NNN)` to each entry that does not
-  already end with an issue reference. A wrong prediction is fixed by renaming the file.
+* **Name:** the branch name, with `/` replaced by `-`. Any name unique among the fragments works.
+  The name carries no meaning, so the PR number is not needed before the PR opens.
+* **Issue references:** written in the entry, as in `CHANGELOG.md` today. An entry may cite the PR
+  or the issue it fixes.
 
-Two PRs only ever add different files, so fragments cannot conflict. Stacked PRs each carry their
+Two PRs add different files, so fragments do not conflict apart from a name clash, below. Stacked PRs each carry their
 own fragment. A PR with no user-facing change adds none.
 
-The PR number is predicted as today, one more than the highest existing number. The fragment can
-be committed with the change it describes. The final consolidated changelog commit is no longer
-needed.
+The fragment can be committed with the change it describes. The final consolidated changelog
+commit is no longer needed.
+
+Two PRs with the same branch name, such as the web editor's `patch-1`, add the same file. GitHub
+shows the second as conflicting, and renaming its fragment resolves it. A fragment stays until the
+release, so a branch name reused within a release cycle collides the same way.
 
 ### Rendering unreleased entries
 
 The unreleased section of a component is its `CHANGELOG.md` unreleased section followed by its
-fragments, in PR number order.
+fragments, ordered by the time of the commit that added each fragment. That order is close to the
+order the PRs were opened. A later edit to a fragment does not move it.
 
 * `doc/changeloggen.py` merges the fragments, so the dev docs show each entry once its PR merges.
   `doc/changelog.bzl` takes the fragments as one more input, through a `glob(["changelog.d/*.md"])`
@@ -85,6 +92,20 @@ fragments, in PR number order.
 
 The fragment parser and the merge live in one Python module shared by `changeloggen.py`,
 `changes.py` and the fold script.
+
+### Fragment order
+
+`changeloggen` runs as a Bazel action, which has no access to the git history. The order reaches it
+through stamping:
+
+* A `workspace_status_command` prints `STABLE_CHANGELOG_ORDER`, the fragment names sorted by the
+  commit time from `git log --diff-filter=A -- changelog.d/`.
+* The `changeloggen` rule reads the stable status file when the build is stamped.
+* `docs.yml` builds with `--stamp`, and checks out with the history back to the last release tag.
+* An unstamped build, as in CI and most local builds, orders the fragments by name.
+
+`changes.py` and `fold-changelogs.py` run in a git checkout, and call the same `git log` directly.
+The fold writes that order into `CHANGELOG.md`.
 
 ### Folding at release
 
@@ -103,14 +124,11 @@ lands on a commit the queue has tested, and the release pushes no commit to `mai
 ### Fragment checks
 
 A `py_test` in `//:test` checks every file in `changelog.d/`, not only the `*.md` ones, so a
-misnamed file such as `fix-wait.md` or `1240-fix.MD` cannot sit there unread:
+misnamed file such as `fix-wait.txt` or `fix-wait.MD` cannot sit there unread:
 
-* the name matches `^[0-9]+-[a-z0-9._-]+\.md$`
+* the name matches `^[A-Za-z0-9._-]+\.md$`
 * each `##` heading names a directory with a `CHANGELOG.md`
 * the body parses, with no text outside a component section
-
-A `ci.yml` step on `pull_request` checks that fragments the PR adds carry its PR number. A wrong
-prediction then fails the PR run before the PR can enter the queue.
 
 ### Failure handling
 
@@ -126,7 +144,7 @@ and is never skipped, as a skipped fragment drops its entries from the release w
 
 An external contributor's PR fails the same check, with the message pointing at the format in
 `CONTRIBUTING.md`. As `CONTRIBUTING.md` already says for a missing entry, a maintainer may instead
-push the fix to the contributor's branch. Usually that is a rename to the PR number.
+push the fix to the contributor's branch.
 
 ### Changelog hints
 
@@ -138,6 +156,7 @@ comment instead. The hints never fail CI.
 | No fragment. Check whether the change needs an entry | The PR changes files under a component with a `CHANGELOG.md` and adds no fragment |
 | `<component>` has changes but no entry | The PR's fragment has no section for a changed component |
 | `<component>` has an entry but no changes | The fragment has a section for a component the PR does not touch |
+| Add the PR or issue number | An entry in the PR's fragment has no `(#NNN)`. The hint does not check which number is cited |
 | Use a fragment in place of `CHANGELOG.md` | The PR edits a `CHANGELOG.md` and deletes no fragment. A fold PR deletes fragments, so it gets no hint |
 
 * **One comment per PR**, found by a hidden marker (`<!-- changelog-hints -->`). Each push edits it,
@@ -236,10 +255,10 @@ the cost of the PR run. It is a separate decision, revisited once the queue is i
 ## Phases
 
 1. **Fragments.** The shared module, `changeloggen.py`, `changes.py`, `fold-changelogs.py`,
-   `10-preflight.py`, `publish-docs.py`, the fragment checks and the PR number check. The changelog
-   rules in the `krpc` `CLAUDE.md` change to: add a fragment, named `<PR>-<branch>.md`, with entries
-   that omit `(#NNN)`. The consolidated final commit and its amend-after-push rule are removed.
-   `CONTRIBUTING.md` gains the fragment format.
+   `10-preflight.py`, `publish-docs.py`, the fragment checks, the stamped order and the `docs.yml`
+   checkout. The changelog rules in the `krpc` `CLAUDE.md` change to: add a fragment named after
+   the branch. The consolidated final commit and its amend-after-push rule are removed, and the
+   `(#NNN)` prediction stays for the entry text. `CONTRIBUTING.md` gains the fragment format.
 2. **Changelog hints.** The workflow, `changelog_hints.py`, its test and the `no-changelog` label.
 3. **Merge queue.** The `merge_group` trigger, the cache-only `push` run, `30-tag.py`, then the
    repository settings. Fragments land first, as a changelog conflict would eject a PR from the
@@ -250,7 +269,9 @@ the cost of the PR run. It is a separate decision, revisited once the queue is i
 Phase 1:
 
 * `//doc:html` with two fragments that share a topic and a component, plus existing unreleased
-  entries → one merged section, topics merged, PR numbers from the file names.
+  entries → one merged section, topics merged.
+* The same build with `--stamp`, the fragments added in two commits in the reverse of their name
+  order → the page follows the commit order. An edit to the older fragment does not move it.
 * `fold-changelogs.py` on the same tree → the `CHANGELOG.md` files match the rendered page, and
   `changelog.d/` is empty.
 * `publish-docs.py` for a released version with fragments present → no unreleased section.
@@ -264,6 +285,7 @@ Phase 2, on a fork, as `pull_request_target` runs the workflow from the base bra
 * A push adding a fragment for `service/SpaceCenter` → the comment is deleted.
 * A fragment for `server` only → the missing-section and no-changes hints.
 * An edit to `client/python/CHANGELOG.md` → the fragment hint. A fold PR → no comment.
+* A fragment entry without `(#NNN)` → the number hint. One citing any number → no hint.
 * The `no-changelog` label → the comment is deleted.
 
 Phase 3, on a fork with the same settings:
@@ -279,10 +301,12 @@ Phase 3, on a fork with the same settings:
 
 ## Trade-offs
 
-* **Topic order follows PR order.** A topic first appears with the lowest-numbered fragment that
-  uses it. The release preparation PR is where the order is curated.
-* **The PR number is still predicted.** A wrong guess costs a rename and a push, caught by the PR
-  run before the queue.
+* **Topic order follows commit order.** A topic first appears with the oldest fragment that uses
+  it. The release preparation PR is where the order is curated.
+* **The dev docs need stamping for the order.** An unstamped build lists fragments by name, which
+  only affects local and CI builds.
+* **A wrong `(#NNN)` goes unnoticed.** The hint checks that a number is there, not which one. The
+  fold PR is the place to catch it.
 * **Editing an entry from another PR** means editing its fragment. That edit can conflict, though
   rarely.
 * **Two CI runs per PR.** The second run is unattended, and it catches breakage between PRs.
@@ -292,11 +316,13 @@ Phase 3, on a fork with the same settings:
 | Alternative | Rejected because |
 | --- | --- |
 | A fragment directory per component, or a subdirectory per topic | One PR would write several files. A flat directory with one file per PR mirrors the PR |
-| A random or branch-only fragment name, with the number added after the PR opens | A second commit and push after opening the PR. The prediction is usually right |
+| The PR number in the fragment name, appended to entries by the generator | The number is unknown until the PR opens, so most outside contributions fail their first run |
+| Order by fragment name, with no git history | The order is arbitrary on the dev docs until the fold |
+| Order by the commit that last changed a fragment | A typo fix moves an entry to the end |
 | `merge=union` in `.gitattributes` for `CHANGELOG.md` | GitHub's PR merge is not known to honor merge drivers (unverified), and a union merge can mangle the topic sub-lists |
 | Changelog entries written by a bot from the PR description after merge | The text is no longer reviewed in the PR, and a bot commits to `main` |
 | `strict` off with auto-merge, and no queue | Cheaper, one run per PR, and equally hands-off. Breakage between PRs reaches `main` and is fixed by a follow-up PR. Kept as the fallback if the queue's second run proves too slow |
 | Changelog hints as a failing check | A change with no user-facing effect is common, and would need an override on every such PR |
 | Hints for the other contributor rules: entry style, labels, tests | The rules guide maintainers, and a contributor need not follow them. Entry style is tidied in the fold PR. Where a test belongs needs an understanding of the change |
-| Danger or a GitHub App for the hints | An extra dependency or a hosted service. A workflow and a short script cover four rules |
+| Danger or a GitHub App for the hints | An extra dependency or a hosted service. A workflow and a short script cover five rules |
 | Towncrier or changesets | Their formats and per-type sections differ from the existing files. The custom parser already exists, and the change is small |
