@@ -97,7 +97,7 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 | ⬜ | `GetStatus` returns a kRPC struct in place of the `KRPC.Status` protobuf message | [#1197](https://github.com/krpc/krpc/issues/1197), **relabel** | enhancement, server, protocol, client | — |
 | ⬜ | DockingCamera on the public Docking Camera (KURS) release; with the LIDAR deprecation, supersedes #674 | [#1232](https://github.com/krpc/krpc/issues/1232) | feature, mod-compatibility, service, ksp | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ⬜ | Deprecate LIDAR in favor of `SpaceCenter.RaycastDistance`, and raycasts ignore trigger colliders; folds in #1181 | [#1233](https://github.com/krpc/krpc/issues/1233) | feature, mod-compatibility, service, ksp | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
-| ⬜ | Client name collisions: a scanner rule on member names, a contract for client naming, `ConfigNode` renames | **To file** | enhancement, server, client, tools | [protocol/client-name-collisions.md](design/protocol/client-name-collisions.md) |
+| ⬜ | Client name collisions: a scanner rule on member names, a contract for client naming, `ConfigNode` renames | [#1237](https://github.com/krpc/krpc/issues/1237), **add milestone** | bug, server, client, tools | [protocol/client-name-collisions.md](design/protocol/client-name-collisions.md) |
 
 * **Single connection first.** It changes connection setup and threading in every client, so the
   conformance suite is written against it rather than rewritten after it.

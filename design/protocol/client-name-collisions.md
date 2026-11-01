@@ -1,6 +1,6 @@
 # Client name collisions
 
-**Status:** proposal (2026-10-31). Issue: to file.
+**Status:** proposal (2026-10-31). Issue: [#1237](https://github.com/krpc/krpc/issues/1237).
 
 ## Problem
 
