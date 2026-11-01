@@ -250,6 +250,8 @@ changes with a dependency or toolchain update, and the next `push` run fills the
 finds the successful `merge_group` run of `ci` for the pushed commit, downloads its artifacts with
 `actions/download-artifact` (`run-id`, `github-token`, `actions: read`), and uploads them under the
 same names. A `main` run then lists the same artifacts as today, with no second build. The
+`build-setup` action stamps the version from the commit, as `0.8.0-<count>-g<sha>`, so the copied
+builds carry the version a build on `main` would. The
 artifacts are not advertised. They are for pointing someone at a fix before it is released.
 
 ```bash
