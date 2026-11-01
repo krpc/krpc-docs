@@ -1,8 +1,8 @@
 # Changelog fragments and a merge queue
 
-**Status:** in progress, 2026-11-01. Phases 1-3 are implemented locally, not yet pushed or
-opened as pull requests. Open: the `no-changelog` label, the branch protection settings, and the
-fork validation of phases 2 and 3.
+**Status:** deployed, 2026-11-01. Phases 1-3 merged as krpc #1239, #1240 and #1242, and the merge
+queue is on. Open: the batching measurements of phase 3, a direct push to `main`, and the first
+release with fragments. See [Deployment](#deployment).
 **Scope:** the changelog tooling (`doc/changeloggen.py`, `doc/changelog.bzl`, `tools/release/`), the
 changelog rules in the `krpc` `CLAUDE.md`, `.github/workflows/ci.yml`, and the branch protection
 settings of `main`.
@@ -290,15 +290,18 @@ gh run list --workflow ci --event merge_group --commit "$GITHUB_SHA" --status su
 A direct push to `main` gets no CI. Direct pushes are kept to files no build or test reads, such
 as `README.md` and `CLAUDE.md`. A change to code always goes through a PR.
 
-Repository settings, on `main`:
+Repository settings, in the `main pull request required` ruleset on `main`:
 
 | Setting | Value |
 | --- | --- |
 | Require status checks to pass | `all-checks-passed`, unchanged |
 | Require branches to be up to date (`strict`) | off |
+| Allowed merge methods | merge commit only |
 | Require merge queue | on |
-| Merge method | merge commit, the only one the repository allows |
-| Build concurrency | 1 to start, see [Cost](#cost) |
+| Merge method | merge commit |
+| Grouping strategy | all entries must pass (`ALLGREEN`) |
+| Build concurrency | 2. The design called for 1, see [Cost](#cost) |
+| Group size | 1 to 3, with a 5 minute wait for the minimum |
 | Status check timeout | 60 minutes |
 
 ### Cost
@@ -381,6 +384,24 @@ Phase 3, on a fork with the same settings:
   run for the same commit. A direct push → no artifacts, and the run passes.
 * A merge that changes `MODULE.bazel` → the `push` run saves the new repository cache, and the
   next PR run restores it.
+
+## Deployment
+
+* **Phase 1**, #1239, merged 2026-11-01.
+* **Phase 2**, #1240, merged 2026-11-01. Validated on test PR #1241, from a branch in the repository
+  rather than a fork: no fragment, a fragment that does not parse, an unrelated number, the fix,
+  and adding and removing `no-changelog`. The first run deleted the comment once no hint applied.
+  That read as if nothing had happened, so a direct push to `main` keeps the comment and says the
+  changelog looks good.
+* **`pull_request_target` policy.** From 2026-12-02, GitHub blocks `pull_request_target` on public
+  repositories by default. The repository Actions policy `Allow pull_request_target` allows it for
+  `.github/workflows/changelog-hints.yml` only.
+* **Phase 3**, #1242, the first PR through the queue, merged 2026-11-01. The branch protection
+  moved to rulesets first. The `merge_group` run passed, and `main` moved to the commit it tested.
+  The `push` run took 2 minutes: the cache jobs hit their keys, the build and test jobs were
+  skipped, and `copy-artifacts` copied all 12 artifacts.
+* **Open:** the batching and failure cases of phase 3 and the merge limits, a direct push, a
+  `MODULE.bazel` change, and the first release with fragments.
 
 ## Trade-offs
 
