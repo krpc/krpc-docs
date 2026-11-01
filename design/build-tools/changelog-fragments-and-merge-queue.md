@@ -89,14 +89,15 @@ The fragment parser and the merge live in one Python module shared by `changelog
 ### Folding at release
 
 A new script, `tools/release/fold-changelogs.py`, writes the fragments into the `CHANGELOG.md`
-files and deletes them. Its output goes through a release preparation PR, where the merged entries
-can be reordered and edited before tagging.
+files, deletes them and strips `- unreleased` from the headers. Its output goes through a release
+preparation PR, where the merged entries can be reordered and edited before tagging. The tag then
+lands on a commit the queue has tested, and the release pushes no commit to `main`.
 
 | Script | Change |
 | --- | --- |
-| `fold-changelogs.py` | New. Folds every fragment into its component's unreleased section |
-| `10-preflight.py` | Fails while `changelog.d/` holds a fragment |
-| `30-tag.py` | Unchanged. Strips `- unreleased` from the folded files |
+| `fold-changelogs.py` | New. Folds every fragment into its component's section, and marks the section released |
+| `10-preflight.py` | Fails while `changelog.d/` holds a fragment, or a header still reads `- unreleased` |
+| `30-tag.py` | Tags `main` and pushes the tag only. The finalize commit, the push of `main` and the wait for its CI run are removed |
 | `publish-docs.py` | Removes `changelog.d/` from the grafted worktree, as a frozen version has no unreleased entries |
 
 ### Fragment checks
@@ -120,7 +121,7 @@ and is never skipped, as a skipped fragment drops its entries from the release w
 | --- | --- |
 | The PR run: the fragment test and `//doc:html` | `all-checks-passed` fails, so the PR cannot enter the queue |
 | The queue run | The PR is removed from the queue. This only happens for a fragment edited by a PR ahead of it |
-| `main`, after an administrator bypasses the queue | The `push` run and the docs workflow fail, and the dev docs stop updating until a follow-up PR fixes the fragment |
+| `main`, after a direct push edits a fragment | The docs workflow fails, and the dev docs stop updating until a follow-up PR fixes the fragment |
 | `fold-changelogs.py` and `10-preflight.py` | The release stops before tagging |
 
 An external contributor's PR fails the same check, with the message pointing at the format in
@@ -157,8 +158,29 @@ on:
     branches: [main]
   merge_group:
   push:
-    branches: [main]
+    branches: [main]  # cache refresh only, see below
 ```
+
+### No second run on `main`
+
+The queue fast-forwards `main` to the commit its run tested, so a full run on the `push` is the same
+test on the same tree. The `push` run is cut down to refreshing the shared caches.
+
+A run restores caches saved on its own ref or on `main`. A cache saved by a `merge_group` run is
+scoped to the queue's temporary branch and lost with it. Only a run on `main` can save a cache that
+later PR and queue runs restore.
+
+| Event | Jobs |
+| --- | --- |
+| `pull_request`, `merge_group` | All, as today |
+| `push` to `main` | Each cache-saving job checks its key with `lookup-only`. On a miss it builds what fills the cache and saves it. Every other job is skipped |
+
+The cache-saving jobs are those that use `bazel-fetch`, `bazel-fetch-windows`, the vcpkg actions
+and the C++ disk cache. Most pushes hit every key, so the `push` run takes a minute or two. A key
+changes with a dependency or toolchain update, and the next `push` run fills the new cache once.
+
+A direct push to `main` gets no CI. Direct pushes are kept to files no build or test reads, such
+as `README.md` and `CLAUDE.md`. A change to code always goes through a PR.
 
 Repository settings, on `main`:
 
@@ -170,9 +192,6 @@ Repository settings, on `main`:
 | Merge method | merge commit, the only one the repository allows |
 | Build concurrency | 1 to start, see [Cost](#cost) |
 | Status check timeout | 60 minutes |
-
-The `push` run on `main` stays. It repeats the queue run on the same tree, and covers a merge by an
-administrator who bypasses the queue.
 
 ### Cost
 
@@ -194,8 +213,9 @@ the cost of the PR run. It is a separate decision, revisited once the queue is i
    rules in the `krpc` `CLAUDE.md` change to: add a fragment, named `<PR>-<branch>.md`, with entries
    that omit `(#NNN)`. The consolidated final commit and its amend-after-push rule are removed.
    `CONTRIBUTING.md` gains the fragment format.
-2. **Merge queue.** The `merge_group` trigger, then the repository settings. Fragments land first,
-   as a changelog conflict would eject a PR from the queue.
+2. **Merge queue.** The `merge_group` trigger, the cache-only `push` run, `30-tag.py`, then the
+   repository settings. Fragments land first, as a changelog conflict would eject a PR from the
+   queue.
 
 ## Validation
 
@@ -216,6 +236,9 @@ Phase 2, on a fork with the same settings:
 * Queue two PRs that pass alone but conflict semantically → the second is removed.
 * Record the number of runs and the wall time for a batch of three, and set the merge limits from
   it.
+* A merge with unchanged cache keys → the `push` run skips every build and finishes in minutes.
+* A merge that changes `MODULE.bazel` → the `push` run saves the new repository cache, and the
+  next PR run restores it.
 
 ## Trade-offs
 
