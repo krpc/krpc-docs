@@ -81,36 +81,61 @@ release, so a branch name reused within a release cycle collides the same way.
 The unreleased section of a component is its `CHANGELOG.md` unreleased section followed by its
 fragments, sorted by their content alone:
 
-1. Fragments citing an issue or PR, by the first `#NNN` in the file. That is usually the PR number,
-   which gives the order the PRs were opened.
+1. Fragments citing an issue or PR, by the highest `#NNN` in the file. A PR is numbered after the
+   issues it fixes, so the key is usually the PR number, which gives the order the PRs were opened.
 2. Then fragments with no `#NNN`, by file name.
 
-The order is approximate. The fold PR at release is where entries are reordered by hand.
+The order is approximate. The release preparation PR is where entries are reordered by hand.
 
+* **Topics merge by text** with the topics already in the `CHANGELOG.md` unreleased section, and
+  with each other. A fragment entry under an existing topic lands at the end of that topic.
 * `doc/changeloggen.py` merges the fragments, so the dev docs show each entry once its PR merges.
-  `doc/changelog.bzl` takes the fragments as one more input, through a `glob(["changelog.d/*.md"])`
-  filegroup.
+  `doc/changelog.bzl` takes the fragments as one more input, through a filegroup in the root
+  `BUILD.bazel`, as the `doc` package cannot glob outside itself.
 * `tools/release/changes.py` merges them too, so release notes previewed before folding are
   complete.
 * A component with fragments and no unreleased header gets one, `## [vX.Y.Z] - unreleased`.
 * Existing unreleased entries stay in `CHANGELOG.md`. Nothing is migrated.
+
+**No fragments is the normal state after a release.** Git does not track an empty directory, so
+`changelog.d/` is absent until the next PR adds a fragment. Every tool treats a missing directory as
+empty. The filegroup's glob sets `allow_empty = True`, as Bazel 9 rejects an empty glob by default.
 
 The fragment parser and the merge live in one Python module shared by `changeloggen.py`,
 `changes.py` and the fold script.
 
 ### Folding at release
 
-A new script, `tools/release/fold-changelogs.py`, writes the fragments into the `CHANGELOG.md`
-files, deletes them and strips `- unreleased` from the headers. Its output goes through a release
-preparation PR, where the merged entries can be reordered and edited before tagging. The tag then
-lands on a commit the queue has tested, and the release pushes no commit to `main`.
+One release preparation PR takes `main` from the in-development version to the next one. It holds
+two commits:
+
+1. **Fold.** A new script, `tools/release/fold-changelogs.py`, writes the fragments into the
+   `CHANGELOG.md` files, deletes them and strips `- unreleased` from the headers. The merged entries
+   are then reordered and edited by hand, in the same commit or in commits squashed into it.
+2. **Bump.** `80-bump-version.py` sets `config.bzl` to the next version and commits.
+
+Once the queue merges the PR, `30-tag.py` tags the fold commit. The repository merges with merge
+commits only, so the fold commit is on `main`'s history. `main` itself never holds the folded
+changelog with the released version, so a PR merged during the release lands on the next version's
+`- unreleased` section, and the release pushes no commit to `main`.
+
+The fold commit is never the head of a CI run, as the PR run and the queue run test the bump commit
+above it. The two differ only in `config.bzl`, and `20-build-and-test.py` builds and tests the
+tagged tree before anything is published.
 
 | Script | Change |
 | --- | --- |
 | `fold-changelogs.py` | New. Folds every fragment into its component's section, and marks the section released |
-| `10-preflight.py` | Fails while `changelog.d/` holds a fragment, or a header still reads `- unreleased` |
-| `30-tag.py` | Tags `main` and pushes the tag only. The finalize commit, the push of `main` and the wait for its CI run are removed |
+| `10-preflight.py` | Checks the commit to be tagged in place of `HEAD` of `main`: it is on `origin/main`, `changelog.d/` holds no fragment, and no header reads `- unreleased` |
+| `30-tag.py` | Tags the fold commit and pushes the tag only. The finalize commit, the push of `main` and the wait for its CI run are removed |
+| `80-bump-version.py` | Commits on the release preparation branch, and pushes nothing. Runs before the tag, in place of after the announcements |
 | `publish-docs.py` | Removes `changelog.d/` from the grafted worktree, as a frozen version has no unreleased entries |
+
+**Release trains, after 1.0.** Until 1.0, the release scripts cover one version, and
+`experimental/ksa` releases by its own process. Once the trains split ([KSA
+releases](../ksa/releases.md)), `fold-changelogs.py` and `10-preflight.py` take a train. The fold
+moves only that train's sections out of each fragment, and keeps a fragment that still has sections
+for another train. Preflight checks only that train's components.
 
 ### Fragment checks
 
@@ -149,7 +174,7 @@ comment instead. The hints never fail CI.
 | `<component>` has an entry but no changes | The fragment has a section for a component the PR does not touch |
 | Add the PR or issue number | An entry in the PR's fragment has no `(#NNN)` |
 | `#NNN` is not related to this PR | An entry the PR adds or changes cites a number that is neither the PR, a `#NNN` in its description, nor one of its linked issues. Catches a typo or a wrong prediction |
-| Use a fragment in place of `CHANGELOG.md` | The PR edits a `CHANGELOG.md` and deletes no fragment. A fold PR deletes fragments, so it gets no hint |
+| Use a fragment in place of `CHANGELOG.md` | The PR edits a `CHANGELOG.md` and deletes no fragment. A release preparation PR deletes fragments, so it gets no hint |
 
 * **One comment per PR**, found by a hidden marker (`<!-- changelog-hints -->`). Each push edits it,
   and deletes it once no hint applies.
@@ -251,12 +276,12 @@ the cost of the PR run. It is a separate decision, revisited once the queue is i
 ## Phases
 
 1. **Fragments.** The shared module, `changeloggen.py`, `changes.py`, `fold-changelogs.py`,
-   `10-preflight.py`, `publish-docs.py` and the fragment checks. The changelog rules in the `krpc` `CLAUDE.md` change to: add a fragment named after
+   `10-preflight.py`, `30-tag.py`, `80-bump-version.py`, `publish-docs.py` and the fragment checks. The changelog rules in the `krpc` `CLAUDE.md` change to: add a fragment named after
    the branch. The consolidated final commit and its amend-after-push rule are removed, and the
    `(#NNN)` prediction stays for the entry text. `CONTRIBUTING.md` gains the fragment format.
 2. **Changelog hints.** The workflow, `changelog_hints.py`, its test and the `no-changelog` label.
-3. **Merge queue.** The `merge_group` trigger, the cache-only `push` run, `30-tag.py`, then the
-   repository settings. Fragments land first, as a changelog conflict would eject a PR from the
+3. **Merge queue.** The `merge_group` trigger, the cache-only `push` run, then the repository
+   settings. Fragments land first, as a changelog conflict would eject a PR from the
    queue.
 
 ## Validation
@@ -264,11 +289,15 @@ the cost of the PR run. It is a separate decision, revisited once the queue is i
 Phase 1:
 
 * `//doc:html` with two fragments that share a topic and a component, plus existing unreleased
-  entries → one merged section, topics merged.
-* Fragments citing `#1230` and `#1225` and one with no number → `#1225`, then `#1230`, then the
+  entries under the same topic → one merged section, with one copy of the topic.
+* Fragments citing `#1230`, `#1100` with `#1228`, and no number → `#1228`, then `#1230`, then the
   unnumbered one.
 * `fold-changelogs.py` on the same tree → the `CHANGELOG.md` files match the rendered page, and
-  `changelog.d/` is empty.
+  `changelog.d/` is gone.
+* `//doc:html`, `changes.py`, the fragment test and `10-preflight.py` with no `changelog.d/` → all
+  pass.
+* A dry run of the release preparation PR on a fork → `30-tag.py` tags the fold commit, and
+  `config.bzl` at the tag names the released version.
 * `publish-docs.py` for a released version with fragments present → no unreleased section.
 * A misnamed fragment, a file without the `.md` extension, a fragment with an unknown component,
   and one that does not parse → the test and `//doc:html` both fail, naming the file and line.
@@ -279,7 +308,7 @@ Phase 2, on a fork, as `pull_request_target` runs the workflow from the base bra
   no-fragment hint.
 * A push adding a fragment for `service/SpaceCenter` → the comment is deleted.
 * A fragment for `server` only → the missing-section and no-changes hints.
-* An edit to `client/python/CHANGELOG.md` → the fragment hint. A fold PR → no comment.
+* An edit to `client/python/CHANGELOG.md` → the fragment hint. A release preparation PR → no comment.
 * A fragment entry without `(#NNN)` → the number hint.
 * Entries citing the PR, an issue named in the description and a linked issue → no hint. An entry
   citing another number → the unrelated-number hint, which goes once the description names it.
@@ -298,14 +327,26 @@ Phase 3, on a fork with the same settings:
 
 ## Trade-offs
 
-* **Order follows the first `#NNN`.** A fragment citing an old issue before its PR number sorts
-  early, and a topic first appears with the earliest fragment that uses it. The release
-  preparation PR is where the order is curated.
+* **Order follows the highest `#NNN`.** A fragment citing only an old issue sorts early, and a
+  topic first appears with the earliest fragment that uses it. The release preparation PR is where
+  the order is curated.
+* **The tagged commit is not the head of a CI run.** It differs from the tested bump commit only in
+  `config.bzl`, and the release scripts build and test it before publishing.
 * **The unrelated-number hint is best effort.** An entry may rightly cite an issue the PR does not
   mention, and the hint is then ignored. A wrong number that the description also cites passes.
 * **Editing an entry from another PR** means editing its fragment. That edit can conflict, though
   rarely.
 * **Two CI runs per PR.** The second run is unattended, and it catches breakage between PRs.
+
+## Open questions
+
+* **Build artifacts from `main`.** The `push` run on `main` uploads the mod and client builds
+  today. The cache-only run drops them, and the `merge_group` runs upload them in their place. Who
+  uses them, and where they come from after the change, is to be designed.
+* **Which components take fragments.** The dev changelog page covers the release components only.
+  `experimental/ksa`, `tools/buildenv` and `tools/krpctest` have a `CHANGELOG.md` but are not on the
+  page, and the root `CHANGELOG.md` is an index. The heading check, the rendering and the fold need
+  one list of the components that take fragments.
 
 ## Rejected alternatives
 
@@ -313,11 +354,11 @@ Phase 3, on a fork with the same settings:
 | --- | --- |
 | A fragment directory per component, or a subdirectory per topic | One PR would write several files. A flat directory with one file per PR mirrors the PR |
 | The PR number in the fragment name, appended to entries by the generator | The number is unknown until the PR opens, so most outside contributions fail their first run |
-| Order by the commit that added each fragment | The Bazel action has no git history. It needs stamping and a deeper checkout in the docs workflow, for an order the fold PR curates anyway |
+| Order by the commit that added each fragment | The Bazel action has no git history. It needs stamping and a deeper checkout in the docs workflow, for an order the release preparation PR curates anyway |
 | `merge=union` in `.gitattributes` for `CHANGELOG.md` | GitHub's PR merge is not known to honor merge drivers (unverified), and a union merge can mangle the topic sub-lists |
 | Changelog entries written by a bot from the PR description after merge | The text is no longer reviewed in the PR, and a bot commits to `main` |
 | `strict` off with auto-merge, and no queue | Cheaper, one run per PR, and equally hands-off. Breakage between PRs reaches `main` and is fixed by a follow-up PR. Kept as the fallback if the queue's second run proves too slow |
 | Changelog hints as a failing check | A change with no user-facing effect is common, and would need an override on every such PR |
-| Hints for the other contributor rules: entry style, labels, tests | The rules guide maintainers, and a contributor need not follow them. Entry style is tidied in the fold PR. Where a test belongs needs an understanding of the change |
+| Hints for the other contributor rules: entry style, labels, tests | The rules guide maintainers, and a contributor need not follow them. Entry style is tidied in the release preparation PR. Where a test belongs needs an understanding of the change |
 | Danger or a GitHub App for the hints | An extra dependency or a hosted service. A workflow and a short script cover five rules |
 | Towncrier or changesets | Their formats and per-type sections differ from the existing files. The custom parser already exists, and the change is small |
