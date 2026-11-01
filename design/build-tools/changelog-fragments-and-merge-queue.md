@@ -201,9 +201,12 @@ comment instead. The hints never fail CI.
 * **One comment per PR**, found by a hidden marker (`<!-- changelog-hints -->`). Each push edits it,
   and once no hint applies, says the changelog looks good. A PR with no hints from the start gets
   no comment.
-* **A `no-changelog` label** marks a PR that has been checked and needs no entry. The comment then
-  says so.
-* **Changed files under a component's `test/` directory** do not count as changes to the component.
+* **A `changelog-checked` label** marks a PR whose changelog a maintainer has checked: one that
+  needs no entry, or whose hints do not apply. The comment then says so.
+* **Changed files under a `test/` or `tests/` directory**, at any depth in a component, do not
+  count as changes to it.
+* **A client entry with no client changes** gets no hint when the PR changes `core/`, `service/`,
+  `protobuf/` or `tools/krpctools/`. These change each client's generated API.
 * **Related numbers** are the PR number, every `#NNN` in the description, and the linked issues
   from the GraphQL `closingIssuesReferences` field. Only the entries the PR's diff adds or changes
   are checked, so an older fragment edited in passing is left alone.
@@ -337,7 +340,7 @@ Implementation notes, where the code differs from or adds to the design:
    `10-preflight.py`, `30-tag.py`, `80-bump-version.py`, `publish-docs.py` and the fragment checks. The changelog rules in the `krpc` `CLAUDE.md` change to: add a fragment named after
    the branch. The consolidated final commit and its amend-after-push rule are removed, and the
    `(#NNN)` prediction stays for the entry text. `CONTRIBUTING.md` gains the fragment format.
-2. **Changelog hints.** The workflow, `changelog_hints.py`, its test and the `no-changelog` label.
+2. **Changelog hints.** The workflow, `changelog_hints.py`, its test and the `changelog-checked` label.
 3. **Merge queue.** The `merge_group` trigger, the cache-only `push` run with `copy-artifacts`,
    then the repository settings. Fragments land first, as a changelog conflict would eject a PR
    from the queue.
@@ -370,7 +373,7 @@ Phase 2, on a fork, as `pull_request_target` runs the workflow from the base bra
 * A fragment entry without `(#NNN)` → the number hint.
 * Entries citing the PR, an issue named in the description and a linked issue → no hint. An entry
   citing another number → the unrelated-number hint, which goes once the description names it.
-* The `no-changelog` label → the comment says the PR needs no entry. Removing it restores the hints.
+* The `changelog-checked` label → the comment says a maintainer has checked the changelog. Removing it restores the hints.
 
 Phase 3, on a fork with the same settings:
 
@@ -392,7 +395,9 @@ Phase 3, on a fork with the same settings:
   rather than a fork: no fragment, a fragment that does not parse, an unrelated number, the fix,
   and adding and removing `no-changelog`. The first run deleted the comment once no hint applied.
   That read as if nothing had happened, so a direct push to `main` keeps the comment and says the
-  changelog looks good.
+  changelog looks good. The first real PRs, #1244 and #1245, showed two false positives: client
+  entries for a service change, and the clientgen goldens under `tools/krpctools/krpctools/test/`.
+  Both are fixed, and `no-changelog` is renamed `changelog-checked` to cover dismissing hints.
 * **`pull_request_target` policy.** From 2026-12-02, GitHub blocks `pull_request_target` on public
   repositories by default. The repository Actions policy `Allow pull_request_target` allows it for
   `.github/workflows/changelog-hints.yml` only.
