@@ -1,6 +1,8 @@
 # Changelog fragments and a merge queue
 
-**Status:** proposal, 2026-11-01.
+**Status:** in progress, 2026-11-01. Phases 1-3 are implemented locally, not yet pushed or
+opened as pull requests. Open: the `no-changelog` label, the branch protection settings, and the
+fork validation of phases 2 and 3.
 **Scope:** the changelog tooling (`doc/changeloggen.py`, `doc/changelog.bzl`, `tools/release/`), the
 changelog rules in the `krpc` `CLAUDE.md`, `.github/workflows/ci.yml`, and the branch protection
 settings of `main`.
@@ -311,6 +313,18 @@ Skipping the Windows jobs on PR runs, phase 1 of [CI lite](ci-lite-merge-queue.m
 the cost of the PR run. It is a separate decision, revisited once the queue is in use.
 
 ## Phases
+
+Implementation notes, where the code differs from or adds to the design:
+
+* The shared module is `tools/release/changelog.py`, exposed to Bazel as `//:changelog`. It holds
+  `COMPONENTS` as a written list, as the Bazel actions cannot glob the tree. `10-preflight.py`
+  checks the list against the `service/*` and `client/*` directories.
+* A fragment must sit directly in `changelog.d/`. A file in a subdirectory fails the check.
+* `fold-changelogs.py` refuses to run on `main`, and checks that the folded files parse back to the
+  merged entries. `10-preflight.py` and `30-tag.py` also fail on a commit with no section for the
+  version, which catches a run from the bump commit.
+* The Windows C++ client job leaves the matrix, as it saves the C++ cache and so runs on a push.
+  The Linux CMake jobs fill a missing ccache on a push from the merge queue run's archive.
 
 1. **Fragments.** The shared module, `changeloggen.py`, `changes.py`, `fold-changelogs.py`,
    `10-preflight.py`, `30-tag.py`, `80-bump-version.py`, `publish-docs.py` and the fragment checks. The changelog rules in the `krpc` `CLAUDE.md` change to: add a fragment named after
