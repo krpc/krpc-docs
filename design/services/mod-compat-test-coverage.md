@@ -2,7 +2,8 @@
 
 **Status:** in progress (2026-07-17) — Action Groups Extended done and merged as
 [PR #968 "AGExt tests"](https://github.com/krpc/krpc/pull/968) (2026-07-18, section 2);
-the rest not yet implemented. The kOS name tag (was phase 2) is covered: #829 was fixed by
+the Firespitter and KerbalActuators thrust reversers implemented, PR not yet opened (sections 5
+and 6); the rest not yet implemented. The kOS name tag (was phase 2) is covered: #829 was fixed by
 [PR #1155](https://github.com/krpc/krpc/pull/1155), whose `test_parts_tag.py` runs over five mod
 sets. The remaining tests are drafted as an issue in
 [issues/mod-compat-tests.md](../../issues/mod-compat-tests.md).
@@ -154,23 +155,32 @@ round-trip (consequence 1) is a legitimate, independent quick win that can ship 
 actively maintained with public KSP 1.12 releases, so sourcing is not the blocker — the module-identity
 design is.
 
-### 5. Firespitter — thrust reverser
+### 5. Firespitter - thrust reverser - implemented, PR not yet opened
 
-`service/SpaceCenter/src/Services/Parts/ThrustReverser.cs` (around line 49): detects the
-`"FSswitchEngineThrustTransform"` module and drives reverse thrust via its `isReversed` field and
-`reverseTTAction` / `normalTTAction` / `switchTTAction` actions.
+`ThrustReverser.cs` detects the `"FSswitchEngineThrustTransform"` module and drives reverse thrust
+via its `isReversed` field and `reverseTTAction` / `normalTTAction` / `switchTTAction` actions.
 
-**Testability:** the Firespitter core plugin is public. Needs a craft with a Firespitter reversible
-engine; test toggles `Reversed` and asserts it round-trips. Detected via `_MOD_PARTS`.
+**As built:** Firespitter v7.17 (`snjo/Firespitter`, no dependencies, no `GameData/` root in the
+archive, so `add_prefix`). Craft `PartsEngineReverserFirespitter`: pod, tank and `FSnoseEngine` on
+launch clamps. `TestPartsEngineReverserFirespitter` round-trips `thrust_reversed` and checks the
+thrust direction turns 180 degrees and back. Detected via `_MOD_PARTS` (`FSnoseEngine`).
 
-### 6. Wild Blue Industries — prop-spinner thrust reverser
+### 6. KerbalActuators - prop-spinner thrust reverser - implemented, PR not yet opened
 
-`ThrustReverser.cs` (around line 52): detects the `"WBIPropSpinner"` module and drives its
-reverse-thrust capability. WBIPropSpinner ships in Wild Blue Tools / associated WBI part packs.
+`ThrustReverser.cs` detects the `"WBIPropSpinner"` module and drives it via its `reverseThrust` and
+`canReverseThrust` fields and the `ToggleThrustTransform` event.
 
-**Testability:** public releases exist; needs release-sourcing to confirm which specific WBI download
-provides `WBIPropSpinner` and pins cleanly on KSP 1.12. Same craft-plus-toggle test shape as
-Firespitter. Detected via `_MOD_PARTS`.
+**As built:** the module ships in KerbalActuators (`Angel-125/KerbalActuators` v1.9.0, installs
+as `GameData/WildBlueIndustries/001KerbalActuators`), not Wild Blue Tools. It has no
+dependencies, and its bundled ModuleManager is not installed. The mod ships no part that uses the
+module, so an overlay (`tools/mods/config/WildBlueIndustries/TestPart.cfg`) clones the Juno into
+`kerbalActuatorsReverserTest` and `kerbalActuatorsFixedTest`. The Juno's one thrust transform
+serves as both forward and reverse, so the test checks state only, not direction. Craft
+`PartsEngineReverserKerbalActuators`. `TestPartsEngineReverserKerbalActuators` round-trips the
+reversible part and checks the fixed part reports no reverser.
+
+**Negative control (both):** pointing each adapter at the wrong state field fails both reverser
+tests in game.
 
 ### 7. Miscellaneous engine thrust-reverser shims — likely not worth pinning
 
@@ -183,6 +193,9 @@ pinning several mods for one `bool` toggle apiece.
 **Recommendation:** do **not** add per-mod tests for these. If the stock-turbofan branch
 (`TF1/TF2ThrustReverser`) is reachable with a stock part, cover that one with a no-mod test; leave the
 rest documented-as-untested. Note the omission explicitly rather than letting it read as covered.
+
+The stock turbofans are covered: `TestPartsEngineReverser` drives the J-90 "Goliath" and J-33
+"Wheesley" reversers with no mod installed.
 
 ## Non-integrations (nothing to test)
 
@@ -230,8 +243,8 @@ changelog** unless a compat bug is fixed along the way, in which case that fix g
 2. **Procedural Fairings** — self-contained parts, clean jettison/state assertions. Now the best next
    target: no module-identity complications, and it exercises the untested `_MOD_PARTS` path on a fresh
    mod.
-3. **Firespitter** and **Wild Blue Industries** thrust reversers — same toggle-and-read shape; WBI
-   needs release-sourcing to identify the exact download for `WBIPropSpinner`.
+3. **Firespitter** and **KerbalActuators** thrust reversers - implemented, PR not yet opened;
+   see sections 5 and 6.
 4. **FAR** — most valuable, most involved: pin the mod, establish a controlled flight condition, and
    assert FAR-sourced aero values (start with invariants/directional response, tighten to magnitudes
    only if a stable condition can be reproduced headless).
