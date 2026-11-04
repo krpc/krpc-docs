@@ -10,7 +10,10 @@ yet a PR. Issue: [#1196](https://github.com/krpc/krpc/issues/1196).
 | `Id` on `KRPCProcedure` and `KRPCMethod`; `GetterId` and `SetterId` on `KRPCProperty` | Implemented. An id for an accessor the property lacks, or on a struct field, is an error |
 | Shared or 0 procedure ids left unassigned, with a warning | Implemented |
 | C-nano clientgen goldens, protocol and extending docs | Done |
-| Reserved service id range | Documented only, not enforced |
+| Reserved service id range | Documented only, not enforced. The protocol and extending docs state the range, with no table of assigned ids |
+| Service and procedure ids in `KRPC.GetServices` | Implemented: every id, hashed or set by hand |
+| Test services (`TestService`, `TestService2`, `ConformanceService`, `Benchmark`) | Hashed ids, in place of 9996 to 9999 |
+| A service id of 0 | Scanner error. A service id clash already was one |
 | Conformance test: a call by id reaches the named procedure | Not started |
 
 ## Problem
@@ -55,8 +58,10 @@ A procedure id is a hash of the procedure's name, by the rule service ids alread
 * **A shared id, or a hashed id of 0, leaves the members callable by name only**
   ([Collisions](#collisions)). 0 means "use the name".
 * **Explicit service ids stay.** Only the procedure counter changes.
-* **The ids reach clients the same way.** They are in the service definitions JSON, which clientgen
-  reads. `KRPC.GetServices` carries no procedure id, so the dynamic clients are unaffected.
+* **Every id reaches clients.** The service definitions JSON, which clientgen reads, holds each
+  id. `KRPC.GetServices` reports each service and procedure id too (`id` on `Service` and
+  `Procedure`), hashed or set by hand. A consumer never computes the hash, and an id set by hand
+  to resolve a clash reaches every client. C-nano cannot fall back to a name.
 
 An id is then as stable as the name, which is exactly the guarantee the string-based clients have.
 Renaming a procedure breaks both kinds of client, and adding, removing or reordering members breaks
@@ -85,9 +90,25 @@ gets an error, and every name-based client is unaffected.
 * `Services` builds `ServicesById` with `ServicesById [service.Id] = service`, so on a clash the last
   service scanned wins. It now leaves both out.
 * A hashed service id of 0 is not checked today. It gets the same warning.
-* **Explicit ids 1 to 255 are reserved for the services that ship with kRPC.** The extending docs
-  tell mod authors to leave `Id` unset. A hashed id lands in that range with odds of about 2^-24, and
-  the clash rule covers it if it does.
+* **Explicit ids 1 to 255 are reserved for the services that ship with kRPC.** They keep the
+  official service ids to one byte on the wire. There are few official services, so each takes a
+  hand-set id. Procedures are too many for that. The extending docs tell mod authors to leave `Id`
+  unset. A hashed id lands in that range with odds of about 2^-24, and the clash rule covers it if
+  it does.
+
+  Assigned ids, audited 2026-11-03 and kept as they are (all one varint byte):
+
+  | Id | Service | Id | Service |
+  | --- | --- | --- | --- |
+  | 1 | KRPC | 7 | UI |
+  | 2 | SpaceCenter | 8 | StdLib |
+  | 3 | Drawing | 9 | never assigned |
+  | 4 | InfernalRobotics | 10 | LIDAR (deprecated, #1233; not reused) |
+  | 5 | KerbalAlarmClock | 11 | DockingCamera |
+  | 6 | RemoteTech | 12 | Debug |
+
+  `KSA` is left hashed while experimental. It will likely take 2, in the KSA server's own id space.
+  The test services' ids 9996 to 9999 predate hashing, and they now take hashed ids.
 
 `tools/ServiceDefinitions` treats every warning as an error, so an author finds a clash within their
 own mod at build time. The graceful path covers clashes between mods, which no one author can see.
@@ -120,6 +141,8 @@ One PR.
 | --- | --- |
 | `core` | `ServiceSignature` computes the id from the name, sharing the hash with `TypeUtils.GetServiceId`; `Id` on the member attributes; shared and 0 ids, service and procedure, left unassigned with a warning |
 | `core` tests | Pin a few known ids, e.g. `KRPC.GetStatus` is `2007570979`, so a change to the hash fails a test |
+| `protobuf`, `core` | `id` on the `Service` and `Procedure` messages, filled by `KRPC.GetServices` |
+| `tools/TestServer`, `tools/benchmarks` | The test services take hashed ids |
 | `tools/krpctools` | Regenerate the C-nano clientgen goldens |
 | Extending docs | The reserved service id range, the member `Id` override, and what a clash does |
 | `doc/src/communication-protocols/messages.rst` | Under Anatomy of a Request, state the id rule, and drop the sentence "They can change between server versions." that follows the integer identifiers' size advantage |
