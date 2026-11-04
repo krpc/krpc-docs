@@ -1,6 +1,7 @@
 # Client name collisions
 
-**Status:** proposal (2026-10-31). Issue: [#1237](https://github.com/krpc/krpc/issues/1237).
+**Status:** proposal (2026-10-31), revised 2026-11-04 to ban clashes outright. Issue:
+[#1237](https://github.com/krpc/krpc/issues/1237).
 
 ## Problem
 
@@ -39,8 +40,10 @@ a service rename that breaks the other clients.
 
 ## Design
 
-A fixed, language-neutral rule on service definitions, checked by the scanner. Client generators
-only use mappings that the rule keeps unique.
+A fixed, language-neutral rule on service definitions. A clash is a bug in the service, and is
+banned outright: the scanner leaves out the clashing members, and the service tools reject them.
+Client generators only use mappings that the rule keeps unique, so a client never sees a clash and
+needs no check of its own.
 
 ### The rule
 
@@ -84,43 +87,47 @@ It must also:
 A client whose conventions do not fit this contract builds its names from procedure names, which
 are unique by construction.
 
-Every current client fits the contract.
+Every current client fits the contract. A client may assume the names it generates are unique, and
+needs no rule of its own for a clash.
 
 ### Checks
 
 | Where | Check | Result |
 | --- | --- | --- |
-| Scanner (`core`) | The rule, per scope, including extension members | Warning in 0.8, error from 1.0 |
-| clientgen | The generated names, per scope, are unique | Build failure |
-| clientgen test | A test service with the clashes the rule allows to pass, e.g. a property `Foo` beside a type `Foo` | Generates and compiles in every client |
+| Scanner (`core`) | The rule, per scope, including extension members | The clashing members are left out, with an error |
+| `krpc-servicedefs`, clientgen | The rule, per scope | Build failure, naming both members |
+| clientgen test | A test service with the clashes the rule allows, e.g. a property `Foo` beside a type `Foo` | Generates and compiles in every client |
 
-**A warning, then an error.** Under [service and mod errors](../server/service-and-mod-errors.md) an
-error disables both members, in every client. A third-party mod that loads today would lose members
-for a problem in one client. Version 1.0 makes it an error, as a breaking release.
-
-**A clash with a deprecated member is exempt.** It gives an author a migration path: deprecate the
-clashing member, add a renamed one, and the warning goes. clientgen omits the deprecated member of
-an exempt pair only where the generated names collide. An existing client keeps generating both,
-as its names do not collide, so its users see no change.
+**The scanner leaves out every member of a clashing pair.** Keeping one of them would depend on the
+order of the scan, so adding a member could remove an existing one. This matches duplicate names
+under [service and mod errors](../server/service-and-mod-errors.md): the error is logged, and shown
+with the service's other load errors. The other members of the service load.
 
 **Extension members.** The extension clash check uses the same keys. The class keeps its own member,
-as for duplicate names in [service and mod errors](../server/service-and-mod-errors.md).
+and the extension member is left out, as for duplicate names in
+[service and mod errors](../server/service-and-mod-errors.md).
+
+**No deprecation exemption, and no warning period.** A clash is a bug that should never ship. A
+third-party mod with one loses those members at once. A clash needs an extension member or a
+hand-written pair, so few mods if any have one.
 
 ### `ConfigNode`
 
-`GetValues` and `GetNodes` are deprecated, replaced by `FindValues(name)` and `FindNodes(name)`.
-The deprecated pair is exempt, and is removed with the other 1.0 removals.
+`GetValues(name)` and `GetNodes(name)` are removed in 0.8, without a deprecation cycle. They clash
+with the properties `Values` and `Nodes`. `FindValues(name)` and `FindNodes(name)` replace them
+(#1261). This breaks the clients whose names do not collide, Python, C#, C++ and C-nano, for a
+one-line rename.
 
 ## Phases
 
 Each phase merges on its own.
 
-1. **Rule and contract.** The scanner check as a warning, extension members included. The rule in
-   `doc/src/extending/types.rst` for service authors. The client contract in the client
-   specification.
-2. **`ConfigNode`.** `FindValues` and `FindNodes`, with the old methods deprecated.
-3. **clientgen check.** The per-scope uniqueness check and the test service.
-4. **1.0.** The warning becomes an error, and the deprecated `ConfigNode` methods are removed.
+1. **`ConfigNode`.** `FindValues` and `FindNodes` (#1261), and the removal of `GetValues` and
+   `GetNodes`, so no bundled service has a clash.
+2. **Rule and contract.** The scanner check, leaving out clashing members, extension members
+   included. The rule in `doc/src/extending/types.rst` for service authors. The client contract in
+   the client specification.
+3. **Tool checks.** The rule in `krpc-servicedefs` and clientgen, and the test service.
 
 ## Rejected
 
@@ -129,4 +136,5 @@ Each phase merges on its own.
 | Renaming per client, on a clash | Adding a member renames an existing one, as above |
 | Per-language name overrides on the attributes | Services would carry knowledge of every client, and a new client would need edits to existing services |
 | Types and members in one scope | Rejects 12 existing property and type pairs, for no client that needs it |
-| An error from 0.8 | Disables members of mods that load today |
+| A warning in 0.8, an error from 1.0, with deprecated members exempt | Each client needs a rule for the exempt pairs, such as leaving out the deprecated member, for a bug that should never ship |
+| Keeping one member of a clashing pair | Which one depends on scan order, so adding a member can remove an existing one |

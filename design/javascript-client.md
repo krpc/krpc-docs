@@ -315,10 +315,11 @@ export type VesselSituation = EnumValue<"SpaceCenter.VesselSituation">;
   The package's own build passes `--include=Service=./Service.js`, and maps the package name to its
   source with `paths`. A mod's generated module adds its service to `Services` with module
   augmentation, documented in `extending/clientgen.rst`.
-- **Name collisions.** `ConfigNode.GetValues` (deprecated) and the getter of `ConfigNode.Values` are
-  both `getValues`. The member that is not deprecated wins, at run time, in the stubs and in the
-  docs. At run time this fixed a phase 1 bug: the second `defineProperty` threw, so `connect()`
-  failed against a real game.
+- **Name collisions.** The client assumes member names are unique, as
+  [client name collisions](protocol/client-name-collisions.md) bans clashes. The one clash in the
+  bundled services, `ConfigNode.GetValues` and `GetNodes` beside the `Values` and `Nodes` properties,
+  is removed on the branch below this one. Before that, the second `defineProperty` of `getValues`
+  threw, so `connect()` failed against a real game.
 - **Docs.** docgen's `js` domain uses Sphinx's built-in JavaScript domain: functions for service
   procedures, a class per class, enumeration, structure and exception, and a property as its two
   accessor signatures on one directive. Types are in `:type:` and `:rtype:` fields, written to
