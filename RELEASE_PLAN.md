@@ -100,7 +100,8 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 | ✅ | Deprecate LIDAR in favor of `SpaceCenter.RaycastDistance`, and raycasts ignore trigger colliders; makes #1181 moot | [#1233](https://github.com/krpc/krpc/issues/1233), fixed by #1263 | feature, mod-compatibility, service, ksp | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | 🚧 | Client name collisions: a scanner rule banning clashing member names, a contract for client naming, the clashing `ConfigNode` methods removed (local branch `confignode-clashes`) | [#1237](https://github.com/krpc/krpc/issues/1237), **add milestone** | bug, server, client, tools | [protocol/client-name-collisions.md](design/protocol/client-name-collisions.md) |
 | ⬜ | Inheritance for remote objects; additive, UI and Drawing first, then robotics and #900 modules | [#905](https://github.com/krpc/krpc/issues/905) | feature, protocol | [protocol/inheritance.md](design/protocol/inheritance.md) |
-| ⬜ | C#: target .NET Standard 2.0 and modern .NET, as well as .NET Framework 4.7.2 | [#1230](https://github.com/krpc/krpc/issues/1230) | feature, client, csharp | — |
+| ⬜ | C#: target .NET Standard 2.0 in place of .NET Framework 4.7.2 | [#1230](https://github.com/krpc/krpc/issues/1230) | feature, client, csharp | [csharp-client-targets.md](design/csharp-client-targets.md) |
+| ⬜ | C#: import the NuGet packages with rules_dotnet's `nuget_repo`, one target per package for every framework; straight after #1230 | **To file**: [csharp-nuget-repo.md](issues/csharp-nuget-repo.md) | enhancement, build | [csharp-client-targets.md](design/csharp-client-targets.md) |
 | ⬜ | Java: publish the client to Maven Central | [#1231](https://github.com/krpc/krpc/issues/1231) | feature, client, java | — |
 
 * **Single connection first.** It changes connection setup and threading in every client, so the
