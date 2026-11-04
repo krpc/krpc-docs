@@ -62,13 +62,18 @@ typedef struct {
    `Stream*`, `begin(speed)` only, a readiness wait on the port, `<Arduino.h>` in place of
    `<HardwareSerial.h>`. Its close does nothing.
  * `KRPC_BUFFER_SIZE` defaults small under `ARDUINO`, keyed on that macro.
+ * An opener clears the connection first, so a failed open leaves no transport. `krpc_connect`
+   returns `KRPC_ERROR_IO` for it.
+ * On Windows the local socket is built only where `__has_include(<afunix.h>)` holds. Without the
+   header, `krpc_open_localsocket` is declared unavailable (`unavailable` on Clang, `error` on
+   GCC, `deprecated` plus a link error on MSVC), and the other transports still build.
 
 ### Builds
 
 | Build | Change |
 | --- | --- |
 | CMake | `KRPC_COMMUNICATION_TCP` and `KRPC_COMMUNICATION_LOCALSOCKET` removed. `ws2_32` always an interface link on Windows |
-| vcpkg | No features. The `communication.h` patch is dropped. Local socket needs Windows SDK 10.0.17134 (`afunix.h`) |
+| vcpkg | No features. The `communication.h` patch is dropped. The local socket needs Windows SDK 10.0.17134 (`afunix.h`), and is left out without it |
 | Bazel | `krpc_cnano_serialio`, `_tcpip`, `_localsocket` and the `_testee` variants become one library, plus one with `KRPC_ERROR_MESSAGES` for tests |
 | Conformance | One testee announcing all three protocols |
 | Benchmark | One program, the transport chosen from `KRPC_TEST_LOCALSOCKET_PATH` or `KRPC_TEST_TCPIP_PORT`. `--client-localsocket` removed from the runner |
