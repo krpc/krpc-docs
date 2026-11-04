@@ -1,6 +1,7 @@
 # KSPTrajectories service for kRPC
 
-**Status:** proposal, not scheduled. No integration exists yet, and no issue.
+**Status:** in progress, not scheduled. An outside contributor opened
+[PR #1253](https://github.com/krpc/krpc/pull/1253), in review. No issue.
 
 ## Context
 
