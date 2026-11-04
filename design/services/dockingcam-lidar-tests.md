@@ -1,10 +1,13 @@
 # LiDAR & DockingCamera services — integration tests (blocked on mod sourcing)
 
-**Status:** proposal — investigated 2026-07-16; full real-API coverage blocked on mod sourcing, the
-lightweight tests (option 3) are unblocked and recommended. Drafted as issues in
-[issues/mod-compat-tests.md](../../issues/mod-compat-tests.md) (tests) and
-[#1180](https://github.com/krpc/krpc/issues/1180) (logging) and
-[#1181](https://github.com/krpc/krpc/issues/1181) (docstrings). The LiDAR service was renamed LIDAR in [PR #1149](https://github.com/krpc/krpc/pull/1149).
+**Status:** done, for 0.8. Option 4 merged: DockingCamera on the public release in
+[PR #1264](https://github.com/krpc/krpc/pull/1264) (#1232), and the LIDAR deprecation in
+[PR #1263](https://github.com/krpc/krpc/pull/1263) (#1233). The logging issue
+[#1180](https://github.com/krpc/krpc/issues/1180) was fixed by
+[PR #1235](https://github.com/krpc/krpc/pull/1235); the docstrings issue
+[#1181](https://github.com/krpc/krpc/issues/1181) was closed as not planned, moot with LIDAR
+deprecated. Investigated 2026-07-16; the test issue draft is
+[issues/mod-compat-tests.md](../../issues/mod-compat-tests.md). The LiDAR service was renamed LIDAR in [PR #1149](https://github.com/krpc/krpc/pull/1149).
 Decided 2026-10-25: option 4. DockingCamera binds to the public 1.3.9 release by reflection, and
 LIDAR is deprecated in favor of `SpaceCenter.RaycastDistance`. Issues
 [#1232](https://github.com/krpc/krpc/issues/1232) (DockingCamera) and

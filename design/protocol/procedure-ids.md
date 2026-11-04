@@ -1,20 +1,21 @@
 # Procedure ids from names
 
-**Status:** in progress, for 0.8 with [protocol version 2](protocol-version.md). Implemented
-locally (2026-10-31), stacked on [service and mod errors](../server/service-and-mod-errors.md), not
-yet a PR. Issue: [#1196](https://github.com/krpc/krpc/issues/1196).
+**Status:** done, for 0.8 with [protocol version 2](protocol-version.md). Merged as
+[PR #1265](https://github.com/krpc/krpc/pull/1265), fixing
+[#1196](https://github.com/krpc/krpc/issues/1196). Diverged from the design: a shared or 0
+procedure id is a scanner error, not left unassigned with a warning.
 
 | Part | State |
 | --- | --- |
 | Hashed procedure ids, shared hash with service ids | Implemented |
 | `Id` on `KRPCProcedure` and `KRPCMethod`; `GetterId` and `SetterId` on `KRPCProperty` | Implemented. An id for an accessor the property lacks, or on a struct field, is an error |
-| Shared or 0 procedure ids left unassigned, with a warning | Implemented |
+| Shared or 0 procedure ids | Scanner error, in place of the planned warning |
 | C-nano clientgen goldens, protocol and extending docs | Done |
 | Reserved service id range | Documented only, not enforced. The protocol and extending docs state the range, with no table of assigned ids |
 | Service and procedure ids in `KRPC.GetServices` | Implemented: every id, hashed or set by hand |
 | Test services (`TestService`, `TestService2`, `ConformanceService`, `Benchmark`) | Hashed ids, in place of 9996 to 9999 |
 | A service id of 0 | Scanner error. A service id clash already was one |
-| Conformance test: a call by id reaches the named procedure | Not started |
+| Conformance test: a call by id reaches the named procedure | C-nano's conformance run calls `TestService` by its hashed id |
 
 ## Problem
 

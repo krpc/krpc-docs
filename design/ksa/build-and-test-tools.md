@@ -1,7 +1,7 @@
 # Build and test tools
 
 **Status:** proposal, 2026-10-26. Part of [kRPC for KSA](README.md). The `--reference-dir` option
-of `krpc-servicedefs` is in progress, in #1228.
+of `krpc-servicedefs` is in review for #1228, PR to open.
 
 Most tools are already game-agnostic. The in-game test harness and the service lists are the two
 that assume KSP.

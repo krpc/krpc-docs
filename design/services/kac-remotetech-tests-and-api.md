@@ -5,8 +5,8 @@
 and [PR #981 "Add RemoteTech availability and antenna negative-path tests"](https://github.com/krpc/krpc/pull/981)
 (2026-07-19, in-game validated: KAC 16/16, RemoteTech 12/12); the RemoteTech API bindings remain.
 The remaining API work is drafted in
-[issues/remotetech-kac-api.md](../../issues/remotetech-kac-api.md), and the `PlaySound` bug in
-[#1179](https://github.com/krpc/krpc/issues/1179). Two implementation notes that supersede the text below:
+[issues/remotetech-kac-api.md](../../issues/remotetech-kac-api.md), and the `PlaySound` bug
+[#1179](https://github.com/krpc/krpc/issues/1179) is fixed by [PR #1262](https://github.com/krpc/krpc/pull/1262). Two implementation notes that supersede the text below:
 the mod *does* have a per-alarm fired flag — `KACAlarm.Triggered`, internal, which this doc missed
 because it only surveyed the public surface — so the alarm-fired "event" shipped as a reflected
 pollable `Alarm.Triggered` getter (clients observe firing via the existing expression-event/stream

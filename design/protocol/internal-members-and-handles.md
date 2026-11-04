@@ -1,6 +1,7 @@
 # Internal members, protocol messages, stream and event handles
 
-**Status:** in progress. Stream and event ids are issue
+**Status:** in progress. Stream and event ids (phase 1) merged as
+[PR #1266](https://github.com/krpc/krpc/pull/1266), fixing
 [#1178](https://github.com/krpc/krpc/issues/1178). Internal procedures, the scanner check and the
 call conformance tests have no issue or PR yet.
 
@@ -147,7 +148,7 @@ profile.
 
 | Phase | Content | State |
 | --- | --- | --- |
-| 1 | Streams and events as bare stream ids (#1178) | implemented, unmerged |
+| 1 | Streams and events as bare stream ids (#1178) | merged, #1266 |
 | 2 | `Procedure.internal`, the seven KRPC procedures marked, clients omit them | implemented, unmerged |
 | 3 | Scanner allows a stream only as the return value of an internal procedure | implemented, unmerged |
 | 4 | Conformance tests for calls the client builds | implemented, unmerged |
