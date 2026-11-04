@@ -93,6 +93,7 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 | ✅ | Client conformance tests and runtime specification | [#1123](https://github.com/krpc/krpc/issues/1123), fixed by #1220 | feature, client | [client-conformance/](design/client-conformance/README.md) |
 | ✅ | Client thread safety: define and document what is thread-safe | [#427](https://github.com/krpc/krpc/issues/427), fixed by #1225 | feature, docs | — |
 | 🚧 | C-nano: every transport compiled in, chosen at run time, so vcpkg ships them all; a custom transport is a table of functions | [#1176](https://github.com/krpc/krpc/issues/1176) | feature, client, cnano | [cnano-transports.md](design/cnano-transports.md) |
+| ⬜ | C-nano: retry POSIX serial reads and writes interrupted by a signal, and loop short writes | **To file**: [cnano-serial-eintr.md](issues/cnano-serial-eintr.md) | bug, client, cnano | — |
 | 🚧 | Streams of calls and server side functions that return no value, run for their side effects; in review, PR to open | [#1198](https://github.com/krpc/krpc/issues/1198) | feature, server, protocol, client | — |
 | ⬜ | Lua and C-nano: compile and run server side functions built with the expression API, which the internal `KRPC` procedures left them without | [#1267](https://github.com/krpc/krpc/issues/1267) | feature, client, lua, cnano | — |
 | ✅ | `GetStatus` returns a kRPC struct in place of the `KRPC.Status` protobuf message | [#1197](https://github.com/krpc/krpc/issues/1197), fixed by #1244, **relabel** | enhancement, server, protocol, client | — |
