@@ -1,7 +1,8 @@
 # C-nano on Arduino: board support and a build test
 
 **Status:** proposal. Depends on [#1176](https://github.com/krpc/krpc/issues/1176) (C-nano
-transport chosen at run time), which lands first. No GitHub issue yet.
+transport chosen at run time), which lands first and carries phase 1
+([cnano-transports.md](cnano-transports.md)). No GitHub issue yet.
 
 ## Problem
 
