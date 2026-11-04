@@ -139,18 +139,66 @@ Each phase merges on its own. Milestone `ksp-v0.8.0` (clients release with KSP).
   from the service object or the connection argument.
 * Close #1195. Mark `python-static-method-binding` fixed in [defects.md](client-conformance/defects.md).
 
+### Phase 4: Bound classes in C#, Java and C++
+
+Building an `Expression` tree passes the connection at every node, 34 times across the C# doc
+examples alone:
+
+```cpp
+auto total = Expr::variable(conn, "total", KType::int_(conn));
+Expr::for_each(conn, x, values, Expr::assign(conn, total, Expr::add(conn, total, x)));
+```
+
+clientgen adds a `bind` factory to each class with static methods. It returns a small `Bound`
+object that holds the connection and has each static method, minus the connection parameter:
+
+```cpp
+auto e = Expr::bind(conn);
+auto t = KType::bind(conn);
+auto total = e.variable("total", t.int_());
+e.for_each(x, values, e.assign(total, e.add(total, x)));
+```
+
+| Client | Factory | Bound call |
+| --- | --- | --- |
+| C# | `var e = Expression.Bind(connection);` | `e.Not(e.Call(engines))` |
+| Java | `Expression.Bound e = Expression.bind(connection);` | `e.not(e.call(engines))` |
+| C++ | `auto e = Expression::bind(client);` | `e.not_(e.call(engines))` |
+
+This is the typed-language counterpart of Python's `E = conn.krpc.Expression`. The bound object is
+the one place that names the connection, as a service object is, so the rule above holds.
+
+* **Opt-in.** `Class.Method(connection, ...)` stays the primary form, so nothing is deprecated.
+* **Generated, for every class with static methods.** One loop per template, forwarding to the
+  static method. It is generic rather than `Expression` only, so there is one rule. It adds a
+  forwarder per static method, about 160.
+* **Streams and call builders.** In C# and Java, the bound methods carry the static method's RPC
+  attribute. C#'s `GetCall` already treats an object that is not a `RemoteObject` like a service
+  object, so `connection.AddStream(() => e.Not(x))` works unchanged. Java's
+  `addStream(Expression.Bound.class, "not", x)` works the same way. C++ gets calls only, as
+  streaming an expression builder has no use, and its `_stream` forms stay on the static method.
+* **Name clashes.** No class has a static method named `Bind` or a member named `Bound`. clientgen
+  fails if one ever does.
+* **Docs.** The server side functions guide uses the bound form in its C#, Java and C++ examples.
+  Each client guide's "Static Methods" section (phase 3) shows it in one sentence and one example.
+  The API reference comes from the service definitions, so it does not list `Bound` classes.
+* **Tests.** A native test per client checks one bound call, and C# and Java a stream of one. The
+  doc examples compile in the build. Bound classes are client API, so they get no conformance test.
+* Changelog `client/csharp`, `client/java`, `client/cpp`: "Add `Bind` to classes with static
+  methods, for calling them without passing the connection (#1195)", in each client's casing.
+
 ## Alternatives considered
 
 | Alternative | Why not |
 | --- | --- |
-| Reach static methods through the service object in C#, Java and C++ too (`sc.ReferenceFrame.CreateRelative(...)`) | One form across all clients, and an `Expression` tree would stop repeating the connection at every node. But in C++ a member cannot share its name with the nested class, in Java a public field named like a class is unusual, and in C# it hides the ordinary `ReferenceFrame.CreateRelative` call. About 160 methods, and every server side function example in three languages, would go through a deprecation cycle. |
+| Reach static methods through the service object in C#, Java and C++ too (`sc.ReferenceFrame.CreateRelative(...)`) | One form across all clients. Phase 4 gets the same ergonomics as an opt-in. But in C++ a member cannot share its name with the nested class, in Java a public field named like a class is unusual, and in C# it hides the ordinary `ReferenceFrame.CreateRelative` call. About 160 methods, and every server side function example in three languages, would go through a deprecation cycle. |
 | A bound statics object from the connection (`connection.Statics<ReferenceFrame>()`) | Not the ordinary static method syntax of any of the languages. |
 | A default connection for static methods | Implicit global state, and wrong for programs with two connections. |
 | Check, in C#, that a static method's connection argument in a stream lambda is the stream's connection | A service object or an object in the lambda carries a connection the stream does not use either. Checking one of the three is inconsistent, and checking objects contradicts `objects-from-another-connection`. |
 | Change C++ static methods to take `Client*` | Churn for no behavior change. |
+| A hand-written `Expression` builder per client | About 140 methods by hand in three languages, drifting from the server. |
+| Operator overloads on `Expression` (`a + b`) | Covers arithmetic and comparison only. A larger design, and C# already has `connection.Compile`. |
 
 ## Out of scope
 
-* Building an `Expression` tree in C#, Java and C++ passes the connection at every node. A
-  connection-bound builder would fix that. It is a server side functions ergonomics question, not
-  binding consistency.
+* Operator overloads for `Expression` in C# and C++.
