@@ -16,7 +16,7 @@ The **GitHub** column says how the issue on GitHub stands against this plan:
 | | Release | Theme | Progress |
 | --- | --- | --- | --- |
 | ✅ | [0.7](#07-server-side-functions-streams-and-events-service-improvements) | Server-side functions, streams and events, protocol additions, service improvements | Tagged 2026-10-21 |
-| 🚧 | [0.8](#08-single-connection-client-codegen-then-client-conformance-and-thread-safety) | Single connection, client codegen, then client conformance testing and thread safety | 10 of 15 done; streams of calls and the bundled TestServer in review |
+| 🚧 | [0.8](#08-single-connection-client-codegen-then-client-conformance-and-thread-safety) | Single connection, client codegen, then client conformance testing and thread safety | 10 of 18 done; streams of calls and the bundled TestServer in review |
 | ⬜ | [1.0](#10-remaining-protocol-improvements-server-side-function-follow-ups) | Remaining protocol improvements (#906), server side function follow-ups | 0 of 9 done; tick control has a 0.7 stopgap |
 
 ## 0.7: server-side functions, streams and events, service improvements
@@ -99,6 +99,9 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 | ✅ | DockingCamera on the public Docking Camera (KURS) release; with the LIDAR deprecation, supersedes #674 | [#1232](https://github.com/krpc/krpc/issues/1232), fixed by #1264 | feature, mod-compatibility, service, ksp | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ✅ | Deprecate LIDAR in favor of `SpaceCenter.RaycastDistance`, and raycasts ignore trigger colliders; makes #1181 moot | [#1233](https://github.com/krpc/krpc/issues/1233), fixed by #1263 | feature, mod-compatibility, service, ksp | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ⬜ | Client name collisions: a scanner rule on member names, a contract for client naming, `ConfigNode` renames | [#1237](https://github.com/krpc/krpc/issues/1237), **add milestone** | bug, server, client, tools | [protocol/client-name-collisions.md](design/protocol/client-name-collisions.md) |
+| ⬜ | Inheritance for remote objects; additive, UI and Drawing first, then robotics and #900 modules | [#905](https://github.com/krpc/krpc/issues/905) | feature, protocol | [protocol/inheritance.md](design/protocol/inheritance.md) |
+| ⬜ | C#: target .NET Standard 2.0 and modern .NET, as well as .NET Framework 4.7.2 | [#1230](https://github.com/krpc/krpc/issues/1230) | feature, client, csharp | — |
+| ⬜ | Java: publish the client to Maven Central | [#1231](https://github.com/krpc/krpc/issues/1231) | feature, client, java | — |
 
 * **Single connection first.** It changes connection setup and threading in every client, so the
   conformance suite is written against it rather than rewritten after it.
@@ -208,15 +211,12 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | Streams and events over serial IO, after the single connection; needs flow control | [#1204](https://github.com/krpc/krpc/issues/1204) | feature, server, protocol, client, cnano | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | ✅ | More communication protocols; local sockets landed in 0.7, gRPC moved to #1187 | [#899](https://github.com/krpc/krpc/issues/899) | feature, protocol | [protocol/local-transports.md](design/protocol/local-transports.md) |
 | ⬜ | gRPC support, possibly through an external bridge; the game's runtime cannot host it | [#1187](https://github.com/krpc/krpc/issues/1187) | feature, server, protocol | [protocol/grpc-support.md](design/protocol/grpc-support.md) |
-| ⬜ | Inheritance for remote objects; additive, UI and Drawing first, then robotics and #900 modules | [#905](https://github.com/krpc/krpc/issues/905) | feature, protocol | [protocol/inheritance.md](design/protocol/inheritance.md) |
 | 🚧 | Principia support; phase 1 shipped as a docs page, phases 2 and 3 wait on upstream | [#767](https://github.com/krpc/krpc/issues/767) | feature, mod-compatibility, service, ksp | [services/principia-service.md](design/services/principia-service.md) |
 | ⬜ | MechJeb2 and Kerbal Engineer Redux services | [#288](https://github.com/krpc/krpc/issues/288) | feature, mod-compatibility, service, ksp | — |
 | ⬜ | Raster Prop Monitor integration and camera views | [#375](https://github.com/krpc/krpc/issues/375), [#424](https://github.com/krpc/krpc/issues/424) | feature, mod-compatibility, service, ksp | — |
 | ⬜ | Vessel state and staging prediction; parts may be covered by the stage API | [#311](https://github.com/krpc/krpc/issues/311) | feature, service, ksp | — |
 | ⬜ | Lua: documentation for the dynamically built services | [#1182](https://github.com/krpc/krpc/issues/1182) | feature, client, docs, lua | — |
 | ⬜ | Lua: pre-generated service stubs, LuaCATS annotations first | [#1201](https://github.com/krpc/krpc/issues/1201) | feature, client, lua | — |
-| ⬜ | C#: target .NET Standard 2.0 and modern .NET, as well as .NET Framework 4.7.2 | [#1230](https://github.com/krpc/krpc/issues/1230) | feature, client, csharp | — |
-| ⬜ | Java: publish the client to Maven Central | [#1231](https://github.com/krpc/krpc/issues/1231) | feature, client, java | — |
 
 ### Fixes, tests and tooling
 
