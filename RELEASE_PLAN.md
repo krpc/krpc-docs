@@ -206,7 +206,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | Trajectories service | — | — | [services/trajectories-service.md](design/services/trajectories-service.md) |
 | ⬜ | Nullable set elements and dictionary keys, parked and likely dropped | — | — | [protocol/nullable-keys-and-set-elements.md](design/protocol/nullable-keys-and-set-elements.md) |
 | ⬜ | Python: asyncio conveniences over `submit`, after the single connection | **To file**: [python-asyncio-client.md](issues/python-asyncio-client.md) | feature, client, python | [protocol/request-ids.md](design/protocol/request-ids.md) |
-| ⬜ | JavaScript client for the browser, on WebSockets, in phases, after 1.0 | **To draft** | feature, client | [javascript-client.md](design/javascript-client.md) |
+| 🚧 | JavaScript client for the browser, on WebSockets, in phases, after 1.0. Phases 1 to 3 implemented, not yet submitted | **To draft** | feature, client | [javascript-client.md](design/javascript-client.md) |
 | ⬜ | Streams and events over serial IO, after the single connection; needs flow control | [#1204](https://github.com/krpc/krpc/issues/1204) | feature, server, protocol, client, cnano | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | ✅ | More communication protocols; local sockets landed in 0.7, gRPC moved to #1187 | [#899](https://github.com/krpc/krpc/issues/899) | feature, protocol | [protocol/local-transports.md](design/protocol/local-transports.md) |
 | ⬜ | gRPC support, possibly through an external bridge; the game's runtime cannot host it | [#1187](https://github.com/krpc/krpc/issues/1187) | feature, server, protocol | [protocol/grpc-support.md](design/protocol/grpc-support.md) |

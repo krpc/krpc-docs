@@ -1,6 +1,7 @@
 # JavaScript client for the browser
 
-**Status:** proposal, after 1.0. No GitHub issue yet.
+**Status:** in progress. Phase 1 is implemented and not yet submitted; see
+[Phase 1 as built](#phase-1-as-built). No GitHub issue yet.
 
 ## Goal
 
@@ -100,7 +101,7 @@ Each phase is implementable and mergeable on its own.
 | Phase | Adds | Conformance profiles |
 | --- | --- | --- |
 | 1 | Browser, WebSockets, unary calls, dynamic stubs | `core`, `dynamic`, `defaults`, `connections`, `concurrency`, `websockets` |
-| 2 | Error types, named arguments | `error-types`, `named-arguments` |
+| 2 | Error types, named arguments. Structures become classes | `error-types`, `named-arguments` |
 | 3 | Generated stubs with TypeScript declarations, docs API reference | — |
 | 4 | Streams, events, callbacks, conditions | `streams`, `events`, `callbacks`, `conditions` |
 | 5 | Server side functions built with the `KRPC.Expression` API: streams, events and runs | `functions`, `function-types` |
@@ -194,7 +195,7 @@ reset on each message.
 
 #### Conformance
 
-- A testee in `client/javascript/conformance/`, a Node.js script reading commands on standard
+- A testee in `client/js/conformance/`, a Node.js script reading commands on standard
   input. It drives the same library code a browser loads.
 - `client/conformance/driver/conventions.py` gains a `camel` case. The conventions file sets
   `{"case": "camel", "accessors": true, "exceptions": false}`.
@@ -204,15 +205,126 @@ reset on each message.
 #### Build
 
 - Node.js and npm dependencies through `rules_nodejs` or `aspect_rules_js`, with a lockfile.
-- Targets: the library, the testee, `//client/javascript:conformance`, a lint (ESLint or Biome),
+- Targets: the library, the testee, `//client/js:conformance`, a lint (ESLint or Biome),
   and an npm tarball in the release zip.
-- A `client/javascript` component in `COMPONENTS`, with its `CHANGELOG.md`.
+- A `client/js` component in `COMPONENTS`, with its `CHANGELOG.md`.
 
 #### Docs
 
 A client guide page under `doc/src/client-guides/`, with examples in
 `doc/src/scripts/<page>/`. The docs build type-checks the TypeScript examples. The API reference
 waits for the stubs in phase 3, as the other clients' references come from clientgen.
+
+### Phase 1 as built
+
+| Item | Decision |
+| --- | --- |
+| Directory | `client/js`, short like the other clients' directories. The language keeps its name, JavaScript, in prose |
+| Bazel | `rules_nodejs` for Node 22, `aspect_rules_js` for the pnpm lock file, `aspect_rules_ts` with `tsc` |
+| Lint | Biome, for formatting and lint, as the `lint` test |
+| `krpc.proto` messages | `protoc-gen-es` in a Bazel rule, generated into the package, not committed |
+| Package | `krpc-js-<version>.tgz`, the `npm pack` layout, a release asset like the other clients' packages. Not in the mod zip |
+| Browser check | The library's `tsconfig` has no Node types. An esbuild bundle was checked by hand: 27 KB minified and gzipped |
+| Docs | A `js.rst` guide. The examples are plain JavaScript, for the wider audience, and `tsc` type-checks them against the client in `//doc:check-scripts-js` |
+
+Where it differs from the design above:
+
+- **No stall timeout.** A WebSocket message arrives whole, so a partial message never stalls. The
+  testee fails `test_stall_timeout_values` for the zero, negative and NaN cases, as expected
+  failures.
+- **Timeouts in milliseconds**, as JavaScript times everything. `handshakeTimeout` defaults to
+  5000, and `Infinity` waits indefinitely.
+- **Lower camel case** lower cases the leading run of capitals, except the last capital when a
+  lower case letter follows: `HTTPServer` is `httpServer`, `MyHTTPServer` is `myHTTPServer`.
+  Underscores stay. The driver's conventions file gained a `camel` case, and accessors are
+  `getName`.
+- **Structures** were frozen plain objects, made by a function the service exposes. Phase 2 made
+  them classes.
+- **Streams and events.** A member that returns a stream or an event exists, so the member lists
+  match, and rejects when called, until phase 4.
+- **The `client/websockets` testee is deleted.** The held-call tests in `test_calls.py` now define
+  `TestService` on the scripted server, which a dynamic client needs to call it.
+- **Unsupported**: interrupting a call (`test_abandoned_id`, `test_close_interrupted`), hashes, and
+  a static method called through an object.
+
+### Phase 2 as built
+
+Named arguments are a plain object after the positional arguments, the usual JavaScript options
+object:
+
+```js
+await conn.spaceCenter.launchVessel("VAB", "My Rocket", "LaunchPad", { recover: false });
+```
+
+- **Structures are classes**, so a plain object is never a value. Each structure is a class on its
+  service, such as `conn.spaceCenter.BoundingBox`, extending `StructValue`. A value is frozen, made
+  with `new` from an object of its fields. Decoded results are instances of it. The codec accepts
+  a value of the structure of the same name from any connection, and `equals` compares one field
+  by field.
+- **Arguments by name** fill any parameter, including one before a positional default. A trailing
+  plain object, with the prototype `Object.prototype` or `null`, holds them. Names are lower camel
+  case. A name passed twice, or a name the procedure lacks, raises a `TypeError`. The object of a
+  method has no name.
+- **Each exception a service lists is a class** on the service, such as
+  `conn.krpc.ObjectDestroyedException`. A mapped exception extends the matching JavaScript error:
+  `TypeError` for `ArgumentException`, `ArgumentNullException` and `NullReferenceException`, and
+  `RangeError` for `ArgumentOutOfRangeException`, `IndexOutOfRangeException`,
+  `DivideByZeroException` and `OverflowException`. The others extend `RPCError`.
+- **`instanceof RPCError` holds for every error from the server**, through a `Symbol.hasInstance`
+  on `RPCError` alone. Each class carries `service`, `exception`, `description` and `stackTrace`.
+- **Messages** of a typed error are the description and stack trace. An exception the client has
+  no class for keeps the `Service.Name:` prefix.
+- The classes are per connection, as the classes of objects are. The conventions file sets
+  `exceptions: true` and lists the native types. The testee reports each built-in error
+  constructor the error is an instance of.
+
+### Phase 3 as built
+
+The stubs are TypeScript declarations only. The client still builds each service at run time from
+`KRPC.GetServices`, so it matches the server it connects to. clientgen's `js` language writes one
+module per service into `src/services/`, which compiles to an empty module and its `.d.ts`:
+
+```ts
+export interface Service {
+  getActiveVessel(): Promise<Vessel | null>;
+  launchVessel(craftDirectory: string, name: string, launchSite: string, crew?: readonly string[] | null, recover?: boolean, flagUrl?: string): Promise<void>;
+  launchVessel(craftDirectory: string, name: string, launchSite: string, options: { crew?: readonly string[] | null; recover?: boolean; flagUrl?: string }): Promise<void>;
+  readonly Vessel: { [Symbol.hasInstance](value: unknown): value is Vessel };
+  ...
+}
+export interface Vessel extends RemoteObject<"SpaceCenter.Vessel"> { ... }
+export type VesselSituation = EnumValue<"SpaceCenter.VesselSituation">;
+```
+
+- **`Connection` holds the services.** An interface `Connection extends Services` merges with the
+  class, and `connect()` returns `Promise<Connection>`. `Services` lists the services a release
+  ships, written from `SERVICES` in `clientgen.bzl`. `DynamicConnection` types any other service as
+  `any`.
+- **Brands.** `RemoteObject`, `EnumValue` and `StructValue` take the type's name as a type parameter,
+  through an optional property keyed by a symbol that exists in types only. Two classes with the
+  same members, or two enumerations, do not mix.
+- **Overloads.** A procedure with defaults has the positional signature, and the required arguments
+  followed by an options object. Mixing the two, or naming a required argument, works at run time
+  and is not typed.
+- **Arguments are wider than results.** A 64-bit integer argument takes `number | bigint`, and a
+  collection argument is read-only. A tuple argument is a tuple type, so an array held in a variable
+  needs `as const` or a type annotation.
+- **Value types** of a class, structure, enumeration or exception are object types on the service,
+  with a `Symbol.hasInstance` predicate, so `instanceof conn.krpc.ArgumentException` narrows.
+- **Imports** come from `@krpc-org/krpc`, the package's namespace exports (`SpaceCenter`, `schema`).
+  The package's own build passes `--include=Service=./Service.js`, and maps the package name to its
+  source with `paths`. A mod's generated module adds its service to `Services` with module
+  augmentation, documented in `extending/clientgen.rst`.
+- **Name collisions.** `ConfigNode.GetValues` (deprecated) and the getter of `ConfigNode.Values` are
+  both `getValues`. The member that is not deprecated wins, at run time, in the stubs and in the
+  docs. At run time this fixed a phase 1 bug: the second `defineProperty` threw, so `connect()`
+  failed against a real game.
+- **Docs.** docgen's `js` domain uses Sphinx's built-in JavaScript domain: functions for service
+  procedures, a class per class, enumeration, structure and exception, and a property as its two
+  accessor signatures on one directive. Types are in `:type:` and `:rtype:` fields, written to
+  contain a literal so Sphinx does not look them up. The 8 API examples have JavaScript versions,
+  type-checked by `//doc:check-scripts-js`, which runs without `strictNullChecks` as the Python
+  check ignores optional access.
 
 ### Phase 6: function compiler
 
@@ -316,4 +428,7 @@ Ruled out:
 - **Origin check.** The server ignores the `Origin` header of a WebSocket upgrade, so any web page
   open in the player's browser can connect to the game. Until the pages phase, the guide
   recommends the server's connection approval for a game with a browser open.
-- **Bazel rules.** `aspect_rules_js` against `rules_nodejs`, decided at the start of phase 1.
+- **Windows CI.** The client's job is in the Windows matrix, but has not run yet. `rules_js`
+  supports Windows with caveats.
+- **npm publishing.** The release builds the tarball as a GitHub asset. Publishing it to npm under
+  `@krpc-org` is a release step still to add.
