@@ -94,7 +94,7 @@ Every current client fits the contract.
 | clientgen | The generated names, per scope, are unique | Build failure |
 | clientgen test | A test service with the clashes the rule allows to pass, e.g. a property `Foo` beside a type `Foo` | Generates and compiles in every client |
 
-**A warning, then an error.** Under [service scanner errors](../server/service-scanner-errors.md) an
+**A warning, then an error.** Under [service and mod errors](../server/service-and-mod-errors.md) an
 error disables both members, in every client. A third-party mod that loads today would lose members
 for a problem in one client. Version 1.0 makes it an error, as a breaking release.
 
@@ -104,7 +104,7 @@ an exempt pair only where the generated names collide. An existing client keeps 
 as its names do not collide, so its users see no change.
 
 **Extension members.** The extension clash check uses the same keys. The class keeps its own member,
-as for duplicate names in [service scanner errors](../server/service-scanner-errors.md).
+as for duplicate names in [service and mod errors](../server/service-and-mod-errors.md).
 
 ### `ConfigNode`
 

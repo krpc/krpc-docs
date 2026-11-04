@@ -1,7 +1,7 @@
 # Procedure ids from names
 
 **Status:** in progress, for 0.8 with [protocol version 2](protocol-version.md). Implemented
-locally (2026-10-31), stacked on [service scanner errors](../server/service-scanner-errors.md), not
+locally (2026-10-31), stacked on [service and mod errors](../server/service-and-mod-errors.md), not
 yet a PR. Issue: [#1196](https://github.com/krpc/krpc/issues/1196).
 
 | Part | State |
@@ -66,7 +66,7 @@ neither.
 
 Services and procedures follow one rule: **an id that is 0, or shared by two members, is not
 assigned. Those members are callable by name only.** The scanner records a warning naming both, and
-the server keeps running ([service-scanner-errors.md](../server/service-scanner-errors.md)).
+the server keeps running ([service-and-mod-errors.md](../server/service-and-mod-errors.md)).
 
 | Case | Outcome |
 | --- | --- |
