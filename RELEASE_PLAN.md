@@ -3,7 +3,7 @@
 The authoritative list of planned work per release, with pointers to design docs. GitHub issues on
 [`krpc/krpc`](https://github.com/krpc/krpc) are updated to match this file, and track work status.
 
-✅ done · 🚧 in progress or partly done · ⬜ not started
+✅ done · 🚧 in progress or partly done · ⬜ not started · ⛔ blocked
 
 The **GitHub** column says how the issue on GitHub stands against this plan:
 
@@ -168,6 +168,7 @@ connection, and the bundles and the audit depend on the conformance suite.
 | ✅ | Server window does not resize to fit its content | [#1186](https://github.com/krpc/krpc/issues/1186), fixed by #1247 | bug, server, ksp | — |
 | ⬜ | Publish wheels for krpc and krpctools | **To file**: [python-wheels.md](issues/python-wheels.md) | enhancement, client, tools, build, python | — |
 | ⬜ | Deprecation signals for every member kind in every client | **To file**: [deprecation-all-members.md](issues/deprecation-all-members.md) | enhancement, client, tools | — |
+| ✅ | Lua API docs on sphinx-lua-ls, when luadomain breaks on a Sphinx bump | [#1202](https://github.com/krpc/krpc/issues/1202), fixed by #1252, **relabel** | enhancement, client, docs, lua | — |
 
 ## 1.0: remaining protocol improvements, server side function follow-ups
 
@@ -223,7 +224,6 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | | Item | GitHub | Labels | Design doc |
 | --- | --- | --- | --- | --- |
 | ⬜ | Windows CI: C++ local socket test hangs, any release | [#1078](https://github.com/krpc/krpc/issues/1078) | bug, client, cpp | — |
-| ⬜ | Windows CI: Python stream test flake, any release | [#1138](https://github.com/krpc/krpc/issues/1138) | bug, client, python | — |
 | ⬜ | Windows CI: C-nano serial transport tests, over a named pipe | [#1200](https://github.com/krpc/krpc/issues/1200), **relabel** | enhancement, client, build, cnano | — |
 | 🚧 | Autopilot test-plan gaps | **To file**: [autopilot-test-gaps.md](issues/autopilot-test-gaps.md) | enhancement, service, tools, ksp | [autopilot/test-plan.md](design/autopilot/test-plan.md) |
 | 🚧 | Mod compatibility tests | **To file**: [mod-compat-tests.md](issues/mod-compat-tests.md) | enhancement, mod-compatibility, tools | [services/mod-compat-test-coverage.md](design/services/mod-compat-test-coverage.md), [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
@@ -234,8 +234,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | Conformance: wake waits on the testee's notifications | **To file**: [conformance-wait-until-polls.md](issues/conformance-wait-until-polls.md) | enhancement, tools | [client-conformance/harness.md](design/client-conformance/harness.md) |
 | ⬜ | Conformance: a race point for a value queued during a first call | **To file**: [conformance-queued-value-race-point.md](issues/conformance-queued-value-race-point.md) | enhancement, tools | [client-conformance/harness.md](design/client-conformance/harness.md) |
 | ⬜ | Conformance: a driver helper for a callback that runs a command on itself | **To file**: [conformance-self-removing-callback.md](issues/conformance-self-removing-callback.md) | enhancement, tools | [client-conformance/harness.md](design/client-conformance/harness.md) |
-| ⬜ | Lua API docs on sphinx-lua-ls, when luadomain breaks on a Sphinx bump | [#1202](https://github.com/krpc/krpc/issues/1202), **relabel** | enhancement, client, docs, lua | — |
-| ⬜ | luasocket release pin, blocked upstream | [#1203](https://github.com/krpc/krpc/issues/1203) | bug, client, lua | [build-tools/lua-socket-unix-on-windows.md](design/build-tools/lua-socket-unix-on-windows.md) |
+| ⛔ | luasocket release pin, blocked upstream on lunarmodules/luasocket#469 | [#1203](https://github.com/krpc/krpc/issues/1203) | bug, client, lua | [build-tools/lua-socket-unix-on-windows.md](design/build-tools/lua-socket-unix-on-windows.md) |
 | ⬜ | Generate the client API references from the client sources | **To file**: [client-api-reference-autodoc.md](issues/client-api-reference-autodoc.md) | enhancement, client, tools, docs | — |
 | 🚧 | Conformance: rename the `threads` profile to `concurrency`, before the JavaScript client | **To file**: [conformance-concurrency-profile.md](issues/conformance-concurrency-profile.md), local branch `conformance-concurrency` | enhancement, client, tools | [javascript-client.md](design/javascript-client.md) |
 | ⬜ | Client spec: one callback thread per connection | **To file**: [spec-callback-thread-per-connection.md](issues/spec-callback-thread-per-connection.md) | feature, client | [client-conformance/spec.md](design/client-conformance/spec.md) |
