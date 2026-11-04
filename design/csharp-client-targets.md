@@ -1,6 +1,6 @@
 # C# client: target .NET Standard 2.0
 
-**Status:** in progress: phase 1 committed on a local branch. Issue [#1230](https://github.com/krpc/krpc/issues/1230).
+**Status:** in review: PR [#1274](https://github.com/krpc/krpc/pull/1274), both phases. Issue [#1230](https://github.com/krpc/krpc/issues/1230).
 
 ## Problem
 
