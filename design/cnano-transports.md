@@ -1,6 +1,6 @@
 # C-nano: pluggable transports, chosen at run time
 
-**Status:** in progress. Issue [#1176](https://github.com/krpc/krpc/issues/1176). Folds in phase 1
+**Status:** in review as [PR #1275](https://github.com/krpc/krpc/pull/1275). Issue [#1176](https://github.com/krpc/krpc/issues/1176). Folds in phase 1
 of [cnano-arduino.md](cnano-arduino.md).
 
 ## Problem
