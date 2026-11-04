@@ -17,4 +17,6 @@ Proposal:
 - Keep the `//tools/build/ksp` imports, which match the assemblies KSP ships, unless a pinned package version covers them.
 - A bazel target that regenerates the lock and the package list, alongside `//tools/build/python:requirements.update`.
 
+`KRPC.Client` compiles against Protobuf's `netstandard2.0` asset, while its .NET 10 tests must load the `net8.0` one, as a NuGet consumer does. Check the tests' `deps.json` after the switch. #1230 keeps this right with an `import_library` that splits the compile-time and run-time assets.
+
 Follows #1230, which moves `KRPC.Client` to `netstandard2.0`, so that both the client and its .NET 10 tests import Google.Protobuf.
