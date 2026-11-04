@@ -167,10 +167,11 @@ feed a testee commands by hand (changed after C6, from varint length-delimited f
 **Hello** reports the client name, the testee protocol version, the profiles and the transports
 ([spec.md](spec.md) "Profiles").
 
-**Commands** each carry an `id` and an optional `thread` name. The testee runs each command on the
-named worker thread and replies asynchronously, keyed by `id`. A test can then say "wait on thread
-A, remove on thread B", the shape of the deadlocks found in Python and Java. A testee without the
-`threads` profile (Lua, cnano) gets no `thread`, and runs each command to completion in order.
+**Commands** each carry an `id` and an optional `task` name. The testee runs each command on the
+named task, a worker thread or an async task chain, and replies asynchronously, keyed by `id`. A
+test can then say "wait on task A, remove on task B", the shape of the deadlocks found in Python
+and Java. A testee without the `concurrency` profile (Lua, cnano) gets no `task`, and runs each
+command to completion in order.
 
 | Command | Does |
 | --- | --- |

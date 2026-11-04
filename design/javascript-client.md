@@ -99,7 +99,7 @@ Each phase is implementable and mergeable on its own.
 
 | Phase | Adds | Conformance profiles |
 | --- | --- | --- |
-| 1 | Browser, WebSockets, unary calls, dynamic stubs | `core`, `dynamic`, `defaults`, `connections`, `threads`, `websockets` |
+| 1 | Browser, WebSockets, unary calls, dynamic stubs | `core`, `dynamic`, `defaults`, `connections`, `concurrency`, `websockets` |
 | 2 | Error types, named arguments | `error-types`, `named-arguments` |
 | 3 | Generated stubs with TypeScript declarations, docs API reference | — |
 | 4 | Streams, events, callbacks, conditions | `streams`, `events`, `callbacks`, `conditions` |
@@ -165,9 +165,11 @@ The client runs on one thread, and Web Workers cannot share a `WebSocket`. Sever
 be in flight at once. Each request carries its id (#1174), and the client matches each response to
 its `Promise` by id.
 
-- **`threads`: supported.** Its tests check concurrent calls: unique request ids, responses in any
-  order, a close while a call waits, a response after the disconnect. Promises raise each case. The
-  testee maps each named thread of the testee protocol to an async task chain. Commands on one
+- **`concurrency`: supported**, renamed from `threads`
+  ([draft](../issues/conformance-concurrency-profile.md)). Its tests check concurrent calls: unique
+  request ids, responses in any order, a close while a call waits, a response after the
+  disconnect. Promises raise each case. The testee maps each named task of the testee protocol to
+  an async task chain. Commands on one
   chain run in order, and chains interleave. A test that needs a real thread, such as `Interrupt`
   or the thread a callback runs on, goes in `unsupported.txt`.
 - **`races`: unsupported.** Its race points pause the update thread mid-step. JavaScript never

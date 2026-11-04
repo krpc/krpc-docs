@@ -1,7 +1,7 @@
 # Conformance: wake waits on the testee's notifications
 
 `wait_until` in `client/conformance/driver/testee.py` polls its condition every 10 ms until it
-holds or `REPLY_TIMEOUT` elapses. About 50 calls use it, in `test_streams.py`, `test_threading.py`,
+holds or `REPLY_TIMEOUT` elapses. About 50 calls use it, in `test_streams.py`, `test_concurrency.py`,
 `test_functions.py`, `test_events.py`, `test_calls.py` and the driver's `update_barrier`.
 
 Nearly every condition reads state that changes only when a testee notification arrives, such as a

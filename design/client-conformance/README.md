@@ -81,7 +81,7 @@ New in this revision:
 | Codec vectors | Move into the suite as `Encode`/`Decode` commands. A NaN must decode from either sign and encode to some NaN, which ends the vector drift. |
 | Testee values | Cross as a `testee.proto` `Value` of plain protobuf fields, never as kRPC wire bytes. A codec bug that is symmetric in one client would otherwise cancel out in the testee. See [harness.md](harness.md) "Values". |
 | Python is not the reference | The spec is. Where clients disagree, the spec picks, and the losing clients get expected failures until fixed. |
-| Thread safety ([#427](https://github.com/krpc/krpc/issues/427)) | Answered by the spec's threading page, and pinned by the `threads` profile. Documented in each client guide by #1225, which closed #427. |
+| Thread safety ([#427](https://github.com/krpc/krpc/issues/427)) | Answered by the spec's concurrency page, and pinned by the `concurrency` profile. Documented in each client guide by #1225, which closed #427. |
 | Testee lifetime | One process per test session, with a fresh `Connect` per test. The driver restarts a testee that crashes or times out. `Counter` counts per client, so a fresh connection starts from clean state. |
 | Timeouts | The handshake and stall timeouts are `Connect` settings. The spec says clients SHOULD make both settable. |
 | Timing | Tests order events through `ConformanceService` (`SetValue`, `Block`, `TriggerEvent`) in place of wall-clock sleeps where they can. Tests that still race the clock are marked `@timing` ([harness.md](harness.md)). |

@@ -48,11 +48,11 @@ the guide with the API.
 
 | Client | Feature left out | Spec requirement |
 |---|---|---|
-| C++ | An explicit close; close twice; close from another thread waking waiters | `connection-close`, `connection-close-twice`, `threading-close-with-a-call-in-flight` |
+| C++ | An explicit close; close twice; close from another thread waking waiters | `connection-close`, `connection-close-twice`, `concurrency-close-with-a-call-in-flight` |
 | C++, Java | A spelling for an infinite handshake or stall timeout (item 1) | `connection-handshake-timeout-values`, `connection-stall-timeout-values` |
 | Java | The connection error after a close or failure. Calls declare only the checked `RPCException`, and `ConnectionException` is an `IOException`, so the exception types need a design first (item 7) | `connection-call-after-end`, `streams-read-after-close`, `streams-wake-waiter` |
 | C#, Java | A scoped stream idiom, `using` or try-with-resources (item 12) | `streams-scoped-removal` |
-| C#, Java | A connection-wide update wait and callback (item 11) | `threading-wait-for-update`, `streams-update-callback` |
+| C#, Java | A connection-wide update wait and callback (item 11) | `concurrency-wait-for-update`, `streams-update-callback` |
 | C# | Host names for the address (item 10) | `connection-unknown-host` |
 | Lua | A stall timeout (item 13) | `connection-stall` |
 | C-nano | Handshake and stall timeouts, which need a timed read, and so the automatic serial retry. The guide keeps the retry by hand (item 14) | `connection-handshake-timeout`, `connection-stall`, `connection-serialio-no-answer` |
@@ -102,7 +102,7 @@ Written as fixed, though the client still fails the test:
 10. **C# has no host names.** The address is an `IPAddress` (`test_connection.py::test_unknown_host`).
 
 11. **C# and Java have no connection-wide update wait or callback.** Python and C++ have both
-    (`test_threading.py::test_wait_for_update`, `test_streams.py::test_update_callback`).
+    (`test_concurrency.py::test_wait_for_update`, `test_streams.py::test_update_callback`).
 
 12. **Java and C# have no scoped stream idiom** (`test_streams.py::test_scoped_removal`). Python
     and C++ remove a stream at the end of a block.

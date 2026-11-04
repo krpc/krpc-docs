@@ -12,11 +12,11 @@ failures, "The client has no race points".
 | Race point | Where the thread pauses | Tests |
 |---|---|---|
 | `STREAM_CALLBACKS` | The update thread, with a value and a copy of the stream's callbacks, before it calls them | `test_streams.py::test_a_callback_is_not_called_once_its_stream_is_removed`, `test_streams.py::test_a_callback_removed_during_an_update_is_not_called`, `test_events.py::test_a_callback_removed_during_an_update_does_not_take_a_firing` |
-| `UPDATE_CALLBACKS` | The update thread, before it calls the update callbacks | `test_threading.py::test_update_callbacks_are_not_called_once_closed` |
+| `UPDATE_CALLBACKS` | The update thread, before it calls the update callbacks | `test_concurrency.py::test_update_callbacks_are_not_called_once_closed` |
 | `FIRST_CALL` | The adding thread, with the stream's value, before the first call | `test_streams.py::test_a_first_call_is_not_passed_an_older_value` |
-| `FIRST_CALL_STARTED` | The adding thread, once the first call keeps the update thread out, before the callback runs | `test_threading.py::test_close_while_an_update_waits_for_a_first_call` |
+| `FIRST_CALL_STARTED` | The adding thread, once the first call keeps the update thread out, before the callback runs | `test_concurrency.py::test_close_while_an_update_waits_for_a_first_call` |
 | `STREAM_ENDING` | The update thread, with the ending of a stream stored, before it wakes the stream's waiters and calls its end callbacks | `test_streams.py::test_a_remove_during_an_ending_by_the_server_keeps_its_error` |
-| `STREAM_VALUE` | The update thread, with a value of a stream stored, before it wakes the stream's waiters | `test_threading.py::test_a_wait_does_not_return_for_a_value_read_before_its_wake` |
+| `STREAM_VALUE` | The update thread, with a value of a stream stored, before it wakes the stream's waiters | `test_concurrency.py::test_a_wait_does_not_return_for_a_value_read_before_its_wake` |
 | `FIRST_CALL_ENDED` | The adding thread, with the first call made and the values queued during it passed, before it lets the update thread call the callback | `test_streams.py::test_a_value_that_arrives_as_a_first_call_ends_is_passed` |
 | `REPLAY` | The thread adding an event callback, with an unseen firing, before the call | `test_events.py::test_a_callback_added_during_a_replay_does_not_replay_the_firing`, `test_events.py::test_a_callback_removed_during_its_add_does_not_take_a_firing` |
 
