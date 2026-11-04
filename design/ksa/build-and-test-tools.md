@@ -1,6 +1,7 @@
 # Build and test tools
 
-**Status:** proposal, 2026-10-26. Part of [kRPC for KSA](README.md).
+**Status:** proposal, 2026-10-26. Part of [kRPC for KSA](README.md). The `--reference-dir` option
+of `krpc-servicedefs` is in progress, in #1228.
 
 Most tools are already game-agnostic. The in-game test harness and the service lists are the two
 that assume KSP.
@@ -35,8 +36,9 @@ install. The KSA prototype has its own `ksatest.py` with the same shape.
 
 * **`--no-launch` and test selection work the same** for both games.
 * **KSA has no mod sets yet.** Its backend installs StarMap and kRPC only.
-* **`krpctest` is published** to PyPI for third-party KSP services. The split keeps the KSP backend
-  in the package. A KSA backend joins it once KSA service authors need it.
+* **`krpctest` is not published.** It installs the mod by building it with Bazel, so it runs only
+  from a kRPC checkout. Moving it into `krpctools`, configured per game, is drafted in
+  [krpctest-in-krpctools.md](../../issues/krpctest-in-krpctools.md).
 
 ## Service lists
 
@@ -54,5 +56,7 @@ See [releases.md](releases.md) for where each list's stubs ship.
 ## Service definitions
 
 `krpc-servicedefs` loads a service assembly by reflection and needs the game assemblies to resolve
-its types. Stub assemblies are enough, since nothing runs. It gains a `--game` or `--reference-dir`
-option. The prototype already calls the `ServiceDefinitions` binary with `--reference-dir`.
+its types. Stub assemblies are enough, since nothing runs. It gains a repeatable `--reference-dir`
+option in place of the KSP directory argument (#1228). The prototype already calls the
+`ServiceDefinitions` binary with `--reference-dir`, and moves to `krpc-servicedefs` when it builds
+against krpctools 0.8.
