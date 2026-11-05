@@ -90,7 +90,7 @@ Each phase merges on its own. All of them follow kRPC 1.0, except procedure ids,
 | 2 | CI: KSA targets in the existing jobs | A KSA change is checked with no new jobs |
 | 3 | Tools: shared in-game harness, `//ksa:test-ingame` | KSA in-game tests run through Bazel |
 | 4 | Release trains: per-train versions, tags and release scripts | A KSA release leaves the KSP and client versions alone |
-| 5 | Docs: per-game builds from one source | `/ksa/` has the full client guides with KSA examples |
+| 5 | Docs: per-game builds from one source | `/ksa/` has the full user guides with KSA examples |
 
 ## Open Questions
 

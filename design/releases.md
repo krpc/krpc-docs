@@ -3,7 +3,7 @@
 **Status:** proposal, 2026-10-26, revised 2026-10-31 (stub packages, labels, `core` changelog, CKAN
 and KSP-AVC, version strings; label migration done apart from the service labels) and 2026-11-05 (a
 train per client, one `krpctools` train, no milestones, no latest release, release workflows,
-client docs). Covers every component. Started for [kRPC for KSA](ksa/README.md).
+a docs site per train). Covers every component. Started for [kRPC for KSA](ksa/README.md).
 
 ## Problem
 
@@ -254,8 +254,8 @@ The per-component files stay. Each train releases the components it owns: a clie
 
 * **A fragment can span trains.** A train's release folds only its own components' sections out of
   each fragment, and deletes a fragment once it is empty. `01-fold-changelogs.py` takes the train.
-* **Release notes list one train's components.** The docs changelog page of each game lists that
-  game's components, then each client and `krpctools`.
+* **Release notes list one train's components.** Each game site's changelog lists that game's
+  components. Each client site has its own changelog.
 
 **`core` changes are logged in each game's Server section, at pull request time.** A `core` pull
 request adds its user-facing entry to the Server changelog of each game, under that game's
@@ -304,7 +304,7 @@ publishes.
 | `tools/release/*` | Split per train. The shared steps (fold, bump, tag) take the train, and each train has its own publish steps |
 | `.github/workflows/` | A release workflow per train, triggered by its tag prefix |
 | `50-release-github.py` | Creates the release with `--latest=false` |
-| `.github/workflows/docs.yml` | Triggers on the game tags, freezing that game's docs, and on the client tags, refreshing that client's pages (see [Docs](#docs)). It stops triggering on bare `v*` |
+| `.github/workflows/docs.yml` | A game tag freezes that game's site. A client or `krpctools` tag rebuilds that site's current major (see [Docs](#docs)). It stops triggering on bare `v*` |
 | `BUILD.bazel`, `40-build-assets.py`, `70-announcements.py` | Assets per train. The mod archives are `krpc-ksp-v1.0.0.zip` and `krpc-ksa-v1.0.0.zip`, replacing `krpc-0.7.0.zip`. Announcements are for game releases |
 | `tools/release/lib.py` | `TAG = "v" + VERSION` becomes one tag per train |
 | `68-release-ckan.py` | Waits for `kRPC-v1.0.0.ckan`, named for the CKAN version (see below), not the tag |
@@ -313,24 +313,78 @@ Releases before the split keep their `v*` tags.
 
 ## Docs
 
-**Open: the plan below is not settled.** It extends [docs-website.md](ksa/docs-website.md), which
-gives each game its own site.
+**Each page belongs to one train, and each train's pages are versioned with it.** A version switcher
+then lists the releases of exactly one train. A single game switcher over client pages would show
+a client version that matches nothing in the dropdown.
 
-* **One site per game, with a version switcher of that game's releases.** A `ksp-v*` tag freezes
-  `/ksp/v<version>/`, a `ksa-v*` tag `/ksa/v<version>/`.
-* **Each client page shows its client's latest release**, and states the version it was built from,
-  e.g. "Python client v1.4.2".
-* **A client release refreshes its pages without a game release.** A `python-v*` tag rebuilds the
-  Python pages of each game's sites from the client's tag, and replaces them in place.
-  `publish-docs.py` already grafts a version's content onto the current toolchain, and would graft
-  the client's pages onto the game snapshot in the same way.
+| Site | Switcher | Contents |
+| --- | --- | --- |
+| `/` | none, built from `main` | Links to each game, client and the protocol, with their latest releases. kRPC development, third-party clients |
+| `/ksp/` | KSP releases | Getting started, tutorials, user guides, the service API reference in each language, extending, the KSP changelog |
+| `/ksa/` | KSA releases | The same for KSA |
+| `/clients/<language>/` | that client's major versions | Installing, connecting, the client's own classes, its changelog |
+| `/clients/krpctools/` | `krpctools` major versions | `clientgen`, `docgen`, `servicedefs`, the `TestServer`, `krpctest` |
+| `/protocol/` | protocol versions | Communication protocols, the client spec, the compatibility table |
 
-Open questions:
+Each site has its own search.
 
-* **Which snapshots a client release refreshes**: the latest of each game, or every one.
-* **The API reference in each language** comes from the game's service definitions and `docgen`. A
-  client release that changes how its API reference renders would need the reference rebuilt too.
-* **Shared pages that cite a client feature**, such as the protocol pages, are frozen with the game.
+**The top-level site is unversioned.** It holds the pages tied to no train, which always describe
+`main`. Every push to `main` rebuilds it, and so does every release, to update the latest versions
+it lists.
+
+**The service API reference belongs to the game.** It is generated from the game's service
+definitions, the same source as the stub packages. `/ksp/v1.0.0/` documents exactly what each
+`ksp-v1.0.0` stub package contains. A later `docgen` change reaches the reference at the game's
+next release.
+
+**The user guides are written once and built per game**, as
+[docs-website.md](ksa/docs-website.md) plans. Streams, events, control loops, server-side functions
+and object lifetime are explained there, with an example per language in the game's API. These pages
+take over the worked examples from today's client guides, which call `SpaceCenter` in 18 of 20
+Python examples.
+
+**A client site covers what does not depend on a game.** That is installing, connecting, the type
+mapping, and the client's own classes, such as `Connection`, `Stream` and `Event`, and its errors.
+Its examples call the `KRPC` service. A page that needs a real use links to the user guide of each
+game.
+
+**A client site keeps one snapshot per major version.** A `python-v1.4.2` tag rebuilds
+`/clients/python/v1/` in place, and its footer states "Python client v1.4.2". `versionadded` and
+`versionchanged` mark features added within a major. A new major freezes the previous one. `main`
+builds `dev/` for each site.
+
+**Links run from games to clients.** A game page links to `/clients/<language>/` for the latest
+release. Each game snapshot states the minimum client versions its stubs require. A client page
+never links into a game snapshot.
+
+**The protocol site changes rarely.** A protocol version bump freezes `/protocol/v<n>/`. The
+compatibility table and the conformance results are rebuilt by every client and game release.
+
+| Today | Moves to |
+| --- | --- |
+| Getting started, tutorials, user guides | each game site |
+| Client guides: install, connect, the client's classes | `/clients/<language>/` |
+| Client guides: worked examples of streams, events and server-side functions | the user guides on each game site |
+| Service API reference | each game site |
+| Communication protocols, client spec | `/protocol/` |
+| Extending | each game site, as [docs-website.md](ksa/docs-website.md) plans |
+| `krpctools` | `/clients/krpctools/` |
+| Third-party clients | `/` |
+| kRPC development | `/` |
+
+Other projects split their docs along release trains in the same way, as far as we recall without
+checking the sites:
+
+* **MongoDB** versions the server manual, and each driver's docs on their own, with a compatibility
+  table of driver against server version.
+* **Temporal** and **OpenTelemetry** have an unversioned concept site and a reference per SDK
+  versioned by that SDK's releases. OpenTelemetry publishes a spec compliance matrix per language.
+* **Elastic** moved from versioned guides per product to one site with version badges, since a
+  snapshot per release across many products did not scale.
+
+**Rejected: one site per game with client pages refreshed in place.** A game snapshot's switcher
+shows the game version, and its client pages a newer client version. Each client release would have
+to rewrite every game snapshot, or leave the older ones stale.
 
 ## CKAN and KSP-AVC
 

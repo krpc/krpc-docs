@@ -26,18 +26,17 @@ One source tree, built once per game. Each game gets its own site:
 
 | URL | Contents |
 | --- | --- |
-| `/` | Picks the game |
+| `/` | Links to each game and client, and the unversioned pages ([releases.md](../releases.md#docs)) |
 | `/ksp/dev/`, `/ksp/v1.0.0/` | KSP build |
 | `/ksa/dev/`, `/ksa/v0.2.0/` | KSA build |
 
 | Part | KSP build | KSA build |
 | --- | --- | --- |
-| Getting started, tutorials, user guides | KSP pages | KSA pages |
-| Client guides | shared prose, KSP examples | shared prose, KSA examples |
+| Getting started, tutorials | KSP pages | KSA pages |
+| User guides, including streams, events and server-side functions | shared prose, KSP examples | shared prose, KSA examples |
 | API reference | SpaceCenter and the mod services | `KSA` |
-| Communication protocols | shared | shared |
 | Extending | shared prose, KSP mod examples | shared prose, StarMap and Harmony specifics |
-| Changelog | KSP, clients and tools | KSA, clients and tools |
+| Changelog | KSP | KSA |
 
 * **The shared prose is written once.** Copying the KSP guides into a KSA tree would give two copies
   that drift apart.
@@ -63,8 +62,9 @@ One source tree, built once per game. Each game gets its own site:
 
 * **Snapshots follow the release trains** ([releases.md](../releases.md)): a `ksp-v*` tag freezes
   `/ksp/v<version>/`, a `ksa-v*` tag freezes `/ksa/v<version>/`. `main` updates both `dev/` builds.
-* **Each client's pages show its latest release**, refreshed by a client release without a game
-  release ([releases.md](../releases.md#docs), still open).
+* **The client guides, the protocol pages and `krpctools` move to sites of their own**, versioned by
+  their own trains ([releases.md](../releases.md#docs)). The worked examples in today's client guides
+  move into the user guides above.
 * **The existing snapshots stay where they are** (`/0.5.4/`, `/0.7.0/`, ...). The version switcher
   lists them under KSP. `/experimental/ksa/` redirects to `/ksa/`.
 * **Paths and switcher labels carry the `v`**, as the tags do
@@ -75,5 +75,5 @@ current single-game switcher.
 
 ## Cost
 
-The work is KSA versions of the examples in the shared pages. That is about 20 client-guide
+The work is KSA versions of the examples in the shared pages. That is about 20 user-guide
 examples per language, across six languages, plus the extending examples. The core set can go first.
