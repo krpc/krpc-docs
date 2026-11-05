@@ -21,7 +21,7 @@ carry, and keeps a KSA change from paying for KSP work it does not touch.
 | [repo-layout.md](repo-layout.md) | Monorepo or split, the directory layout, the Bazel build of the KSA mod |
 | [build-and-test-tools.md](build-and-test-tools.md) | In-game test harness, `run-<game>`, servicedefs, clientgen and docgen service lists |
 | [ci.md](ci.md) | What CI checks for each game, with no new jobs |
-| [releases.md](../releases.md) | Release trains, per-game stub packages, milestones, labels, tags, channels |
+| [releases.md](../releases.md) | Release trains per game and client, stub packages, labels, tags, release workflows |
 | [docs-website.md](docs-website.md) | One source, one site build per game |
 | [borea.md](borea.md) | Listing the KSA mod on the Borea mod manager, from `ksa-v0.2.0` |
 

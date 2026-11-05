@@ -1,12 +1,21 @@
 # Releases and versioning
 
-**Status:** proposal, 2026-10-26, revised 2026-10-31 (stub packages and their dependencies, milestones, labels, `core` changelog, CKAN and KSP-AVC, version strings; label migration done apart from the service labels). Part of
-[kRPC for KSA](ksa/README.md).
+**Status:** proposal, 2026-10-26, revised 2026-10-31 (stub packages, labels, `core` changelog, CKAN
+and KSP-AVC, version strings; label migration done apart from the service labels) and 2026-11-05 (a
+train per client, one `krpctools` train, no milestones, no latest release, release workflows,
+client docs). Covers every component. Started for [kRPC for KSA](ksa/README.md).
 
 ## Problem
 
-`config.bzl` holds one version, and every component releases under it. With two games, a KSA
-release would bump the KSP mod and every client, and a KSP fix would bump KSA.
+`config.bzl` holds one version, and every component releases under it:
+
+* **Two games.** A KSA release would bump the KSP mod and every client, and a KSP fix would bump KSA.
+* **A new client starts at the shared version.** A Go client added when the others reach 2.4.1
+  would start at 2.4.1.
+* **A fix in one client releases every client**, most of them unchanged.
+* **The clients lack feature parity.** Bringing the others up to Python's level would bump Python's
+  version with no change to Python.
+* **A release takes an evening.** Every channel is published in one sitting.
 
 Compatibility no longer depends on release versions. Since 0.7, client and server agree on a
 protocol version in the handshake ([protocol-version.md](protocol/protocol-version.md)), so
@@ -14,26 +23,37 @@ release versions are free to move apart.
 
 ## Release trains
 
+One train per game mod, one per client, and one for the tools:
+
 | Train | Contents | Tag | Channels |
 | --- | --- | --- | --- |
-| Clients and tools | every client runtime, with the `KRPC` and `StdLib` stubs; `krpctools`; `krpctest`; the `TestServer` image | `clients-v1.2.0` | GitHub (Java), PyPI, NuGet, vcpkg, Arduino, LuaRocks, ghcr.io |
-| KSP | the KSP mod and its services, the KSP stub package for each client, KSP API docs | `ksp-v1.0.3` | GitHub, CKAN, and the client channels for the stubs |
-| KSA | the KSA mod and its services, the KSA stub package for each client, `KSA.proto`, KSA API docs | `ksa-v0.2.0` | GitHub, SpaceDock, Borea ([borea.md](ksa/borea.md)), and the client channels for the stubs |
+| KSP | the KSP mod and its services, the KSP stub package of each client, KSP API docs | `ksp-v1.0.3` | GitHub, CKAN, and each client's channel for its stubs |
+| KSA | the KSA mod and its services, the KSA stub package of each client, `KSA.proto`, KSA API docs | `ksa-v0.2.0` | GitHub, SpaceDock, Borea ([borea.md](ksa/borea.md)), and each client's channel for its stubs |
+| Python | the Python client | `python-v1.4.2` | PyPI |
+| C# | the C# client | `csharp-v1.1.0` | NuGet |
+| Java | the Java client | `java-v1.0.1` | Maven Central, GitHub |
+| C++ | the C++ client | `cpp-v1.2.0` | vcpkg (`krpc`), GitHub |
+| C-nano | the C-nano client and the Arduino library built from it | `cnano-v1.0.2` | vcpkg (`krpc-cnano`), Arduino, GitHub |
+| Lua | the Lua client | `lua-v1.0.0` | LuaRocks, GitHub |
+| Tools | `krpctools`: `clientgen`, `docgen`, `servicedefs`, the `TestServer` and `krpctest` | `krpctools-v1.1.0` | PyPI |
 | Protocol | an integer in the handshake | none | none |
 
-* **The clients release in lockstep.** They share the protocol version. One version per language
-  would mean about eight release pipelines for little gain. A language can split out later if one
-  really diverges.
-* **Stub packages release with their game.** KSP stubs `1.0.3` are generated from KSP mod `1.0.3`.
+* **A client runtime carries the `KRPC` and `StdLib` stubs.** Each game's stubs are a separate
+  package, versioned with the game (see [Client packages](#client-packages)).
+* **A new client starts at its own version**, e.g. a Go client at `go-v0.1.0`.
+* **`krpctools` is one package.** The `TestServer` is already bundled in it, and `krpctest` moves
+  into it. `clientgen` serves every client, so the tools cannot belong to one client's train.
 * **`core` is not a train, and has no version.** Each mod builds in `core` as it stands on `main`
-  when that mod is released. `krpctools` ships `core` for third-party servers in the same way, as it
-  stands at the clients release.
+  when that mod is released. `krpctools` ships `core` for third-party servers in the same way, as
+  it stands at the tools release.
 * **A `core` change reaches a game in that game's next release.** It gets a KSP patch release only
   when KSP users would notice it.
-* **A breaking protocol change bumps all three trains**, since every client and both servers move to
-  the new version.
-* The docs gain a compatibility table keyed on protocol version: which client, KSP and KSA releases
-  speak each one.
+* **A breaking protocol change bumps every client's major version and both games**, since every
+  client and both servers move to the new version.
+* **The docs gain a compatibility table keyed on protocol version**, with one row per client: which
+  releases of each client, KSP and KSA speak each version.
+* **Feature parity is tracked by the conformance results**, not by version numbers. The table can
+  show the conformance profiles each client release passes.
 
 ## Version strings
 
@@ -42,12 +62,17 @@ number stays bare: `1.2.3`.
 
 | Form | Where |
 | --- | --- |
-| `v1.2.3` | Tags, release titles, milestones, changelog headers, archive and file names we choose, docs URL paths and switcher labels, in-game window titles and messages, the CKAN version |
+| `v1.2.3` | Tags (after the train prefix), release titles, changelog headers, archive and file names we choose, docs URL paths and switcher labels, in-game window titles and messages, the CKAN version |
 | `1.2.3` | `config.bzl` and `tools/krpc-version.sh`, assembly versions, the KSP-AVC `VERSION` fields, the version the server reports to clients, and package versions on PyPI, NuGet, Maven, vcpkg, LuaRocks and Arduino |
 | Not ours | Borea reads `ksa-v0.2.0` through `tag_prefix = "ksa-v"` and shows `0.2.0` |
 
 Package files keep their ecosystem's name: `krpc-1.2.3.tar.gz`, `KRPC.Client.1.2.3.nupkg`,
 `krpc-java-1.2.3.jar`, `krpc-1.2.3-0.rockspec`.
+
+* **Release titles name the train**: "kRPC for KSP v1.0.3", "kRPC for KSA v0.2.0", "kRPC Python
+  client v1.4.2", "krpctools v1.1.0".
+* **No release is marked latest.** Each release is created with `--latest=false`, since GitHub picks
+  one latest release across all trains. Links point at a train's tag, never at `releases/latest`.
 
 ### Inconsistencies today
 
@@ -55,31 +80,33 @@ Package files keep their ecosystem's name: `krpc-1.2.3.tar.gz`, `KRPC.Client.1.2
 | --- | --- | --- |
 | KSP mod archive (`BUILD.bazel`) | `krpc-0.7.0.zip` | `krpc-ksp-v1.0.0.zip` |
 | KSA mod archive (`experimental/ksa/release.sh`) | `kRPC-KSA-0.1.0.zip`, then `krpc-ksa-0.2.0.zip` | `krpc-ksa-v1.0.0.zip` |
-| Other release assets | `krpc-cpp-0.7.0.zip`, `krpc-cnano-0.7.0.zip`, `krpc-lua-0.7.0.zip`, `krpc-genfiles-0.7.0.zip`, `krpc-doc-0.7.0.pdf`, `TestServer-0.7.0.zip`, `SHA256SUMS-0.7.0.txt` | `v1.2.3` in each |
-| Milestones | `0.1.2` to `0.7.0` bare; `ksp-v0.8.0`, `ksp-v1.0.0`, `ksa-v0.2.0` carry the `v` | The `v` form. Old milestones stay |
+| Other release assets | `krpc-cpp-0.7.0.zip`, `krpc-cnano-0.7.0.zip`, `krpc-lua-0.7.0.zip`, `krpc-genfiles-0.7.0.zip`, `krpc-doc-0.7.0.pdf`, `SHA256SUMS-0.7.0.txt` | `v1.2.3` in each, on its own train's release |
 | Docs URL paths | `/0.5.4/`, `/0.7.0/` | `/ksp/v1.0.0/`, `/ksa/v0.2.0/`, as [docs-website.md](ksa/docs-website.md) plans. Old snapshots stay |
 | KSA release readme and docs (`@VERSION@`) | "kRPC for KSA 0.2.0" | "kRPC for KSA v0.2.0", as the release title |
 | KSA compatibility popup | "kRPC 0.2.0 was built for KSA ..." | "kRPC v0.2.0 ..." |
 | `krpc` `CLAUDE.md` | The changelog header form `## [X.Y.Z]` | `## [vX.Y.Z]` |
+| README and docs links | `releases/latest` | the train's tag |
 
-Already consistent: the tags, the GitHub release titles ("kRPC v0.7.0", "kRPC for KSA v0.2.0"), the
-changelog headers, the KSP server window title, the `v<version>-docs` branches, and the CKAN version.
+Already consistent: the GitHub release titles ("kRPC v0.7.0", "kRPC for KSA v0.2.0"), the changelog
+headers, the KSP server window title, the `v<version>-docs` branches, and the CKAN version.
 
 ## Client packages
 
-Each client splits into three packages:
+Each client has a runtime package, plus a stub package per game:
 
 | Package | Contents | Version | Example (Python) |
 | --- | --- | --- | --- |
-| Client | the runtime, with the `KRPC` and `StdLib` stubs | clients train | `krpc` |
-| KSP stubs | the KSP service stubs | KSP train | `krpc-ksp` |
-| KSA stubs | the KSA service stubs | KSA train | `krpc-ksa` |
+| Client | the runtime, with the `KRPC` and `StdLib` stubs | the client's train | `krpc` |
+| KSP stubs | the KSP service stubs for this client | KSP train | `krpc-ksp` |
+| KSA stubs | the KSA service stubs for this client | KSA train | `krpc-ksa` |
 
 * **Which clients have stubs.** C#, C++, C-nano and Java compile against generated stubs. Python
   loads its generated stubs when present and builds the other services at connect time, so its stub
   packages add types and IDE completion. Lua builds every service at connect time, and gains stub
   packages if pre-generated Lua stubs land ([#1201](https://github.com/krpc/krpc/issues/1201)).
 * **A new game API reaches users the day the mod ships**, with no client release.
+* **A game release publishes every client's stubs**, under the game's version. A language whose
+  stubs did not change still gets the new version.
 * **C-nano stubs work across server builds**, since procedure ids come from names
   ([procedure-ids.md](protocol/procedure-ids.md), 0.8).
 * **Stubs and server can be out of step.** A stub for a procedure the server lacks fails at call
@@ -92,40 +119,41 @@ Each client splits into three packages:
 
 ### Stub package dependencies
 
-A stub package depends on the client package, with a version range:
+A stub package depends on its own client's package, with a version range:
 
 ```toml
 # krpc-ksp/pyproject.toml
 [project]
 name = "krpc-ksp"
 version = "1.0.3"
-dependencies = ["krpc>=1.2,<2"]
+dependencies = ["krpc>=1.4,<2"]
 ```
 
 `pip install krpc-ksp` then installs the stubs and a client recent enough for them. A user never
 installs the client package by hand.
 
-* **The lower bound is the client release the stubs were generated against**, the latest clients
-  release when the game is tagged.
-* **The upper bound is the next client major version.** The interface between generated code and
+* **The lower bound is the client release the stubs were generated against**, that client's latest
+  release when the game is tagged. Each language's stubs have their own bounds.
+* **The upper bound is the client's next major version.** The interface between generated code and
   the client runtime stays stable within a client major version. A change to it is a breaking
-  client release, and the next game releases regenerate their stubs against it.
+  release of that client.
 * **A range, never an exact pin.** Client fixes reach users without a game release, and `krpc-ksp`
   and `krpc-ksa` installed together resolve to one client.
-* **Generated code on `main` may need a client runtime change that is not released yet.** The
-  clients train then releases before the game, so the lower bound names a published version.
+* **Generated code on `main` may need a client runtime change that is not released yet.** That
+  client then releases before the game, so the lower bound names a published version. The other
+  clients are not involved.
 * **Every channel expresses the same range:**
 
 | Channel | Client | Dependency in the stub package |
 | --- | --- | --- |
-| PyPI | Python | `dependencies = ["krpc>=1.2,<2"]` |
-| NuGet | C# | `<PackageReference Include="KRPC.Client" Version="[1.2,2.0)" />` |
-| Maven Central, GitHub | Java | `<version>[1.2,2.0)</version>` |
+| PyPI | Python | `dependencies = ["krpc>=1.4,<2"]` |
+| NuGet | C# | `<PackageReference Include="KRPC.Client" Version="[1.1,2.0)" />` |
+| Maven Central, GitHub | Java | `<version>[1.0,2.0)</version>` |
 | vcpkg | C++, C-nano | `"dependencies": [{"name": "krpc", "version>=": "1.2.0"}]`, no upper bound |
-| Arduino | C-nano | `depends=kRPC (>=1.2.0)`, no upper bound |
+| Arduino | C-nano | `depends=kRPC (>=1.0.2)`, no upper bound |
 
-* **vcpkg and Arduino have no upper bound.** A client major version release coincides with new
-  stub releases of both games, so the gap only reaches users who upgrade the client alone.
+* **vcpkg and Arduino have no upper bound.** The gap reaches users who upgrade the client to a new
+  major without new stubs.
 * **The Python client finds stubs from a separate package.** Today `krpc/services/__init__.py`
   imports a fixed list of generated modules. A stub package installs its own top-level module, and
   registers it with the client under a `krpc.services` entry point group. The client loads every
@@ -133,28 +161,43 @@ installs the client package by hand.
 * **The other clients need no discovery.** A program names the stub types it uses, and the build
   links the stub package.
 
-## Milestones and labels
+### Client major versions
 
-### Milestones
+A client major release breaks that client's stubs for both games. The stubs carry the game's
+version, so new stubs would take a game release with no change to the game. This is undesirable,
+and no design avoids it outright.
 
-One GitHub milestone per train release, named as its tag, e.g. `clients-v1.2.0`, `ksp-v1.0.1`,
-`ksa-v0.2.0`.
+* **A major bump is the last resort.** A client keeps accepting the previous generated interface
+  where it can, and drops it at a later major.
+* **Open: a stub-only revision.** The stubs could be regenerated against the game's released service
+  definitions, published as a packaging revision of the game version. Each channel has a native
+  form, but they differ and each needs checking:
 
-| Pull request touches | Milestone |
-| --- | --- |
-| A client, `krpctools`, `krpctest`, `TestServer` | clients |
-| KSP services, the KSP mod | KSP |
-| KSA services, the KSA mod | KSA |
-| `core`, CI, build rules, repo tooling | none, labeled `server` or `build` |
+| Channel | Game release | Stub revision |
+| --- | --- | --- |
+| PyPI | `1.0.3` | `1.0.3.post1` |
+| NuGet | `1.0.3` | `1.0.3.1` |
+| Maven Central | `1.0.3` | `1.0.3-1`, to check how it sorts |
+| vcpkg | `1.0.3` | `1.0.3` with `port-version` 1 |
+| Arduino | `1.0.3` | to check |
 
-* **A pull request has one milestone.** `core` changes are rare, and reach every game's next
-  release anyway, so they get none. The label marks them as triaged.
-* **A pull request spanning trains is split** where it can be. A breaking protocol change cannot be,
-  and takes the clients milestone.
-* **Until the split**, KSA builds against the `KRPC.Core.dll` released in `krpctools`. A `core`
-  change takes the KSP milestone, and a separate KSA pull request picks it up.
+  The KSP and KSA releases would attach their service definitions, so a revision needs no checkout
+  of the game tag. A revision has no tag of its own, and runs as a manual workflow taking the game
+  version and the client.
 
-### Labels
+## Planning without milestones
+
+GitHub milestones are dropped. A pull request often touches several clients and the server at
+once, so it fits no single train's milestone.
+
+* **Labels mark what a pull request touches**, and the changelog fragments say what each train
+  releases. A train's next release is everything in its unreleased changelog sections.
+* **Version targets live in [RELEASE_PLAN.md](../RELEASE_PLAN.md)**, which lists the planned work
+  by train and target version.
+* **The existing milestones are closed.** The milestone rule in the `krpc` `CLAUDE.md` is replaced
+  by the labels rule.
+
+## Labels
 
 An issue or pull request takes one kind, at least one component, and the other labels that apply.
 The labels of each group share a color.
@@ -170,7 +213,9 @@ The labels of each group share a color.
 | Triage | `needs-triage` | Set on new issues by the issue templates, removed once triaged | Dark red |
 
 * **`client` and `build` are kept** beyond the base set. Every client change needs a component, and
-  CI and build rules carry no milestone, so need a label apart from `tools`.
+  CI and build rules need a label apart from `tools`.
+* **The language labels map to the client trains.** A pull request carries one for each client it
+  changes.
 * **`enhancement` is a kind of its own**, added back on 2026-10-31. Labeling an improvement, a
   dependency update or a cleanup `feature` misleads, and leaving it without a kind hides it.
 * **`dependencies` is kept** because Dependabot applies it. It goes with `enhancement`.
@@ -201,9 +246,16 @@ the merges relabeled them.
   [RELEASE_PLAN.md](../RELEASE_PLAN.md) are updated. The feature request issue template sets
   `feature`.
 
+
 ## Changelogs
 
-The per-component files stay. `doc/src/changelog.rst` groups them by train.
+The per-component files stay. Each train releases the components it owns: a client train its
+`client/<language>` component, a game train its server and services, the tools train `tools/krpctools`.
+
+* **A fragment can span trains.** A train's release folds only its own components' sections out of
+  each fragment, and deletes a fragment once it is empty. `01-fold-changelogs.py` takes the train.
+* **Release notes list one train's components.** The docs changelog page of each game lists that
+  game's components, then each client and `krpctools`.
 
 **`core` changes are logged in each game's Server section, at pull request time.** A `core` pull
 request adds its user-facing entry to the Server changelog of each game, under that game's
@@ -216,23 +268,69 @@ unreleased header. Each game publishes the entry at its next release.
 
 | Alternative | Rejected because |
 | --- | --- |
-| A `core` version train, with each game's notes appending the `core` sections it picked up | A fourth train to tag and bump, and `core` shown to users as a component |
+| A `core` version train, with each game's notes appending the `core` sections it picked up | Another train to tag and bump, and `core` shown to users as a component |
 | One entry in `core/CHANGELOG.md`, copied into each game's notes when that game is tagged | The tag script must track which entries each game has already released |
 | Server entries written by hand just before each release | Depends on remembering `core` changes merged months earlier |
 
-## Release scripts
+## Releasing
+
+**A release is a release pull request, then a tag.** The pull request folds the train's changelog
+sections and bumps its version. Pushing the tag runs that train's workflow, which builds, tests and
+publishes.
+
+* **Each release is small.** It covers one train and its channels, where today one release covers
+  every channel in an evening.
+* **Publishing runs in GitHub Actions**, from a `release` environment that holds the credentials and
+  requires approval.
+* **Trusted publishing where the channel offers it.** PyPI and NuGet accept a GitHub Actions identity,
+  so no long-lived token is stored. The other channels keep their credentials as secrets in the
+  environment.
+* **A game release also publishes each client's stubs** to that client's channel, with the same
+  credentials as the client's own release.
+
+| Train | Publishes to | Credentials |
+| --- | --- | --- |
+| Python, Tools | PyPI | trusted publishing |
+| C# | NuGet | trusted publishing |
+| Java | Maven Central, GitHub | Central Portal token, GPG key |
+| C++, C-nano | vcpkg pull request, GitHub; C-nano also the `krpc-arduino` repository | a GitHub token for the vcpkg fork and `krpc-arduino` |
+| Lua | LuaRocks, S3 for the source archive, GitHub | LuaRocks API key, AWS keys |
+| KSP | GitHub, then CKAN indexes it | `GITHUB_TOKEN` |
+| KSA | GitHub, SpaceDock, Borea indexes it | SpaceDock credentials |
 
 | Area | Change |
 | --- | --- |
 | `config.bzl`, `tools/krpc-version.sh` | One version per train. `krpc-version.sh` takes the train |
-| `tools/release/*` | Each script takes the train, and runs only the steps for its channels. The game trains publish their stub packages to the client channels |
-| `30-tag.py`, `80-bump-version.py` | Tag and bump one train |
-| `.github/workflows/docs.yml` | Triggers on the `ksp-v*` and `ksa-v*` tags, freezing that game's docs. It stops triggering on bare `v*` |
-| `BUILD.bazel`, `40-build-assets.py`, `70-announcements.py` | The mod archives are `krpc-ksp-v1.0.0.zip` and `krpc-ksa-v1.0.0.zip`, replacing `krpc-0.7.0.zip` |
+| `tools/release/*` | Split per train. The shared steps (fold, bump, tag) take the train, and each train has its own publish steps |
+| `.github/workflows/` | A release workflow per train, triggered by its tag prefix |
+| `50-release-github.py` | Creates the release with `--latest=false` |
+| `.github/workflows/docs.yml` | Triggers on the game tags, freezing that game's docs, and on the client tags, refreshing that client's pages (see [Docs](#docs)). It stops triggering on bare `v*` |
+| `BUILD.bazel`, `40-build-assets.py`, `70-announcements.py` | Assets per train. The mod archives are `krpc-ksp-v1.0.0.zip` and `krpc-ksa-v1.0.0.zip`, replacing `krpc-0.7.0.zip`. Announcements are for game releases |
 | `tools/release/lib.py` | `TAG = "v" + VERSION` becomes one tag per train |
 | `68-release-ckan.py` | Waits for `kRPC-v1.0.0.ckan`, named for the CKAN version (see below), not the tag |
 
 Releases before the split keep their `v*` tags.
+
+## Docs
+
+**Open: the plan below is not settled.** It extends [docs-website.md](ksa/docs-website.md), which
+gives each game its own site.
+
+* **One site per game, with a version switcher of that game's releases.** A `ksp-v*` tag freezes
+  `/ksp/v<version>/`, a `ksa-v*` tag `/ksa/v<version>/`.
+* **Each client page shows its client's latest release**, and states the version it was built from,
+  e.g. "Python client v1.4.2".
+* **A client release refreshes its pages without a game release.** A `python-v*` tag rebuilds the
+  Python pages of each game's sites from the client's tag, and replaces them in place.
+  `publish-docs.py` already grafts a version's content onto the current toolchain, and would graft
+  the client's pages onto the game snapshot in the same way.
+
+Open questions:
+
+* **Which snapshots a client release refreshes**: the latest of each game, or every one.
+* **The API reference in each language** comes from the game's service definitions and `docgen`. A
+  client release that changes how its API reference renders would need the reference rebuilt too.
+* **Shared pages that cite a client feature**, such as the protocol pages, are frozen with the game.
 
 ## CKAN and KSP-AVC
 
@@ -248,7 +346,7 @@ request to KSP-CKAN/NetKAN, merged before the first `ksp-v` release:
 * **The current `asset_match` misses the new archive.** `krpc-[0-9]+\.[0-9]+\.[0-9]+\.zip` needs a
   digit after `krpc-`. The indexer skips a release with no matching asset, so it would never index a
   `ksp-v` release.
-* **The new pattern is anchored.** The old one would match a Lua `krpc-1.0.0.zip` on a `clients-v`
+* **The new pattern is anchored.** The old one would match a Lua `krpc-1.0.0.zip` on a client
   release. Neither `krpc-ksa-v` archives nor client archives match the new one.
 * **The version needs its prefix stripped.** CKAN versions the mod from the tag, and takes only the
   KSP compatibility range from the `.version` file (`$vref: ksp-avc`). CKAN compares versions
@@ -261,7 +359,7 @@ KSP-AVC (`kRPC.version`, generated in `BUILD.bazel`):
 * **`VERSION` and the `ksp-avc.cybutek.net` URL do not depend on the tag.** The manual bump on
   KSP-AVC online stays.
 * **`DOWNLOAD` must name the release.** It points at `releases/latest`, and GitHub marks one release
-  as latest across all three trains. It becomes `https://github.com/krpc/krpc/releases/tag/ksp-v<version>`,
+  as latest across all trains. It becomes `https://github.com/krpc/krpc/releases/tag/ksp-v<version>`,
   generated from the KSP version.
 
 ## Versions at the split
