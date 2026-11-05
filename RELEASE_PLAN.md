@@ -237,6 +237,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | | Item | GitHub | Labels | Design doc |
 | --- | --- | --- | --- | --- |
 | ⬜ | Windows CI: C-nano serial transport tests, over a named pipe | [#1200](https://github.com/krpc/krpc/issues/1200) | enhancement, client, build, cnano | — |
+| ⬜ | Reject a string argument holding invalid UTF-8 in the KSP mod; measure the cost first | **To file**: [invalid-utf8-arguments.md](issues/invalid-utf8-arguments.md) | bug, server, ksp | — |
 | 🚧 | Autopilot test-plan gaps | **To file**: [autopilot-test-gaps.md](issues/autopilot-test-gaps.md) | enhancement, service, tools, ksp | [autopilot/test-plan.md](design/autopilot/test-plan.md) |
 | 🚧 | Mod compatibility tests | **To file**: [mod-compat-tests.md](issues/mod-compat-tests.md) | enhancement, mod-compatibility, tools | [services/mod-compat-test-coverage.md](design/services/mod-compat-test-coverage.md), [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ⬜ | NUnit 5 | **To file**: [nunit-5-migration.md](issues/nunit-5-migration.md) | enhancement, tools | [build-tools/nunit-5-migration.md](design/build-tools/nunit-5-migration.md) |
