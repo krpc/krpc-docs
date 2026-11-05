@@ -1,6 +1,6 @@
 # Static method binding
 
-**Status:** proposal. Issue [#1195](https://github.com/krpc/krpc/issues/1195).
+**Status:** proposal. C++ by-reference cleanup agreed 2026-11-05. Issue [#1195](https://github.com/krpc/krpc/issues/1195).
 
 A static class method has no object to carry the connection. This doc audits how each client binds
 one to a connection, for a call, a stream and a call builder, and plans one rule for all of them.
@@ -70,7 +70,7 @@ Python path.
 | 3 | Python | The conformance suite misses finding 2. `ConformanceService` and `TestService` have no pre-generated stubs, so the testee takes the dynamic path, whose classes are per client. `test_static_method_through_an_object_connection` passes. | Test gap |
 | 4 | Python | A stub class imported directly (`from krpc.services.spacecenter import ReferenceFrame`) has no client. Its static methods fail with an `AttributeError` on `_client`, or work after some earlier call through an object bound it (finding 2). | Confusing error |
 | 5 | C# | In a stream or `GetCall` lambda, the static method's connection argument is skipped and never evaluated. The stream runs on the connection `AddStream` is called on. This matches a service object or an object in the lambda, which also carry a connection the stream does not use. | Consistent, no change |
-| 6 | C++ | Consistent: the connection once, for the call, the stream and the call builder. Static methods take `Client&`, and a service constructor takes `Client*`. | Minor, no change |
+| 6 | C++ | Consistent: the connection once, for the call, the stream and the call builder. Static methods take `Client&`, and a service constructor takes `Client*`, so one program writes `sc(&conn)` and `create_relative(conn, ...)`. | Inconsistent, phase 5 |
 | 7 | Lua, cnano | Consistent. No streams. | None |
 | 8 | JS | Matches Python. A static method through an object is unsupported, which suits JavaScript (a static method lives on the constructor). | None |
 | 9 | Docs | Only the Java guide (`java.rst`) describes a static method, and it documents the doubled connection. The other client guides do not show how to call or stream one. | Docs gap |
@@ -98,7 +98,8 @@ object's connection.
 | --- | --- |
 | Java | `connection.addStream(TestClass.class, "staticMethod", a, b)` and `connection.getCall(...)` likewise, matching a service procedure. |
 | Python | Through an object, bind to that object's client without touching the shared class. An unbound stub class raises an error naming the fix. |
-| C#, C++, Lua, cnano, JS | No change. |
+| C++ | Service constructors take `Client&`, as static methods do (phase 5). |
+| C#, Lua, cnano, JS | No change. |
 | Docs | Each client guide shows a static method call and, where the client has them, its stream. |
 
 ## Plan
@@ -187,6 +188,26 @@ the one place that names the connection, as a service object is, so the rule abo
 * Changelog `client/csharp`, `client/java`, `client/cpp`: "Add `Bind` to classes with static
   methods, for calling them without passing the connection (#1195)", in each client's casing.
 
+### Phase 5: C++ client by reference
+
+The public C++ API takes the client by reference everywhere:
+
+```cpp
+krpc::services::SpaceCenter sc(conn);   // was sc(&conn)
+auto frame = SpaceCenter::ReferenceFrame::create_relative(conn, parent);
+auto e = KRPC::Expression::bind(conn);
+```
+
+* Service constructors change from `Client*` to `Client&`, in `cpp.tmpl` and the `Service` base
+  in `service.hpp`. Hard break, with no `Client*` overload.
+* Objects, streams, events and the decoders keep storing and passing `Client*` internally. An
+  object's constructor stays `Client* = nullptr`, as a default-constructed object has no client
+  and the decoder fills it in.
+* The KSA C++ stubs come from the same template and change with it.
+* Every C++ doc example, test and testee constructing a service changes (about 58 files).
+* Changelog `client/cpp`: "**Breaking:** Service constructors take the client by reference, as in
+  `SpaceCenter sc(conn)` (#1195)".
+
 ## Alternatives considered
 
 | Alternative | Why not |
@@ -195,7 +216,8 @@ the one place that names the connection, as a service object is, so the rule abo
 | A bound statics object from the connection (`connection.Statics<ReferenceFrame>()`) | Not the ordinary static method syntax of any of the languages. |
 | A default connection for static methods | Implicit global state, and wrong for programs with two connections. |
 | Check, in C#, that a static method's connection argument in a stream lambda is the stream's connection | A service object or an object in the lambda carries a connection the stream does not use either. Checking one of the three is inconsistent, and checking objects contradicts `objects-from-another-connection`. |
-| Change C++ static methods to take `Client*` | Churn for no behavior change. |
+| Standardize C++ on `Client*` instead | Breaks fewer programs, as static calls are rarer than service constructors. But a service or static call never takes a null client, and a reference says so. |
+| Keep a deprecated `Client*` service constructor for a release | 0.8 is the last large break before 1.0, and the shim would have to go before 1.0 anyway. |
 | A hand-written `Expression` builder per client | About 140 methods by hand in three languages, drifting from the server. |
 | Operator overloads on `Expression` (`a + b`) | Covers arithmetic and comparison only. A larger design, and C# already has `connection.Compile`. |
 
