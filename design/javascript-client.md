@@ -316,7 +316,7 @@ export type VesselSituation = EnumValue<"SpaceCenter.VesselSituation">;
   source with `paths`. A mod's generated module adds its service to `Services` with module
   augmentation, documented in `extending/clientgen.rst`.
 - **Name collisions.** The client assumes member names are unique, as
-  [client name collisions](protocol/client-name-collisions.md) bans clashes. The one clash in the
+  the [service definition rules](protocol/service-definition-rules.md#member-keys) ban clashes. The one clash in the
   bundled services, `ConfigNode.GetValues` and `GetNodes` beside the `Values` and `Nodes` properties,
   is removed on the branch below this one. Before that, the second `defineProperty` of `getValues`
   threw, so `connect()` failed against a real game.
