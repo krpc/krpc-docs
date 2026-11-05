@@ -248,6 +248,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | Client spec: one callback thread per connection | **To file**: [spec-callback-thread-per-connection.md](issues/spec-callback-thread-per-connection.md) | feature, client | [client-conformance/spec.md](design/client-conformance/spec.md) |
 | ⬜ | Lua: `platform.sleep` busy-waits, to whole seconds | **To file**: [lua-platform-sleep.md](issues/lua-platform-sleep.md) | bug, client, lua | — |
 | ⬜ | Lua 5.1: `math.huge` stands for the largest integer, so 2^63 - 1 reads as infinity | **To file**: [lua-51-math-huge.md](issues/lua-51-math-huge.md) | bug, client, lua | — |
+| ⬜ | Scanner rules for service, type, parameter and enumeration value names, the C++ helper names, and reserved names | **To file**: [clientgen-qualified-names.md](issues/clientgen-qualified-names.md) | enhancement, server | [protocol/service-definition-rules.md](design/protocol/service-definition-rules.md) |
 | ⬜ | Compiled delegates for the KSA control inputs; waits on a `KRPC.Core` release with `Accessor` | **To file**: [ksa-control-inputs-delegates.md](issues/ksa-control-inputs-delegates.md) | enhancement, service, ksa | — |
 
 ### Negative results
