@@ -74,6 +74,7 @@ Python path.
 | 7 | Lua, cnano | Consistent. No streams. | None |
 | 8 | JS | Matches Python. A static method through an object is unsupported, which suits JavaScript (a static method lives on the constructor). | None |
 | 9 | Docs | Only the Java guide (`java.rst`) describes a static method, and it documents the doubled connection. The other client guides do not show how to call or stream one. | Docs gap |
+| 10 | Python | A class reached through a connection with the pre-generated stubs is a `WrappedClass`, which is not a type. `isinstance(vessel, conn.space_center.Vessel)` and `issubclass` were always false, since the 2023 client rewrite. The dynamic path builds real per-client classes, so conformance misses it, as for finding 3. | Bug, fixed on branch `python-isinstance`: the wrapper checks against the stub class it wraps. Separate from the binding fix in phase 2 |
 
 ## Decision
 
