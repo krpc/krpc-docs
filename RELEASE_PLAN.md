@@ -16,7 +16,7 @@ The **GitHub** column says how the issue on GitHub stands against this plan:
 | | Release | Theme | Progress |
 | --- | --- | --- | --- |
 | ✅ | [0.7](#07-server-side-functions-streams-and-events-service-improvements) | Server-side functions, streams and events, protocol additions, service improvements | Tagged 2026-10-21 |
-| 🚧 | [0.8](#08-single-connection-client-codegen-then-client-conformance-and-thread-safety) | Single connection, client codegen, then client conformance testing and thread safety | 10 of 18 done; streams of calls and the bundled TestServer in review |
+| 🚧 | [0.8](#08-single-connection-client-codegen-then-client-conformance-and-thread-safety) | Single connection, client codegen, then client conformance testing and thread safety | 13 of 20 features done; Java on Maven Central and the C/C++ lints in review |
 | ⬜ | [1.0](#10-remaining-protocol-improvements-server-side-function-follow-ups) | Remaining protocol improvements (#906), server side function follow-ups | 0 of 9 done; tick control has a 0.7 stopgap |
 
 ## 0.7: server-side functions, streams and events, service improvements
@@ -92,18 +92,18 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 | ✅ | Client codegen: the exception mapping and the service list, generated | #1172 | feature, client, tools | [client-codegen.md](design/client-codegen.md) |
 | ✅ | Client conformance tests and runtime specification | [#1123](https://github.com/krpc/krpc/issues/1123), fixed by #1220 | feature, client | [client-conformance/](design/client-conformance/README.md) |
 | ✅ | Client thread safety: define and document what is thread-safe | [#427](https://github.com/krpc/krpc/issues/427), fixed by #1225 | feature, docs | — |
-| 🚧 | C-nano: every transport compiled in, chosen at run time, so vcpkg ships them all; a custom transport is a table of functions; in review as #1275 | [#1176](https://github.com/krpc/krpc/issues/1176) | feature, client, cnano | [cnano-transports.md](design/cnano-transports.md) |
+| ✅ | C-nano: every transport compiled in, chosen at run time, so vcpkg ships them all; a custom transport is a table of functions | [#1176](https://github.com/krpc/krpc/issues/1176), fixed by #1275 | feature, client, cnano | [cnano-transports.md](design/cnano-transports.md) |
 | ⬜ | C-nano: retry POSIX serial reads and writes interrupted by a signal, and loop short writes | **To file**: [cnano-serial-eintr.md](issues/cnano-serial-eintr.md) | bug, client, cnano | — |
-| 🚧 | Streams of calls and server side functions that return no value, run for their side effects; in review, PR to open | [#1198](https://github.com/krpc/krpc/issues/1198) | feature, server, protocol, client | — |
+| ✅ | Streams of calls and server side functions that return no value, run for their side effects | [#1198](https://github.com/krpc/krpc/issues/1198), fixed by #1272 | feature, server, protocol, client | — |
 | ⬜ | Lua and C-nano: compile and run server side functions built with the expression API, which the internal `KRPC` procedures left them without | [#1267](https://github.com/krpc/krpc/issues/1267) | feature, client, lua, cnano | — |
-| ✅ | `GetStatus` returns a kRPC struct in place of the `KRPC.Status` protobuf message | [#1197](https://github.com/krpc/krpc/issues/1197), fixed by #1244, **relabel** | enhancement, server, protocol, client | — |
+| ✅ | `GetStatus` returns a kRPC struct in place of the `KRPC.Status` protobuf message | [#1197](https://github.com/krpc/krpc/issues/1197), fixed by #1244 | enhancement, server, protocol, client | — |
 | ✅ | DockingCamera on the public Docking Camera (KURS) release; with the LIDAR deprecation, supersedes #674 | [#1232](https://github.com/krpc/krpc/issues/1232), fixed by #1264 | feature, mod-compatibility, service, ksp | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ✅ | Deprecate LIDAR in favor of `SpaceCenter.RaycastDistance`, and raycasts ignore trigger colliders; makes #1181 moot | [#1233](https://github.com/krpc/krpc/issues/1233), fixed by #1263 | feature, mod-compatibility, service, ksp | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
-| 🚧 | Client name collisions: a scanner rule banning clashing member names, a contract for client naming, the clashing `ConfigNode` methods removed (local branch `confignode-clashes`) | [#1237](https://github.com/krpc/krpc/issues/1237), **add milestone** | bug, server, client, tools | [protocol/client-name-collisions.md](design/protocol/client-name-collisions.md) |
+| 🚧 | Client name collisions: a scanner rule banning clashing member names, a contract for client naming, the clashing `ConfigNode` methods removed (done: #1261, #1273) | [#1237](https://github.com/krpc/krpc/issues/1237), **add milestone** | bug, server, client, tools | [protocol/client-name-collisions.md](design/protocol/client-name-collisions.md) |
 | ⬜ | Inheritance for remote objects; additive, UI and Drawing first, then robotics and #900 modules | [#905](https://github.com/krpc/krpc/issues/905) | feature, protocol | [protocol/inheritance.md](design/protocol/inheritance.md) |
-| 🚧 | C#: target .NET Standard 2.0 in place of .NET Framework 4.7.2; PR #1274 in review | [#1230](https://github.com/krpc/krpc/issues/1230) | feature, client, csharp | [csharp-client-targets.md](design/csharp-client-targets.md) |
+| ✅ | C#: target .NET Standard 2.0 in place of .NET Framework 4.7.2 | [#1230](https://github.com/krpc/krpc/issues/1230), fixed by #1274 | feature, client, csharp | [csharp-client-targets.md](design/csharp-client-targets.md) |
 | ⬜ | C#: import the NuGet packages with rules_dotnet's `nuget_repo`, one target per package for every framework; straight after #1230 | **To file**: [csharp-nuget-repo.md](issues/csharp-nuget-repo.md) | enhancement, build | [csharp-client-targets.md](design/csharp-client-targets.md) |
-| ⬜ | Java: publish the client to Maven Central | [#1231](https://github.com/krpc/krpc/issues/1231) | feature, client, java | — |
+| 🚧 | Java: publish the client to Maven Central; PR #1276 in review | [#1231](https://github.com/krpc/krpc/issues/1231) | feature, client, java | — |
 
 * **Single connection first.** It changes connection setup and threading in every client, so the
   conformance suite is written against it rather than rewritten after it.
@@ -145,6 +145,13 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 | ✅ | Client guides restructured, one guide per client; developer documentation brought up to date (fixes #427) | #1225 | — |
 | ✅ | New logo, README refresh, license fixes | #1221 | — |
 | ✅ | Build and CI: Python autodoc timeout, Lua lint in CI, doc serve staging, third-party C++ disk cache, vcpkg cache per runner image | #1208, #1218, #1224, #1226, #1229 | — |
+| ✅ | Events from `AddEvent` are edge triggered | #1234 | — |
+| ✅ | Quieter server logging, with the client named in log lines (fixes #1180) | #1235 | — |
+| ✅ | Adaptive rate control keeps the configured max. time per update (fixes #1236) | #1250 | — |
+| ✅ | Compiled delegates for reflected members | #1251 | — |
+| ✅ | Internal procedures for the `KRPC` service's stream, event and function plumbing, hidden from stubs and docs | #1269 | — |
+| ✅ | Conformance: the `threads` profile renamed `concurrency`, before the JavaScript client | #1270 | [javascript-client.md](design/javascript-client.md) |
+| ✅ | Build and CI: changelog fragments and PR hints, merge queue, CI hardened against flaky downloads, docs build on Windows (fixes #1259), run-ksp follows the current log | #1239, #1240, #1242, #1254, #1260, #1268 | — |
 
 ### Fixes and smaller items
 
@@ -156,22 +163,22 @@ connection, and the bundles and the audit depend on the conformance suite.
 | --- | --- | --- | --- | --- |
 | ✅ | Close a WebSockets connection whose frame is too large | #1193 | bug, server | — |
 | ✅ | Codec and clientgen fixes: bytes default arguments in generated code, a C# nullable enum return, a C++ short tuple | #1194 | bug, client, tools, cpp, csharp, lua | [client-conformance/](design/client-conformance/README.md) |
-| ✅ | `RemoveStream` and `SetStreamRate` take a `Stream`; resolved the other way, streams and events encoded as bare stream ids | [#1178](https://github.com/krpc/krpc/issues/1178), fixed by #1266, **relabel** | enhancement, server, protocol, client | — |
+| ✅ | `RemoveStream` and `SetStreamRate` take a `Stream`; resolved the other way, streams and events encoded as bare stream ids | [#1178](https://github.com/krpc/krpc/issues/1178), fixed by #1266 | enhancement, server, protocol, client | — |
 | ✅ | `KerbalAlarmClock.Alarm.PlaySound` has no effect | [#1179](https://github.com/krpc/krpc/issues/1179), fixed by #1262 | bug, mod-compatibility, service, ksp | [services/kac-remotetech-tests-and-api.md](design/services/kac-remotetech-tests-and-api.md) |
 | ✅ | DockingCamera log spam | [#1180](https://github.com/krpc/krpc/issues/1180), fixed by #1235 | bug, mod-compatibility, service, ksp | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ⬜ | Raise the default receive timeout | **To file**: [recv-timeout-default.md](issues/recv-timeout-default.md) | enhancement, server | [server/recv-timeout-cliff.md](design/server/recv-timeout-cliff.md) |
 | ⬜ | Python: Ctrl-C during a call on Windows, with the single connection | **To file**: [python-ctrl-c-windows.md](issues/python-ctrl-c-windows.md) | bug, client, python | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | ⬜ | Python: trim client frames from server error tracebacks | **To file**: [python-traceback-trim.md](issues/python-traceback-trim.md) | enhancement, client, python | — |
-| 🚧 | Publish the bundled TestServer and ServiceDefinitions for every platform, so `krpc-conformance` and `servicedefs` run on Windows; the TestServer ships only in krpctools, as `krpc-testserver`; in review, PR to open | [#1228](https://github.com/krpc/krpc/issues/1228) | feature, tools | [ksa/build-and-test-tools.md](design/ksa/build-and-test-tools.md), "Service definitions" |
-| ⬜ | Run clang-format and clang-tidy over every C and C++ source | [#1177](https://github.com/krpc/krpc/issues/1177), **relabel** | enhancement, client, build, cpp, cnano | — |
-| ⬜ | Audit how each client binds static methods and streams to a connection | [#1195](https://github.com/krpc/krpc/issues/1195), **relabel** | enhancement, client, python, cpp, cnano, csharp, java, lua | [static-method-binding.md](design/static-method-binding.md) |
+| ✅ | Publish the bundled TestServer and ServiceDefinitions for every platform, so `krpc-conformance` and `servicedefs` run on Windows; the TestServer ships only in krpctools, as `krpc-testserver` | [#1228](https://github.com/krpc/krpc/issues/1228), fixed by #1271 | feature, tools | [ksa/build-and-test-tools.md](design/ksa/build-and-test-tools.md), "Service definitions" |
+| 🚧 | Run clang-format and clang-tidy over every C and C++ source; PR #1277 in review | [#1177](https://github.com/krpc/krpc/issues/1177) | enhancement, client, build, cpp, cnano | — |
+| ⬜ | Audit how each client binds static methods and streams to a connection | [#1195](https://github.com/krpc/krpc/issues/1195) | enhancement, client, python, cpp, cnano, csharp, java, lua | [static-method-binding.md](design/static-method-binding.md) |
 | ⬜ | C++: hold the client by handle, so objects never dangle, and take it by reference in the public API; breaking | **To file**: [cpp-client-handle.md](issues/cpp-client-handle.md) | bug, client, cpp | — |
 | ✅ | Documentation crefs use the C# service name | [#1188](https://github.com/krpc/krpc/issues/1188), fixed by #1243 | bug, server | — |
-| ⬜ | Client disconnect during a yielding call stops the server on .NET | [#1189](https://github.com/krpc/krpc/issues/1189) | bug, server, ksa | — |
+| ✅ | Client disconnect during a yielding call stops the server on .NET | [#1189](https://github.com/krpc/krpc/issues/1189), fixed by #1249 | bug, server, ksa | — |
 | ✅ | Server window does not resize to fit its content | [#1186](https://github.com/krpc/krpc/issues/1186), fixed by #1247 | bug, server, ksp | — |
 | ⬜ | Publish wheels for krpc and krpctools | **To file**: [python-wheels.md](issues/python-wheels.md) | enhancement, client, tools, build, python | — |
 | ⬜ | Deprecation signals for every member kind in every client | **To file**: [deprecation-all-members.md](issues/deprecation-all-members.md) | enhancement, client, tools | — |
-| ✅ | Lua API docs on sphinx-lua-ls, when luadomain breaks on a Sphinx bump | [#1202](https://github.com/krpc/krpc/issues/1202), fixed by #1252, **relabel** | enhancement, client, docs, lua | — |
+| ✅ | Lua API docs on sphinx-lua-ls, when luadomain breaks on a Sphinx bump | [#1202](https://github.com/krpc/krpc/issues/1202), fixed by #1252 | enhancement, client, docs, lua | — |
 
 ## 1.0: remaining protocol improvements, server side function follow-ups
 
@@ -226,8 +233,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 
 | | Item | GitHub | Labels | Design doc |
 | --- | --- | --- | --- | --- |
-| ⬜ | Windows CI: C++ local socket test hangs, any release | [#1078](https://github.com/krpc/krpc/issues/1078) | bug, client, cpp | — |
-| ⬜ | Windows CI: C-nano serial transport tests, over a named pipe | [#1200](https://github.com/krpc/krpc/issues/1200), **relabel** | enhancement, client, build, cnano | — |
+| ⬜ | Windows CI: C-nano serial transport tests, over a named pipe | [#1200](https://github.com/krpc/krpc/issues/1200) | enhancement, client, build, cnano | — |
 | 🚧 | Autopilot test-plan gaps | **To file**: [autopilot-test-gaps.md](issues/autopilot-test-gaps.md) | enhancement, service, tools, ksp | [autopilot/test-plan.md](design/autopilot/test-plan.md) |
 | 🚧 | Mod compatibility tests | **To file**: [mod-compat-tests.md](issues/mod-compat-tests.md) | enhancement, mod-compatibility, tools | [services/mod-compat-test-coverage.md](design/services/mod-compat-test-coverage.md), [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ⬜ | NUnit 5 | **To file**: [nunit-5-migration.md](issues/nunit-5-migration.md) | enhancement, tools | [build-tools/nunit-5-migration.md](design/build-tools/nunit-5-migration.md) |
@@ -239,7 +245,6 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | Conformance: a driver helper for a callback that runs a command on itself | **To file**: [conformance-self-removing-callback.md](issues/conformance-self-removing-callback.md) | enhancement, tools | [client-conformance/harness.md](design/client-conformance/harness.md) |
 | ⛔ | luasocket release pin, blocked upstream on lunarmodules/luasocket#469 | [#1203](https://github.com/krpc/krpc/issues/1203) | bug, client, lua | [build-tools/lua-socket-unix-on-windows.md](design/build-tools/lua-socket-unix-on-windows.md) |
 | ⬜ | Generate the client API references from the client sources | **To file**: [client-api-reference-autodoc.md](issues/client-api-reference-autodoc.md) | enhancement, client, tools, docs | — |
-| 🚧 | Conformance: rename the `threads` profile to `concurrency`, before the JavaScript client | **To file**: [conformance-concurrency-profile.md](issues/conformance-concurrency-profile.md), local branch `conformance-concurrency` | enhancement, client, tools | [javascript-client.md](design/javascript-client.md) |
 | ⬜ | Client spec: one callback thread per connection | **To file**: [spec-callback-thread-per-connection.md](issues/spec-callback-thread-per-connection.md) | feature, client | [client-conformance/spec.md](design/client-conformance/spec.md) |
 | ⬜ | Lua: `platform.sleep` busy-waits, to whole seconds | **To file**: [lua-platform-sleep.md](issues/lua-platform-sleep.md) | bug, client, lua | — |
 | ⬜ | Lua 5.1: `math.huge` stands for the largest integer, so 2^63 - 1 reads as infinity | **To file**: [lua-51-math-huge.md](issues/lua-51-math-huge.md) | bug, client, lua | — |

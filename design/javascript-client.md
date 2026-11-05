@@ -167,7 +167,7 @@ be in flight at once. Each request carries its id (#1174), and the client matche
 its `Promise` by id.
 
 - **`concurrency`: supported**, renamed from `threads`
-  ([draft](../issues/conformance-concurrency-profile.md)). Its tests check concurrent calls: unique
+  (#1270). Its tests check concurrent calls: unique
   request ids, responses in any order, a close while a call waits, a response after the
   disconnect. Promises raise each case. The testee maps each named task of the testee protocol to
   an async task chain. Commands on one
