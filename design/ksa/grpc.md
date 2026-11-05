@@ -155,6 +155,9 @@ This list is the public seam `core` would need for a gRPC server outside it:
    but has not been run on Windows.
  * The gRPC server's `Protocol` value is outside the server core's enumeration, because the core
    has no gRPC protocol.
+ * **Lenient argument decoding.** `ProtoCodec` accepts values the core's `Encoder` rejects since
+   #1280, such as an undeclared enum value, a bool varint other than 0 or 1, and invalid UTF-8. The
+   same call can fail over TCP and succeed over gRPC.
 
 ## Streams
 
