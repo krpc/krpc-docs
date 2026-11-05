@@ -1,7 +1,7 @@
 # Releases and versioning
 
 **Status:** proposal, 2026-10-26, revised 2026-10-31 (stub packages and their dependencies, milestones, labels, `core` changelog, CKAN and KSP-AVC, version strings; label migration done apart from the service labels). Part of
-[kRPC for KSA](README.md).
+[kRPC for KSA](ksa/README.md).
 
 ## Problem
 
@@ -9,7 +9,7 @@
 release would bump the KSP mod and every client, and a KSP fix would bump KSA.
 
 Compatibility no longer depends on release versions. Since 0.7, client and server agree on a
-protocol version in the handshake ([protocol-version.md](../protocol/protocol-version.md)), so
+protocol version in the handshake ([protocol-version.md](protocol/protocol-version.md)), so
 release versions are free to move apart.
 
 ## Release trains
@@ -18,7 +18,7 @@ release versions are free to move apart.
 | --- | --- | --- | --- |
 | Clients and tools | every client runtime, with the `KRPC` and `StdLib` stubs; `krpctools`; `krpctest`; the `TestServer` image | `clients-v1.2.0` | GitHub (Java), PyPI, NuGet, vcpkg, Arduino, LuaRocks, ghcr.io |
 | KSP | the KSP mod and its services, the KSP stub package for each client, KSP API docs | `ksp-v1.0.3` | GitHub, CKAN, and the client channels for the stubs |
-| KSA | the KSA mod and its services, the KSA stub package for each client, `KSA.proto`, KSA API docs | `ksa-v0.2.0` | GitHub, SpaceDock, Borea ([borea.md](borea.md)), and the client channels for the stubs |
+| KSA | the KSA mod and its services, the KSA stub package for each client, `KSA.proto`, KSA API docs | `ksa-v0.2.0` | GitHub, SpaceDock, Borea ([borea.md](ksa/borea.md)), and the client channels for the stubs |
 | Protocol | an integer in the handshake | none | none |
 
 * **The clients release in lockstep.** They share the protocol version. One version per language
@@ -57,7 +57,7 @@ Package files keep their ecosystem's name: `krpc-1.2.3.tar.gz`, `KRPC.Client.1.2
 | KSA mod archive (`experimental/ksa/release.sh`) | `kRPC-KSA-0.1.0.zip`, then `krpc-ksa-0.2.0.zip` | `krpc-ksa-v1.0.0.zip` |
 | Other release assets | `krpc-cpp-0.7.0.zip`, `krpc-cnano-0.7.0.zip`, `krpc-lua-0.7.0.zip`, `krpc-genfiles-0.7.0.zip`, `krpc-doc-0.7.0.pdf`, `TestServer-0.7.0.zip`, `SHA256SUMS-0.7.0.txt` | `v1.2.3` in each |
 | Milestones | `0.1.2` to `0.7.0` bare; `ksp-v0.8.0`, `ksp-v1.0.0`, `ksa-v0.2.0` carry the `v` | The `v` form. Old milestones stay |
-| Docs URL paths | `/0.5.4/`, `/0.7.0/` | `/ksp/v1.0.0/`, `/ksa/v0.2.0/`, as [docs-website.md](docs-website.md) plans. Old snapshots stay |
+| Docs URL paths | `/0.5.4/`, `/0.7.0/` | `/ksp/v1.0.0/`, `/ksa/v0.2.0/`, as [docs-website.md](ksa/docs-website.md) plans. Old snapshots stay |
 | KSA release readme and docs (`@VERSION@`) | "kRPC for KSA 0.2.0" | "kRPC for KSA v0.2.0", as the release title |
 | KSA compatibility popup | "kRPC 0.2.0 was built for KSA ..." | "kRPC v0.2.0 ..." |
 | `krpc` `CLAUDE.md` | The changelog header form `## [X.Y.Z]` | `## [vX.Y.Z]` |
@@ -81,11 +81,11 @@ Each client splits into three packages:
   packages if pre-generated Lua stubs land ([#1201](https://github.com/krpc/krpc/issues/1201)).
 * **A new game API reaches users the day the mod ships**, with no client release.
 * **C-nano stubs work across server builds**, since procedure ids come from names
-  ([procedure-ids.md](../protocol/procedure-ids.md), 0.8).
+  ([procedure-ids.md](protocol/procedure-ids.md), 0.8).
 * **Stubs and server can be out of step.** A stub for a procedure the server lacks fails at call
   time with an error, as a name-based call does.
 * **`KSA.proto` for gRPC** stays in the KSA release archive. It is generated from the same service
-  definitions ([grpc.md](grpc.md)).
+  definitions ([grpc.md](ksa/grpc.md)).
 * **Until the split**, the client packages bundle the KSP stubs as now
   (`tools/krpctools/services.bzl`), and the KSA stubs ship in the KSA release archive, as the
   prototype does.
@@ -198,7 +198,7 @@ the merges relabeled them.
   issue was a KSP one.
 * **The renamed language labels lack `client`.** Issues carrying one still need `client` added.
 * **References:** the pull request rule in the `krpc` `CLAUDE.md` and the labels column of
-  [RELEASE_PLAN.md](../../RELEASE_PLAN.md) are updated. The feature request issue template sets
+  [RELEASE_PLAN.md](../RELEASE_PLAN.md) are updated. The feature request issue template sets
   `feature`.
 
 ## Changelogs

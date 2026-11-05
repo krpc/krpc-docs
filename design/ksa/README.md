@@ -21,7 +21,7 @@ carry, and keeps a KSA change from paying for KSP work it does not touch.
 | [repo-layout.md](repo-layout.md) | Monorepo or split, the directory layout, the Bazel build of the KSA mod |
 | [build-and-test-tools.md](build-and-test-tools.md) | In-game test harness, `run-<game>`, servicedefs, clientgen and docgen service lists |
 | [ci.md](ci.md) | What CI checks for each game, with no new jobs |
-| [releases.md](releases.md) | Release trains, per-game stub packages, milestones, labels, tags, channels |
+| [releases.md](../releases.md) | Release trains, per-game stub packages, milestones, labels, tags, channels |
 | [docs-website.md](docs-website.md) | One source, one site build per game |
 | [borea.md](borea.md) | Listing the KSA mod on the Borea mod manager, from `ksa-v0.2.0` |
 
@@ -30,7 +30,7 @@ Related, outside this folder:
 * [protocol/protocol-version.md](../protocol/protocol-version.md): only the protocol version decides
   client and server compatibility, so release versions can move apart. Services are not versioned.
 * [protocol/procedure-ids.md](../protocol/procedure-ids.md): procedure ids derived from names, in
-  0.8. It lets C-nano stubs work across server builds, which [releases.md](releases.md) relies on.
+  0.8. It lets C-nano stubs work across server builds, which [releases.md](../releases.md) relies on.
 * [protocol/grpc-support.md](../protocol/grpc-support.md): gRPC for KSP, through an external bridge.
 
 ## Background

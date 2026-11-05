@@ -51,7 +51,7 @@ services included.
 | KSP | `SpaceCenter`, `Drawing`, `UI`, mod services | the KSP stub packages, KSP docs |
 | KSA | `KSA` | the KSA stub packages, KSA docs |
 
-See [releases.md](releases.md) for where each list's stubs ship.
+See [releases.md](../releases.md) for where each list's stubs ship.
 
 ## Service definitions
 

@@ -61,14 +61,14 @@ One source tree, built once per game. Each game gets its own site:
 
 ## Versioning
 
-* **Snapshots follow the release trains** ([releases.md](releases.md)): a `ksp-v*` tag freezes
+* **Snapshots follow the release trains** ([releases.md](../releases.md)): a `ksp-v*` tag freezes
   `/ksp/v<version>/`, a `ksa-v*` tag freezes `/ksa/v<version>/`. `main` updates both `dev/` builds.
 * **Each snapshot carries the shared client guides as of its release.** They describe the protocol
   and client features, which are the same for both games.
 * **The existing snapshots stay where they are** (`/0.5.4/`, `/0.7.0/`, ...). The version switcher
   lists them under KSP. `/experimental/ksa/` redirects to `/ksa/`.
 * **Paths and switcher labels carry the `v`**, as the tags do
-  ([releases.md](releases.md#version-strings)). The existing bare snapshots keep their paths.
+  ([releases.md](../releases.md#version-strings)). The existing bare snapshots keep their paths.
 
 This extends [versioned-docs-website.md](../build-tools/versioned-docs-website.md), which built the
 current single-game switcher.

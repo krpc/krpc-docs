@@ -155,7 +155,7 @@ tagged tree before anything is published.
 
 **Release trains, after 1.0.** Until 1.0, the release scripts cover one version, and
 `experimental/ksa` releases by its own process. Once the trains split ([KSA
-releases](../ksa/releases.md)), `fold-changelogs.py` and `10-preflight.py` take a train. The fold
+releases](../releases.md)), `fold-changelogs.py` and `10-preflight.py` take a train. The fold
 moves only that train's sections out of each fragment, and keeps a fragment that still has sections
 for another train. Preflight checks only that train's components.
 
