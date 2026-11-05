@@ -98,15 +98,26 @@ Only the protocol version decides compatibility.
 | Transports | No | They carry the same messages. A transport difference, such as serial IO having no streams, is a capability. |
 | Server | Release version, informational | Reported by `GetStatus`, never used for compatibility. |
 | Clients | Release version, informational | A client declares the protocol version it speaks. |
-| Services | No | See below. |
+| `KRPC` and `StdLib` services | Yes, part of the protocol version | The client runtime ships their stubs and calls `KRPC` itself. See below. |
+| Game services | No | See below. |
 
-**Services are not versioned.** `GetServices` says whether a procedure exists, and a static client
+**Game services are not versioned.** `GetServices` says whether a procedure exists, and a static client
 calling a missing one gets "procedure not found". Extension members
 ([PR #1077](https://github.com/krpc/krpc/pull/1077)) make a service version inaccurate: a service's
 surface is its own DLL plus every installed extension member. The rule from
 [deprecation.md](deprecation.md) covers a change of behavior: a member never changes meaning, and a
 new member replaces it. [service-versioning.md](../services/service-versioning.md) records per-service
 version strings as a negative result.
+
+**`KRPC` and `StdLib` are part of the protocol.** Both are defined in `core` and served by every
+game. The client runtime ships their stubs and calls `KRPC` itself, for status and streams.
+
+* **A breaking change to either bumps the protocol version**, as a breaking schema change does.
+  Under the deprecation rule, that is the removal of a deprecated member.
+* **An addition is additive**, and leaves the version alone. User code calling it on an older server
+  gets "procedure not found".
+* **An addition the runtime relies on is a feature** in the handshake. A server that lacks it does
+  not grant it, and the runtime falls back or reports the missing feature.
 
 ### Additive changes
 

@@ -100,6 +100,11 @@ Each client has a runtime package, plus a stub package per game:
 | KSP stubs | the KSP service stubs for this client | KSP train | `krpc-ksp` |
 | KSA stubs | the KSA service stubs for this client | KSA train | `krpc-ksa` |
 
+**The `KRPC` and `StdLib` stubs ship in the client runtime**, since both services are part of the
+protocol ([protocol-version.md](protocol/protocol-version.md#what-is-versioned)). A breaking change
+to either bumps the protocol version. An addition the runtime relies on is a handshake feature, so
+a client released before a game, or after it, still connects.
+
 * **Which clients have stubs.** C#, C++, C-nano and Java compile against generated stubs. Python
   loads its generated stubs when present and builds the other services at connect time, so its stub
   packages add types and IDE completion. Lua builds every service at connect time, and gains stub
