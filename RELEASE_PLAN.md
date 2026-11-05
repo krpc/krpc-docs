@@ -156,8 +156,8 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 
 ### Fixes and smaller items
 
-Everything but the `RemoveStream` change, the Ctrl-C fix, the portable tool bundles and the connection binding audit can ship in a
-0.7.x release if 0.8 is far off. The `RemoveStream` change breaks the `KRPC` service, the Ctrl-C fix depends on the single
+Everything but the `RemoveStream` change, the argument position check, the Ctrl-C fix, the portable tool bundles and the connection binding audit can ship in a
+0.7.x release if 0.8 is far off. The `RemoveStream` change breaks the `KRPC` service, the argument position check breaks clients that send one, the Ctrl-C fix depends on the single
 connection, and the bundles and the audit depend on the conformance suite.
 
 | | Item | GitHub | Labels | Design doc |
@@ -170,6 +170,7 @@ connection, and the bundles and the audit depend on the conformance suite.
 | ⬜ | Raise the default receive timeout | **To file**: [recv-timeout-default.md](issues/recv-timeout-default.md) | enhancement, server | [server/recv-timeout-cliff.md](design/server/recv-timeout-cliff.md) |
 | ⬜ | Python: Ctrl-C during a call on Windows, with the single connection | **To file**: [python-ctrl-c-windows.md](issues/python-ctrl-c-windows.md) | bug, client, python | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | ⬜ | Python: trim client frames from server error tracebacks | **To file**: [python-traceback-trim.md](issues/python-traceback-trim.md) | enhancement, client, python | — |
+| ⬜ | Fail a call with an argument position past the last parameter; breaking | **To file**: [argument-position-out-of-range.md](issues/argument-position-out-of-range.md) | bug, server | — |
 | ✅ | Publish the bundled TestServer and ServiceDefinitions for every platform, so `krpc-conformance` and `servicedefs` run on Windows; the TestServer ships only in krpctools, as `krpc-testserver` | [#1228](https://github.com/krpc/krpc/issues/1228), fixed by #1271 | feature, tools | [ksa/build-and-test-tools.md](design/ksa/build-and-test-tools.md), "Service definitions" |
 | 🚧 | Run clang-format and clang-tidy over every C and C++ source; PR #1277 in review | [#1177](https://github.com/krpc/krpc/issues/1177) | enhancement, client, build, cpp, cnano | — |
 | ⬜ | Audit how each client binds static methods and streams to a connection | [#1195](https://github.com/krpc/krpc/issues/1195) | enhancement, client, python, cpp, cnano, csharp, java, lua | [static-method-binding.md](design/static-method-binding.md) |
