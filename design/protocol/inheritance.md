@@ -1,6 +1,9 @@
 # Inheritance for remote objects (issue #905)
 
-**Status:** proposal (2026-10-25). Nothing implemented. Written against `krpc` at version 0.8.0.
+**Status:** in progress. Phase 1 is split into a stack: server and schema, then the Python client.
+Phase 2 sits on top of it, with in-game tests not yet run.
+Neither branch has a pull request yet. The other clients and docgen follow. Written against `krpc` at
+version 0.8.0.
 
 [Issue #905](https://github.com/krpc/krpc/issues/905) asks for service class hierarchies to reach
 the clients. Today the scanner flattens them, so each class carries a copy of every inherited
@@ -38,9 +41,11 @@ module discovery (`Part.modules_of_type`).
 | Which classes are exposed | Only those marked `[KRPCClass]`, as today | The author controls the hierarchy, e.g. exposing `A`, `B`, `C` and hiding `D` |
 | Base of an exposed class | The nearest `[KRPCClass]` ancestor, or none | Skips internal helper classes |
 | Multiple inheritance | Single class inheritance only. Interfaces are out of scope | Every OOP client supports a single base. The interface cases below are weak |
-| Member placement | A member belongs to the class that declares it | Virtual dispatch on the server runs any `override` |
-| Override of a KRPC member | Not a new member. Same procedure as the base | The base procedure already dispatches to it |
-| `[KRPCMethod]` in an unexposed class whose subclass is exposed | Scanner error | Otherwise the member has no class to belong to |
+| Member placement | A member belongs to the class that declares it | One implementation per exposed member |
+| Override of a KRPC member | Scanner error, with or without the attribute on the override. Ruled 2026-11-05 | Keeps inheritance simple. A subclass varies a base member through a protected member that is not exposed, as UI `Control` does with `Selectable`. No use case needs an override |
+| `[KRPCMethod]` in an unexposed class whose subclass is exposed | Copied onto each exposed subclass, as before | An error would break UI `Control`, Drawing `Drawable<T>` and any mod built that way. Ruled 2026-11-05 |
+| Member that hides a base member with `new` | Scanner error | A client calls the base procedure, which would not reach it |
+| Game scenes of a base member called on a subclass | Those of the instance's own class | A base procedure would otherwise bypass a subclass's narrower scenes. Ruled 2026-11-05 |
 | Generic base class | Scanner error if `[KRPCClass]` | Clients have no generics for classes. Drawing drops its type parameter |
 | Base in another service | Allowed. `base` is a service-qualified name | The #900 case: `TestFlight.FailureModule : SpaceCenter.Module` |
 | Abstract base class | Exposed like any other class | The server never returns an instance whose runtime type is abstract |
@@ -89,12 +94,12 @@ rare, and the RPC is additive. Revisit B if a polymorphic collection turns out t
 | Client | Generated form | Notes |
 | --- | --- | --- |
 | Python | `class Button(Control)` in stubs and in the dynamic client | The dynamic client builds classes in dependency order |
-| C# | `class Button : Control` | `UI.Object` collides with `object` only if a generated name is unqualified. Check this in clientgen |
+| C# | `class Button : Control` | Checked: no generated C# name is an unqualified `Object` |
 | C++ | Restructure `krpc::Object<T>` | CRTP blocks a base. Split the equality and hashing helpers from the base, or template the leaf only |
 | Java | `class Button extends Control` | |
 | Lua | Metatable chain | Dynamic, so no clientgen |
-| cnano | No change | Objects are `typedef krpc_object_t`, so base functions already accept a derived handle. Emit base functions only |
-| docgen | Base class line plus "inherited from" links | Members are listed on the declaring class |
+| cnano | No change | Objects are `typedef krpc_object_t`, so base functions already accept a derived handle. Keep the flattened functions until phase 5, as dropping them breaks source compatibility. Ruled 2026-11-05 |
+| docgen | Base class line plus "inherited from" links | Members are listed on the declaring class. Each language shows the base once its client derives its classes, as the docs then promise that a derived object goes where its base is expected. Python has the `Bases:` line |
 
 Option A adds a cast helper per client: `conn.cast(obj, FailureModule)`, `obj.as<FailureModule>()`,
 and similar. The cast throws an exception if the runtime class is not a subclass of the requested
@@ -124,11 +129,23 @@ Each phase is mergeable on its own.
      reports the new errors.
    * clientgen for Python, C#, C++ and Java, the dynamic Python and Lua clients, and docgen.
    * Conformance tests for skipping inherited members and for tolerating an unknown base.
+   * A TestServer hierarchy for those tests: `TestService.Shape` and `Circle`. Moved here
+     from phase 2, as the tests need it.
+   * Built as a stack: a class named `Object` in the generated code, then the server and schema,
+     then the Python client as the proof of concept. The other clients and docgen follow once
+     Python is done.
+   * A class named `Object`, as UI will expose, shadowed `krpc::Object<T>` in each generated C++
+     constructor and `java.lang.Object` in each generated Java structure. The fix qualifies both,
+     and adds `TestService.Object` so the client builds cover it. C# was not affected.
 2. **Adopt in UI and Drawing.**
    * Mark `UI.Object`, `Control` and `Container` as `[KRPCClass]`.
    * Drop the type parameter from Drawing's `Drawable<T>`. It names the GameObject and nothing
      else. Expose `Drawable`, `Path`, `FramedPath` and `SphereShape`.
-   * Add a TestServer hierarchy for the client tests.
+     `MapMarker` and `NavballMarker` implement `IDrawable` and do not derive from `Drawable<T>`,
+     so they stay outside the hierarchy unless they are rebased.
+   * Built as a fourth branch on the stack, on top of the Python client, so the Python in-game
+     tests run end to end. Each base gets an API reference page. The derived pages still list the
+     inherited members, as the other clients still call the flattened copies.
 3. **SpaceCenter robotics.** Add a `RoboticServo` base. The change is additive.
 4. **Runtime type and casts.** `KRPC.GetObjectClass` plus the client cast helpers. Then the #900
    follow-ups: a mod `[KRPCClass]` deriving from `SpaceCenter.Module`, and `Part.modules`
@@ -153,9 +170,11 @@ Inheritance needs no constructor support. A C# constructor is not inherited.
 
 ## Open points
 
-* Whether an override may narrow a return type (C# 9 covariant returns). The mod targets net472,
-  whose runtime lacks covariant returns, so not yet.
 * Whether `[KRPCClass]` on a base should require at least one member. Lean no: an empty base is
   still useful for typing a list.
 * Interfaces, if the deployable or spatial cases ever earn them. They would need a repeated
   `interfaces` field, and the cnano and Lua mapping.
+* Python stubs: when the server adds members to a stub class, for example with extension members
+  from a mod, the client builds a per-connection subclass of it (`_client_class`). A derived stub
+  class still derives from the shared stub base, so it misses those members. This first matters
+  for the phase 4 module work, where a mod class derives from `SpaceCenter.Module`.
