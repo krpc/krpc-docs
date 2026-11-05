@@ -94,3 +94,5 @@ reading `All` and `None`.
 * `doc/src/communication-protocols/messages.rst` covers `flags` and the validity rule.
 * Each client guide shows how to combine and test values.
 * The API reference marks a flags enumeration.
+* `MapFilterType` says again that its values may be combined. Strict argument decoding removed that
+  line, when the combination stopped working.
