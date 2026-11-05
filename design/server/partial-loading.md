@@ -1,17 +1,20 @@
-# Service and mod errors
+# Partial loading
 
-**Status:** in progress, for 0.8. Issue: [#1227](https://github.com/krpc/krpc/issues/1227). A
-first implementation of the scanner part (2026-10-31, never a PR) predates the best-effort binding of
-mod members, and is stale. It is redone against this design.
+**Status:** in progress, for 0.8. Issue: [#1227](https://github.com/krpc/krpc/issues/1227). A first
+implementation of the scanner part (2026-10-31, never a PR) predates the best-effort binding of mod
+members, and is stale. Best-effort binding is implemented with no PR yet. The rest is designed.
+
+What kRPC does when part of it cannot load: a service definition that breaks a
+[service definition rule](../protocol/service-definition-rules.md), including a name clash, or a mod
+integration that cannot bind to its mod after a game or mod update. kRPC disables as little as
+possible and keeps running. How the player and the mod author learn of it is in
+[problem reporting](problem-reporting.md).
 
 | Part | State |
 | --- | --- |
-| Scanner: partial load, type cascade, duplicates, service id warnings | Designed; first implementation stale |
-| Mod integrations: bind at load, disable only the failing mod | Designed, see [Mod integrations](#mod-integrations) |
-| KSP popup listing scanner problems and disabled mods | Designed; first implementation stale |
-| KSA popup | Deferred: KSA builds against the released `KRPC.Core`, which has no `ServiceProblems` |
+| Scanner: partial load, type cascade, duplicates and clashes | Designed; first implementation stale |
+| Mod integrations: bind at load, disable only the failing mod | Designed. Best-effort binding implemented, no PR |
 | Call to a disabled member returns its error | Dropped, see below |
-| "Ignore" button | Dropped: the popup shows on each launch with a problem |
 
 ## Problem
 
@@ -23,9 +26,8 @@ server starts. One bad member, in any installed mod, takes all of kRPC down:
 | KSP | `ServicesChecker` disables kRPC entirely. The popup says "plugin has been disabled. See the log for more information" and lists nothing. |
 | KSA | `Services.Instance` calls `Scanner.GetServices ()` with no error list, so the first error throws out of the server's startup. |
 
-The player sees kRPC gone, or the game failing to load, and has to search the log for the cause. The
-cause is often a third-party mod the player cannot fix. A KSP or KSA update that breaks one service
-member breaks every service.
+The player sees kRPC gone, or the game failing to load. The cause is often a third-party mod the
+player cannot fix. A KSP or KSA update that breaks one service member breaks every service.
 
 The scanner already does most of the work for a gentler outcome. Given an error list, it catches each
 member's error, records it and moves on, leaving the member out. Neither server uses that partial
@@ -33,19 +35,19 @@ result.
 
 ## Design
 
-kRPC loads every member that scans cleanly, disables the rest, and lists both errors and warnings in
-one popup. The game keeps loading.
+kRPC loads every member that scans cleanly and every integration that binds, and disables the rest.
+The game keeps loading.
 
 ### Errors and warnings
 
 | Kind | Examples | Effect |
 | --- | --- | --- |
-| **Error** | Invalid parameter or return type, a procedure outside a service, a duplicate name, a struct containing itself | The member is disabled: absent from `KRPC.GetServices` and not callable |
-| **Warning** | A shared id, a hashed id of 0 ([procedure-ids.md](../protocol/procedure-ids.md#collisions)), extension members in a class that is not public | kRPC keeps running. An id warning leaves the member callable by name only, and the class's extension members are skipped, as before |
+| **Error** | Invalid parameter or return type, a procedure outside a service, a struct containing itself, a [clash](#clashes) | The member is disabled: absent from `KRPC.GetServices` and not callable |
+| **Warning** | Extension members in a class that is not public | kRPC keeps running, and the class's extension members are skipped, as before |
 
 `Scanner.GetServices` takes an error list and a warning list. A null warning list makes warnings
-errors, and a null error list makes the first problem throw. The public `ServiceProblems` class gives
-the server the lists from the scan `Services` ran.
+errors, and a null error list makes the first problem throw, which `tools/ServiceDefinitions` relies
+on. The public `ServiceProblems` class gives the server the lists from the scan `Services` ran.
 
 ### What an error disables
 
@@ -63,50 +65,39 @@ whether the type scanned. A procedure returning a class whose scan failed would 
 clients pointing at a class that does not exist. Disabling a struct can disable a member that takes a
 class, which can disable a struct field. So the pass repeats until nothing changes.
 
-**Duplicate names disable both members**, as a shared id leaves both without one. Keeping the first
-one scanned would make the outcome depend on assembly load order. One exception: an extension member
-that clashes with a member of the class itself is disabled, and the class keeps its own member. The
-class's members are always scanned first, so the outcome is fixed, and a mod cannot remove a
-member of another service by declaring a clashing extension.
-
 **A removed class takes its static methods with it.** They have no parameter of the class type, so
 the cascade also checks each procedure's declaring `KRPCClass`.
+
+### Clashes
+
+Every [service definition rule](../protocol/service-definition-rules.md) that compares two names
+leaves out each name of a clashing pair, exact duplicates included. Keeping the first one scanned
+would make the outcome depend on assembly load order, so adding a member could remove an existing
+one.
+
+The one exception is an extension member that clashes with a member of the class itself. The
+extension member is left out, and the class keeps its own. The class's members are always scanned
+first, so the outcome is fixed, and a mod cannot remove a member of another service by declaring a
+clashing extension.
+
+| Clash | Left out |
+| --- | --- |
+| Two members of a scope that share a [member key](../protocol/service-definition-rules.md#member-keys) or a helper key | Both members |
+| Two types of a service, compared case-insensitively | Both types, and the cascade |
+| Two services, compared case-insensitively | Both services, their types, and extension members that target them |
+| A type named as its service or a [reserved name](../protocol/service-definition-rules.md#reserved-names) | That type, and the cascade |
+| A service with a reserved name | That service |
+| Two parameters of a procedure, or a parameter name that breaks the rule | That procedure |
+| An enumeration value name that breaks the rule | The enumeration, and the cascade |
+| A shared or 0 id | Both members, see [procedure ids](../protocol/procedure-ids.md#collisions) |
+
+Two classes that declare one service name exactly still merge into one service, as they always have.
 
 ### Calling a disabled member
 
 Dropped. A member that fails validation never gets a procedure name, so only the cascade and the
 duplicate removals could report one. A call to a disabled member gets "procedure not found", and the
 popup and the log give the reason.
-
-### The popup
-
-One popup per launch with a problem, listing every error and warning grouped by service, the
-disabled members under each, then each mod whose integration failed to load. It says what still works ("kRPC is running. These members are
-unavailable:"). The full messages go to the log, and the popup gives the log's path.
-
-| Server | Popup |
-| --- | --- |
-| KSP | `ServicesChecker` keeps its `PopupDialog`, now with a scrolling list. `OK` stays false only for the whole-kRPC failures above. |
-
-**The check and the popup run at different times on KSP:**
-
-* **Check at startup.** The scan and the mod loaders run at `Startup.Instantly`, or lazily on the
-  first read of `ServicesChecker.OK`. They need only the loaded assemblies. The server addons read
-  `OK` in `Awake`, and `NoGameAddon` runs at `Startup.MainMenu`. A check at `MainMenu` could run
-  after that read, as KSP does not order the addons of a scene.
-* **Popup at the first main menu.** A `MainMenu` addon shows the popup once per launch, in the
-  `LoadOnceAddon` pattern. A popup at `Instantly` competes with the loading screen. The main menu is
-  where a player expects warnings about installed mods. Showing it on loading a save would interrupt
-  play, and the problems concern the install, not the save.
-| KSA | A popup of its own, beside `CompatibilityPopup`, once KSA builds against a core with `ServiceProblems`. Until then a scanner error still throws out of startup. |
-
-### Mod authors
-
-The players get the graceful path. A mod author gets a hard failure before release:
-
-* `tools/ServiceDefinitions` calls `GetServices ()` with no list, so any error or warning fails the
-  build. It stays strict, so the bundled services and any mod built with kRPC's tooling are checked.
-* `core/test/Service/ScannerTest.cs` gains a test per row of the cascade table.
 
 ## Mod integrations
 
@@ -129,10 +120,11 @@ This design builds on the best-effort binding of mod members (a follow-up to
 ### Load every mod API at startup
 
 Every integration binds its mod's types and members once, when kRPC loads, in the same pass that
-scans the services. The popup can then report scanner problems and mod failures together.
+scans the services. The scan and the mod loads then finish before any scene, and are reported
+together.
 
 The pass finds each integration as a subclass of `ModAPI` in the service assemblies, as the scanner
-finds services ([Implementation](#implementation)). A failed load is listed in `ServiceProblems`,
+finds services ([Implementation](#implementation)). A failed load is recorded in `ServiceProblems`,
 beside the scan's errors and warnings.
 
 Member binding needs only the mod's types, and those exist once KSP has loaded the assemblies. Two
@@ -163,24 +155,19 @@ version too old, or an essential member missing:
   error (`KerbalAlarmClock.Available` is false). Another mod's integration, another service and the
   rest of kRPC keep running. For an integration inside SpaceCenter (FAR, RealFuels, AGExt), the
   integration is disabled and SpaceCenter falls back to the stock behavior.
-* **Reported** in the popup, in a group of its own: "Kerbal Alarm Clock support is disabled:
-  KerbalAlarmClock.APIReady is not available in the installed version".
+* **Reported** in the popup, in a group of its own, see
+  [problem reporting](problem-reporting.md#mod-failures).
 
-`APILoader` stops showing a popup of its own. A failed API load goes to the kRPC popup, and a
-missing method is only a stub.
+### Run-time failures
 
-### Run-time failures are not in the popup
-
-A missing member that is not essential binds as a stub. It logs a warning at load and does not
-appear in the popup. A call to an RPC that uses it throws `MissingMemberException`, and that
-exception reaching the client is the notification. A popup cannot name the RPCs affected anyway,
-because the link from a reflected member to an RPC is not known statically.
+A missing member that is not essential binds as a stub, and its integration stays available. A call
+to an RPC that uses it throws `MissingMemberException` with the stub's message. How each failure
+reaches the player is in [problem reporting](problem-reporting.md#what-is-reported).
 
 | | Scanner error | Mod failed to load | Missing non-essential member |
 | --- | --- | --- | --- |
 | Found | At startup, by the scan | At startup, by the mod's loader | At startup, by `MemberBinder` |
 | Effect | Member removed from `KRPC.GetServices` | The integration's RPCs throw "not available" | The RPCs using the member throw `MissingMemberException` |
-| Reported | Popup and log | Popup and log | Log; the client sees the exception |
 
 The call-time error dropped for scanner errors ([Calling a disabled member](#calling-a-disabled-member))
 comes free for mod members. The stub carries the message.
@@ -199,7 +186,7 @@ and nothing else:
 | Availability, and the "not available" error its RPCs throw | `core`: `ModAPI` base class |
 | The list of failed integrations | `core`: `ServiceProblems.Mods` |
 | Finding a mod's assembly and version | The server, through `IModAssemblies` |
-| Showing the popup | The server |
+| Reporting the problems | The server, see [problem reporting](problem-reporting.md) |
 | Which members to bind, and which are essential | The integration |
 
 The KSP server implements `IModAssemblies` over `AssemblyLoader.loadedAssemblies`, which carries the
@@ -248,22 +235,23 @@ sealed class KerbalAlarmClockAPI : ModAPI
 
 ### Exceptions
 
-Core classifies a failure by its exception type. The type decides the log level and whether the
-popup lists the failure:
+Core classifies a failure by its exception type. The type decides whether the integration is disabled,
+and how the failure is [reported](problem-reporting.md#mod-failures):
 
-| Exception (`KRPC.Utils`) | Raised by | Integration | Popup |
-| --- | --- | --- | --- |
-| `ModNotInstalledException` | Core, assembly not found | Unavailable | No; info log |
-| `ModVersionException` : `ModIncompatibleException` | Core, version below the minimum | Disabled | Yes |
-| `ModTypeMissingException` : `ModIncompatibleException` | `Require.Type` | Disabled | Yes |
-| `ModMemberMissingException` : `MissingMemberException` | `Require`, at load; a stub, at a call | Disabled at load; one RPC fails at a call | At load only |
-| Any other exception from `Bind` | A bug in the integration | Disabled | Yes, with the type name; stack trace in the log |
+| Exception (`KRPC.Utils`) | Raised by | Integration |
+| --- | --- | --- |
+| `ModNotInstalledException` | Core, assembly not found | Unavailable |
+| `ModVersionException` : `ModIncompatibleException` | Core, version below the minimum | Disabled |
+| `ModTypeMissingException` : `ModIncompatibleException` | `Require.Type` | Disabled |
+| `ModMemberMissingException` : `MissingMemberException` | `Require`, at load; a stub, at a call | Disabled at load; one RPC fails at a call |
+| Any other exception from `Bind` | A bug in the integration | Disabled |
 
 `ModMemberMissingException` derives from `MissingMemberException`, so the stubs keep their current
 type for clients. It carries `Mod` and `Member`, so core logs and lists it without parsing the message.
 
 ### Tests
 
+* `core/test/Service/ScannerTest.cs` gains a test per row of the cascade and clash tables.
 * `core/test`: a fake `IModAssemblies` and a test assembly drive `ModAPIs` through each row of the
   exceptions table.
 * One in-game test checks that every integration bound against its pinned mod version with no
@@ -272,20 +260,17 @@ type for clients. It carries `Mod` and `Member`, so core logs and lists it witho
 ## Changes
 
 One PR, after procedure ids, which adds the first warnings, and the best-effort binding of mod
-members.
+members. [Problem reporting](problem-reporting.md#changes) lands with it.
 
 | Area | Change |
 | --- | --- |
-| `core` scanner | Errors and warnings with a severity; the type cascade; a whole-kRPC failure flag |
-| `core` `Services` | Built from the partial scan; logs each problem; services without an id left out of `ServicesById`; public `ServiceProblems`, with the failed mods |
-| `server` (KSP) | `ServicesChecker` checks at startup and disables kRPC only on a whole-kRPC failure; a `MainMenu` addon shows the popup once per launch |
-| KSA server | Later: a problems popup, once on a core release with `ServiceProblems` |
-| `tools/ServiceDefinitions` | Unchanged: it passes no lists, so it fails on any error or warning |
-| Docs | Extending kRPC: an Errors and Warnings section, and the reserved service id range |
-| Changelogs | Server: a broken service member disables that member, and a mod that fails to load disables only its integration, with a popup naming both |
+| `core` scanner | Errors and warnings with a severity; the type cascade; the clash removals; a whole-kRPC failure flag |
+| `core` `Services` | Built from the partial scan; services without an id left out of `ServicesById`; public `ServiceProblems`, with the failed mods |
 | `core` mods | `ModAPI`, `ModAPIs`, `ModBinder`, `MemberBinder.Require`, `IModAssemblies`, the mod exceptions, `ServiceProblems.Mods` |
 | Mod integrations | KAC, IR, FAR, RealFuels, AGExt and RemoteTech each become one `ModAPI`. KAC and IR look up their live object per scene. `APILoader` is removed |
-| `server` (KSP) popup | A group for disabled mods, beside the scanner's errors and warnings |
+| `server` (KSP) | `ServicesChecker` checks at startup and disables kRPC only on a whole-kRPC failure |
+| `tools/ServiceDefinitions` | Unchanged: it passes no lists, so it fails on any error or warning |
+| Changelogs | Server: a broken service member disables that member, and a mod that fails to load disables only its integration |
 
 ## Alternatives
 

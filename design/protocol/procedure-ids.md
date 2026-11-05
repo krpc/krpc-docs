@@ -72,7 +72,7 @@ neither.
 
 Services and procedures follow one rule: **an id that is 0, or shared by two members, is not
 assigned. Those members are callable by name only.** The scanner records a warning naming both, and
-the server keeps running ([service-and-mod-errors.md](../server/service-and-mod-errors.md)).
+the server keeps running ([partial loading](../server/partial-loading.md)).
 
 | Case | Outcome |
 | --- | --- |
