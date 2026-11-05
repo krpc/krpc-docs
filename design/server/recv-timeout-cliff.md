@@ -2,7 +2,7 @@
 
 **Status:** investigation. Two adaptive schemes were tried and measured as negative results; a
 recommendation is below. Options 2 and 3 are drafted as issues in
-[issues/recv-timeout-default.md](../../issues/recv-timeout-default.md) (0.8.0) and
+[issues/recv-timeout-default.md](../../issues/recv-timeout-default.md) and
 [issues/recv-patience.md](../../issues/recv-patience.md).
 
 ## Summary
