@@ -458,7 +458,9 @@ What works as documented:
   against `KRPC.Core.net10` rather than kept in a separate net472 library. The C# client's
   netstandard2.0 is not an option without a netstandard build of `KRPC.Core`. The separate build
   also keeps the extension members out of `TestService.json`, so this change goes with the one
-  above.
+  above. Fixed: `TestService` builds for net10.0 against `KRPC.Core.net10`, and the definitions are
+  byte-identical. It stays an assembly separate from the server, so the extension members stay out
+  of `TestService.json` and the gap above stays open.
 - **client**: the crate cannot carry out three `core` testee commands through its public API.
   Objects keep their id private, and have no way to be made from an id. That rules out
   `ObjectId` and an `Object` value with handle 0 (`test_get_object_id`,
