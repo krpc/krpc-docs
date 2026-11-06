@@ -205,8 +205,8 @@ The conformance review (2026-10-29) left four driver items, each drafted as an i
   the serial link instead of a fixed second.
 - [conformance-wait-until-polls.md](../../issues/conformance-wait-until-polls.md): wake waits on
   the testee's notifications.
-- [conformance-queued-value-race-point.md](../../issues/conformance-queued-value-race-point.md):
-  a race point for a value queued during a first call.
+- [conformance-settle-sleeps.md](../../issues/conformance-settle-sleeps.md): race points for a value
+  queued during a first call, now with the other guessed sleeps.
 - [conformance-self-removing-callback.md](../../issues/conformance-self-removing-callback.md): a
   driver helper for a callback that runs a command on itself.
 
