@@ -121,6 +121,8 @@ Each phase merges on its own. Milestone `ksp-v0.8.0` (clients release with KSP).
 
 ### Phase 2: Python binding
 
+Replaced by [python-declarations.md](python-declarations.md), which removes `StaticMethod` and the shared stub classes. The rule and the `TypeError` for an imported class stay.
+
 * `StaticMethod.__get__` through an object binds to `_wrapped_subclass(obj._client, type(obj))`
   and never writes `_client` onto the shared class.
 * Called on an unbound stub class, a static method raises a `TypeError`: reach the class through a
