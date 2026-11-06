@@ -184,6 +184,7 @@ conformance suite, and the scanner rules build on #1237.
 | ✅ | Client disconnect during a yielding call stops the server on .NET | [#1189](https://github.com/krpc/krpc/issues/1189), fixed by #1249 | bug, server, ksa | — |
 | ✅ | Server window does not resize to fit its content | [#1186](https://github.com/krpc/krpc/issues/1186), fixed by #1247 | bug, server, ksp | — |
 | ⬜ | Publish wheels for krpc and krpctools | **To file**: [python-wheels.md](issues/python-wheels.md) | enhancement, client, tools, build, python | — |
+| ⬜ | Update the `krpc` and `krpc-cnano` vcpkg ports for 0.8.0: MIT licenses, copyright files, every C-nano transport | **To file**: [vcpkg-ports-0-8.md](issues/vcpkg-ports-0-8.md) | enhancement, client, build, cpp, cnano | — |
 | ⬜ | Deprecation signals for every member kind in every client | **To file**: [deprecation-all-members.md](issues/deprecation-all-members.md) | enhancement, client, tools | — |
 | ✅ | Lua API docs on sphinx-lua-ls, when luadomain breaks on a Sphinx bump | [#1202](https://github.com/krpc/krpc/issues/1202), fixed by #1252 | enhancement, client, docs, lua | — |
 | ⬜ | Move krpctest into krpctools, as a game-agnostic in-game test runner | **To file**: [krpctest-in-krpctools.md](issues/krpctest-in-krpctools.md) | enhancement, tools | [ksa/build-and-test-tools.md](design/ksa/build-and-test-tools.md) |
