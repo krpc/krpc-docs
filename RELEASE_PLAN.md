@@ -264,6 +264,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | Conformance: skipped arguments in a call built for a server side function, after [#1267](https://github.com/krpc/krpc/issues/1267) | **To file**: [conformance-skipped-arguments-get-call.md](issues/conformance-skipped-arguments-get-call.md) | enhancement, client, lua | — |
 | ⬜ | Clients: defects shared between the threaded clients | **To file**: [client-design-shared-defects.md](issues/client-design-shared-defects.md) | bug, client | — |
 | ⬜ | C#: defects found writing the design doc | **To file**: [client-csharp-defects.md](issues/client-csharp-defects.md) | bug, client, csharp | — |
+| ⬜ | C++: defects found reviewing the client lifetime change | **To file**: [client-cpp-defects.md](issues/client-cpp-defects.md) | bug, client, cpp | — |
 | ⬜ | Java: defects found writing the design doc | **To file**: [client-java-defects.md](issues/client-java-defects.md) | bug, client, java | — |
 | ⬜ | Python: defects found writing the design doc | **To file**: [client-python-defects.md](issues/client-python-defects.md) | bug, client, python | — |
 | ⬜ | Lua: defects found writing the design doc | **To file**: [client-lua-defects.md](issues/client-lua-defects.md) | bug, client, lua | — |
