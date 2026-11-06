@@ -64,3 +64,4 @@ This issue also tracks the other open conformance work. Each item has its own is
 | [conformance-serial-settle-time.md](conformance-serial-settle-time.md) | Wait for the serial link instead of a fixed second | Driver |
 | [conformance-wait-until-polls.md](conformance-wait-until-polls.md) | Wake waits on the testee's notifications | Driver |
 | [conformance-self-removing-callback.md](conformance-self-removing-callback.md) | A driver helper for a callback that runs a command on itself | Driver |
+| [conformance-skipped-arguments-get-call.md](conformance-skipped-arguments-get-call.md) | Skipped arguments in a call built for a server side function | Tests |
