@@ -1,0 +1,10 @@
+# Clients: defects shared between the threaded clients
+
+Writing the client design docs turned up these defects, which more than one client shares.
+
+* **Dropping the last handle leaves a stream running in C#, Java and Python.** The spec requires the removal, and each guide states it, under Streaming Data and Event Endings. `StreamManager` holds the `StreamImpl`, so the server keeps evaluating the stream and its callbacks keep running. These clients list `test_drop_last_handle` as an expected failure. C++ passes it.
+* **A dropped, unclosed client stays connected in C#, Java and Python.** The threads reach the client, so it is never collected. It holds its socket and threads until process exit, and a loop opening connections leaks them. The spec has no ruling on this.
+* **One held condition stalls the dispatcher thread.** Applying an update takes each changed stream's condition in turn, so all streams and callbacks of the connection wait for the holder. A wait on a second stream by that holder never wakes, and the dispatcher queue grows. This is `test_wait_holding_another`, marked `@skip` in all four clients.
+* **The dispatcher queue is unbounded.** The reader queues every update without coalescing, so a slow callback delays all waiters and callbacks of the connection, and memory grows. In Python, with a 10 ms callback and 1 kHz updates, waiters were about 1700 values behind after 2 s. Java shows the same with a burst of 2000 updates. The spec has no ruling on a bound.
+* **A close waits for a blocked callback.** `Session.join` joins the dispatcher thread with no timeout, so a callback that never returns hangs the close. A callback waiting on a lock the closing thread holds deadlocks it, as the skip in the join covers stream conditions only.
+* **The guides misstate the callback thread.** Each Threading section says callbacks never run on the program's threads, apart from a first call. The spec has a remove or a close run end callbacks there. In C# and Java, read from code, an end or first call on another thread can overlap a callback on the dispatcher thread.

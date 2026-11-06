@@ -254,6 +254,13 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | Conformance: a driver helper for a callback that runs a command on itself | **To file**: [conformance-self-removing-callback.md](issues/conformance-self-removing-callback.md) | enhancement, tools | [client-conformance/harness.md](design/client-conformance/harness.md) |
 | ⬜ | Conformance: coverage gaps found writing the client design docs, and the tracker for the other conformance items | **To file**: [conformance-coverage-gaps.md](issues/conformance-coverage-gaps.md) | enhancement, client, tools | [client-conformance/](design/client-conformance/README.md) |
 | ⬜ | Client spec: rule on the behavior clients differ on | **To file**: [conformance-spec-rulings.md](issues/conformance-spec-rulings.md) | enhancement, client | [client-conformance/spec.md](design/client-conformance/spec.md) |
+| ⬜ | Clients: defects shared between the threaded clients | **To file**: [client-design-shared-defects.md](issues/client-design-shared-defects.md) | bug, client | — |
+| ⬜ | C#: defects found writing the design doc | **To file**: [client-csharp-defects.md](issues/client-csharp-defects.md) | bug, client, csharp | — |
+| ⬜ | Java: defects found writing the design doc | **To file**: [client-java-defects.md](issues/client-java-defects.md) | bug, client, java | — |
+| ⬜ | Python: defects found writing the design doc | **To file**: [client-python-defects.md](issues/client-python-defects.md) | bug, client, python | — |
+| ⬜ | Lua: defects found writing the design doc | **To file**: [client-lua-defects.md](issues/client-lua-defects.md) | bug, client, lua | — |
+| ⬜ | C-nano: defects found writing the design doc | **To file**: [client-cnano-defects.md](issues/client-cnano-defects.md) | bug, client, cnano | — |
+| ⬜ | Websockets testee: defects found writing the design doc | **To file**: [client-websockets-defects.md](issues/client-websockets-defects.md) | bug, client | — |
 | ⛔ | luasocket release pin, blocked upstream on lunarmodules/luasocket#469 | [#1203](https://github.com/krpc/krpc/issues/1203) | bug, blocked, client, lua | [build-tools/lua-socket-unix-on-windows.md](design/build-tools/lua-socket-unix-on-windows.md) |
 | ⬜ | Generate the client API references from the client sources | **To file**: [client-api-reference-autodoc.md](issues/client-api-reference-autodoc.md) | enhancement, client, tools, docs | — |
 | ⬜ | Client spec: one callback thread per connection | **To file**: [spec-callback-thread-per-connection.md](issues/spec-callback-thread-per-connection.md) | feature, client | [client-conformance/spec.md](design/client-conformance/spec.md) |
