@@ -179,7 +179,7 @@ conformance suite, and the scanner rules build on #1237.
 | ✅ | Publish the bundled TestServer and ServiceDefinitions for every platform, so `krpc-conformance` and `servicedefs` run on Windows; the TestServer ships only in krpctools, as `krpc-testserver` | [#1228](https://github.com/krpc/krpc/issues/1228), fixed by #1271 | feature, tools | [ksa/build-and-test-tools.md](design/ksa/build-and-test-tools.md), "Service definitions" |
 | ✅ | Run clang-format and clang-tidy over every C and C++ source | [#1177](https://github.com/krpc/krpc/issues/1177), fixed by #1277 | enhancement, client, build, cpp, cnano | — |
 | ⬜ | Audit how each client binds static methods and streams to a connection | [#1195](https://github.com/krpc/krpc/issues/1195) | enhancement, client, python, cpp, cnano, csharp, java, lua | [static-method-binding.md](design/static-method-binding.md) |
-| ⬜ | C++: hold the client by handle, so objects never dangle, and take it by reference in the public API; breaking | **To file**: [cpp-client-handle.md](issues/cpp-client-handle.md) | bug, client, cpp | — |
+| ⬜ | C++: hold the client strongly, so objects never dangle, add `close()`, and take the client by reference in the public API; breaking | **To file**: [cpp-client-lifetime.md](issues/cpp-client-lifetime.md) | bug, client, cpp | — |
 | ✅ | Documentation crefs use the C# service name | [#1188](https://github.com/krpc/krpc/issues/1188), fixed by #1243 | bug, server | — |
 | ✅ | Client disconnect during a yielding call stops the server on .NET | [#1189](https://github.com/krpc/krpc/issues/1189), fixed by #1249 | bug, server, ksa | — |
 | ✅ | Server window does not resize to fit its content | [#1186](https://github.com/krpc/krpc/issues/1186), fixed by #1247 | bug, server, ksp | — |
