@@ -289,6 +289,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | Python: trim client frames from server error tracebacks | **To file**: [python-traceback-trim.md](issues/python-traceback-trim.md) | enhancement, client, python | — |
 | ⬜ | Clients: use `Connection` for the entry point in every client | **To file**: [client-class-names.md](issues/client-class-names.md) | enhancement, client | — |
 | ⬜ | Clients: calls that cannot go in a server side function | **To file**: [calls-a-function-cannot-make.md](issues/calls-a-function-cannot-make.md) | enhancement, client, tools | — |
+| ⬜ | C-nano: follow-ups to server side functions: generated functions, heap use, header opt-out, examples, testee cleanups | **To file**: [cnano-functions-follow-ups.md](issues/cnano-functions-follow-ups.md) | enhancement, client, cnano | — |
 | ⬜ | Clients: check whether a per-element function needs a real instance | **To file**: [call-with-arguments-template.md](issues/call-with-arguments-template.md) | question, client | [server-side-functions/server-side-functions.md](design/server-side-functions/server-side-functions.md) |
 
 ### Negative results
