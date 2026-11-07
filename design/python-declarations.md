@@ -107,10 +107,6 @@ These defects in [client-python-defects.md](../issues/client-python-defects.md) 
  * An `ImportError` in any stub downgrades silently.
  * Without stubs, a service the server lacks is `None`.
 
-## What Stays Broken
-
-**Some member names fail the whole connect.** A parameter named `cls`, or an enumeration value named `Mro`, raises at connect. A mod's service can already do this. Fix it in phase 2, as every service now takes this path.
-
 ## Evidence
 
 Measured with the definitions of all 11 shipped services (2,419 procedures) and a fake client:
@@ -138,7 +134,6 @@ Each phase merges on its own. Milestone `ksp-v0.8.0`.
  * Generate the modules, and the lookup and comparison above. Regenerate the goldens.
  * Fix the testee's `is_service`, and remove the `test_exposed_members[services]` line from `expected-failures.txt`.
  * Build every service from `GetServices`, and remove what is listed under [What Goes](#what-goes).
- * Fix the member names that fail a connect.
  * Remove `:conformance-base` and the other base targets.
  * Native tests in `client/python/krpc/test`:
    * The definitions of an enumeration and a structure differing from the module, as conformance runs only the matching case for `TestService` and the no-module case for `ConformanceService`.
