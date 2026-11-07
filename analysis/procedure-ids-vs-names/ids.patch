@@ -1,0 +1,420 @@
+diff --git a/client/cpp/include/krpc/client.hpp b/client/cpp/include/krpc/client.hpp
+index 2679ce11c..f7343ebdd 100644
+--- a/client/cpp/include/krpc/client.hpp
++++ b/client/cpp/include/krpc/client.hpp
+@@ -78,6 +78,9 @@ class Client {
+   enum class Returns : uint8_t { value, stream };
+   /** Invoke a procedure that returns what returns says, as generated stubs do. A new stream or
+       event is registered with the stream manager. */
++  /** Invoke a procedure by id. */
++  schema::ProcedureResult invoke(uint32_t service_id, uint32_t procedure_id,
++                                 const std::vector<encoder::Value>& args, Returns returns);
+   schema::ProcedureResult invoke(std::string_view service, std::string_view procedure,
+                                  const std::vector<encoder::Value>& args, Returns returns);
+ 
+diff --git a/client/cpp/src/client.cpp b/client/cpp/src/client.cpp
+index 14462b975..3eeec7a5b 100644
+--- a/client/cpp/src/client.cpp
++++ b/client/cpp/src/client.cpp
+@@ -156,6 +156,16 @@ schema::ProcedureResult Client::invoke(std::string_view service, std::string_vie
+   return this->send_request(build_request(service, procedure, args), &returns);
+ }
+ 
++schema::ProcedureResult Client::invoke(uint32_t service_id, uint32_t procedure_id,
++                                       const std::vector<encoder::Value>& args, Returns returns) {
++  schema::Request request;
++  schema::ProcedureCall* call = request.add_calls();
++  call->set_service_id(service_id);
++  call->set_procedure_id(procedure_id);
++  add_arguments(call, args);
++  return this->send_request(std::move(request), &returns);
++}
++
+ // Send a request and return the result it is answered by. The reader registers a stream or an
+ // event a call adds before it reads the stream's first update.
+ schema::ProcedureResult Client::send_request(schema::Request request, const Returns* returns) {
+diff --git a/client/csharp/src/Connection.cs b/client/csharp/src/Connection.cs
+index cb955850b..1fca0e86e 100644
+--- a/client/csharp/src/Connection.cs
++++ b/client/csharp/src/Connection.cs
+@@ -905,6 +905,35 @@ namespace KRPC.Client
+             return response.Results[0];
+         }
+ 
++        /// <summary>
++        /// Invoke a remote procedure by id.
++        /// </summary>
++        public ProcedureResult Invoke (uint service, uint procedure, IList<ByteString> arguments = null)
++        {
++            return Invoke (service, procedure, arguments, global::KRPC.Schema.KRPC.Type.Types.TypeCode.None);
++        }
++
++        /// <summary>
++        /// Invoke a remote procedure by id that returns a value with the given type code.
++        /// </summary>
++        public ProcedureResult Invoke (uint service, uint procedure, IList<ByteString> arguments, global::KRPC.Schema.KRPC.Type.Types.TypeCode returnCode)
++        {
++            CheckDisposed ();
++            var request = new Request ();
++            var call = GetCall (string.Empty, string.Empty, arguments);
++            call.ServiceId = service;
++            call.ProcedureId = procedure;
++            request.Calls.Add (call);
++            var addsStream = returnCode == global::KRPC.Schema.KRPC.Type.Types.TypeCode.Stream ||
++                returnCode == global::KRPC.Schema.KRPC.Type.Types.TypeCode.Event;
++            var response = session.Call (request, addsStream);
++            if (response.Error != null)
++                throw GetException(response.Error);
++            if (response.Results[0].Error != null)
++                throw GetException (response.Results [0].Error);
++            return response.Results[0];
++        }
++
+         internal static ProcedureCall GetCall (string service, string procedure, IList<ByteString> arguments = null)
+         {
+             var call = new ProcedureCall ();
+diff --git a/client/csharp/src/IConnection.cs b/client/csharp/src/IConnection.cs
+index 6f9681a1d..d361ee6ca 100644
+--- a/client/csharp/src/IConnection.cs
++++ b/client/csharp/src/IConnection.cs
+@@ -14,6 +14,16 @@ namespace KRPC.Client
+         /// </summary>
+         global::KRPC.Schema.KRPC.ProcedureResult Invoke (string service, string procedure, IList<ByteString> arguments = null);
+ 
++        /// <summary>
++        /// Invoke a remote procedure by id.
++        /// </summary>
++        global::KRPC.Schema.KRPC.ProcedureResult Invoke (uint service, uint procedure, IList<ByteString> arguments = null);
++
++        /// <summary>
++        /// Invoke a remote procedure by id that returns a value with the given type code.
++        /// </summary>
++        global::KRPC.Schema.KRPC.ProcedureResult Invoke (uint service, uint procedure, IList<ByteString> arguments, global::KRPC.Schema.KRPC.Type.Types.TypeCode returnCode);
++
+         /// <summary>
+         /// Invoke a remote procedure call that returns a value with the given type code.
+         /// </summary>
+diff --git a/client/java/src/krpc/client/Connection.java b/client/java/src/krpc/client/Connection.java
+index ba6614e2f..37de6891e 100644
+--- a/client/java/src/krpc/client/Connection.java
++++ b/client/java/src/krpc/client/Connection.java
+@@ -565,6 +565,25 @@ public class Connection implements AutoCloseable {
+     return invoke(buildCall(service, procedure, arguments));
+   }
+ 
++  /** Invoke a remote procedure call by id. The names are for the local return type lookup. */
++  public KRPC.ProcedureResult invoke(
++      String service, String procedure, int serviceId, int procedureId, ByteString... arguments)
++      throws RPCException {
++    KRPC.Type.TypeCode code;
++    try {
++      code = getReturnTypeCode(service, procedure);
++    } catch (IOException exn) {
++      throw new RPCException("Failed to invoke call", exn);
++    }
++    boolean addsStream = code == KRPC.Type.TypeCode.STREAM || code == KRPC.Type.TypeCode.EVENT;
++    KRPC.ProcedureCall call =
++        buildCall("", "", arguments).toBuilder()
++            .setServiceId(serviceId)
++            .setProcedureId(procedureId)
++            .build();
++    return getCheckedResult(invokeInternal(call, addsStream));
++  }
++
+   private KRPC.ProcedureResult invoke(KRPC.ProcedureCall call) throws RPCException {
+     return getCheckedResult(invokeInternal(call));
+   }
+diff --git a/client/python/krpc/client.py b/client/python/krpc/client.py
+index 94de42427..1c6ef253e 100644
+--- a/client/python/krpc/client.py
++++ b/client/python/krpc/client.py
+@@ -238,11 +238,18 @@ class Client(krpc.services.Client):
+             self.close()
+             raise
+ 
++    _procedure_ids: dict[tuple[str, str], tuple[int, int]] = {}
++
+     def _load_services(self, use_pregenerated_stubs: bool) -> None:
+         services = cast(
+             KRPC.Services,
+             self._invoke("KRPC", "GetServices", [], [], self._types.services_type),
+         ).services
++        self._procedure_ids = {
++            (service_info.name, procedure_info.name): (service_info.id, procedure_info.id)
++            for service_info in services
++            for procedure_info in service_info.procedures
++        }
+ 
+         # Load services
+         definitions = []
+@@ -615,7 +622,14 @@ class Client(krpc.services.Client):
+         # where it belongs
+         args = list(args)
+         request = KRPC.Request()
+-        self._encode_call(request.calls.add(), service, procedure, args, param_types)
++        call = request.calls.add()
++        self._encode_call(call, "", "", args, param_types, service, procedure)
++        ids = self._procedure_ids.get((service, procedure))
++        if ids is not None:
++            call.service_id, call.procedure_id = ids
++        else:
++            call.service = service
++            call.procedure = procedure
+ 
+         # Send the request, and wait for its response. The reader registers a stream
+         # or an event the call adds before it reads the stream's first update
+@@ -657,11 +671,16 @@ class Client(krpc.services.Client):
+         procedure: str,
+         args: Iterable[object],
+         param_types: Iterable[TypeBase],
++        error_service: str | None = None,
++        error_procedure: str | None = None,
+     ) -> None:
+         """Fill in a KRPC.ProcedureCall message with a call and its arguments"""
+ 
+-        call.service = service
+-        call.procedure = procedure
++        if service:
++            call.service = service
++            call.procedure = procedure
++        service = error_service or service
++        procedure = error_procedure or procedure
+         arguments = call.arguments
+ 
+         for i, (value, typ) in enumerate(zip(args, param_types)):
+diff --git a/tools/krpctools/krpctools/clientgen/cpp.py b/tools/krpctools/krpctools/clientgen/cpp.py
+index 35f8fbb48..a60c63bb2 100644
+--- a/tools/krpctools/krpctools/clientgen/cpp.py
++++ b/tools/krpctools/krpctools/clientgen/cpp.py
+@@ -60,6 +60,7 @@ class CppGenerator(Generator[CppLanguage]):
+             if info["getter"]:
+                 properties[name] = {
+                     "remote_name": info["getter"]["remote_name"],
++                    "remote_id": info["getter"]["remote_id"],
+                     "parameters": [],
+                     "return_type": info["type"],
+                     "return_set_client": self.parse_set_client(
+@@ -73,6 +74,7 @@ class CppGenerator(Generator[CppLanguage]):
+             if info["setter"]:
+                 properties["set_" + name] = {
+                     "remote_name": info["setter"]["remote_name"],
++                    "remote_id": info["setter"]["remote_id"],
+                     "parameters": self.generate_context_parameters(
+                         info["setter"]["remote_name"], info["setter"]["procedure"]
+                     ),
+@@ -97,6 +99,7 @@ class CppGenerator(Generator[CppLanguage]):
+                 if info["getter"]:
+                     class_properties[name] = {
+                         "remote_name": info["getter"]["remote_name"],
++                        "remote_id": info["getter"]["remote_id"],
+                         "parameters": [],
+                         "return_type": info["type"],
+                         "return_set_client_fn": self.parse_set_client(
+@@ -110,6 +113,7 @@ class CppGenerator(Generator[CppLanguage]):
+                 if info["setter"]:
+                     class_properties["set_" + name] = {
+                         "remote_name": info["setter"]["remote_name"],
++                        "remote_id": info["setter"]["remote_id"],
+                         "parameters": [
+                             self.generate_context_parameters(
+                                 info["setter"]["remote_name"],
+diff --git a/tools/krpctools/krpctools/clientgen/cpp.tmpl b/tools/krpctools/krpctools/clientgen/cpp.tmpl
+index f2b8a705a..208412fd8 100644
+--- a/tools/krpctools/krpctools/clientgen/cpp.tmpl
++++ b/tools/krpctools/krpctools/clientgen/cpp.tmpl
+@@ -7,7 +7,7 @@ _args.push_back(encoder::encode_arg({{x.name}}));
+ {% endfor %}
+ {% endmacro %}
+ {% macro call(service, procedure, return_type, returns, has_args, is_static=False) %}
+-{% if return_type != 'void' %}auto _data = {% endif %}{% if is_static %}_client.{% else %}this->_client.{% endif %}invoke("{{service}}", "{{procedure}}", {% if has_args %}_args{% else %}{}{% endif %}, ::krpc::Client::Returns::{{ "value" if returns == "value" else "stream" }});
++{% if return_type != 'void' %}auto _data = {% endif %}{% if is_static %}_client.{% else %}this->_client.{% endif %}invoke({{service}}u, {{procedure}}u, {% if has_args %}_args{% else %}{}{% endif %}, ::krpc::Client::Returns::{{ "value" if returns == "value" else "stream" }});
+ {% endmacro %}
+ {% macro return(type, set_client, is_static=False) %}
+ {{type}} _result{};
+@@ -403,7 +403,7 @@ inline {{ service_name }}::{{ service_name }}(const Client& client):
+ inline {{ procedure.return_type }} {{ service_name }}::{{ procedure_name }}({{ impl_parameters(procedure.parameters) }}) {
+ {% if procedure.parameters | length > 0 %}{{ args(procedure.parameters) | indent(width=2) }}
+ {% endif %}
+-{{ call(service_name, procedure.remote_name, procedure.return_type, procedure.returns, procedure.parameters | length > 0) | indent(width=2) }}
++{{ call(service_id, procedure.remote_id, procedure.return_type, procedure.returns, procedure.parameters | length > 0) | indent(width=2) }}
+ {% if procedure.return_type != 'void' %}{{ return(procedure.return_type, procedure.return_set_client) | indent(width=2) }}
+ {% endif %}
+ }
+@@ -437,7 +437,7 @@ inline {{ service_name }}::{{ class_name }}::{{ class_name }}(const Client& clie
+ 
+ inline {{ method.return_type }} {{ service_name }}::{{ class_name }}::{{ method_name }}({{ impl_parameters(method.parameters) }}) {
+ {{ args([{'name': '*this'}] + method.parameters) | indent(width=2) }}
+-{{ call(service_name, method.remote_name, method.return_type, method.returns, True) | indent(width=2) }}
++{{ call(service_id, method.remote_id, method.return_type, method.returns, True) | indent(width=2) }}
+ {% if method.return_type != 'void' %}{{ return(method.return_type, method.return_set_client) | indent(width=2) }}
+ {% endif %}
+ }
+@@ -447,7 +447,7 @@ inline {{ method.return_type }} {{ service_name }}::{{ class_name }}::{{ method_
+ inline {{ method.return_type }} {{ service_name }}::{{ class_name }}::{{ method_name }}({{ impl_parameters([{'type': 'Client&', 'name': '_client'}] + method.parameters) }}) {
+ {% if method.parameters | length > 0 %}  {{ args(method.parameters) | indent(width=2) }}
+ {% endif %}
+-{{ call(service_name, method.remote_name, method.return_type, method.returns, method.parameters | length > 0, True) | indent(width=2) }}
++{{ call(service_id, method.remote_id, method.return_type, method.returns, method.parameters | length > 0, True) | indent(width=2) }}
+ {% if method.return_type != 'void' %}  {{ return(method.return_type, method.return_set_client, True) | indent(width=2) }}
+ {% endif %}
+ }
+diff --git a/tools/krpctools/krpctools/clientgen/csharp.tmpl b/tools/krpctools/krpctools/clientgen/csharp.tmpl
+index dd0b143e9..14b87e412 100644
+--- a/tools/krpctools/krpctools/clientgen/csharp.tmpl
++++ b/tools/krpctools/krpctools/clientgen/csharp.tmpl
+@@ -12,7 +12,7 @@ var _args = new ByteString[] {
+ {% endmacro %}
+ {% macro call(service, procedure, has_return, has_args, is_static=False, returns='value') %}
+ {% set returns_stream = returns != 'value' %}
+-{% if has_return %}var _result = {% endif %}connection.Invoke ("{{service}}", "{{procedure}}"{% if has_args %}, _args{% elif returns_stream %}, null{% endif %}{% if returns_stream %}, global::KRPC.Schema.KRPC.Type.Types.TypeCode.{{ returns | capitalize }}{% endif %});
++{% if has_return %}var _result = {% endif %}connection.Invoke ({{service}}u, {{procedure}}u{% if has_args %}, _args{% elif returns_stream %}, null{% endif %}{% if returns_stream %}, global::KRPC.Schema.KRPC.Type.Types.TypeCode.{{ returns | capitalize }}{% endif %});
+ {% endmacro %}
+ {% macro return(type, spec, is_nullable=False) %}
+ {% if is_nullable %}
+@@ -139,7 +139,7 @@ namespace KRPC.Client.Services.{{ service_name }}
+         {
+ {% if procedure.parameters | length > 0 %}{{ args(procedure.parameters) | indent(width=12) }}
+ {% endif %}
+-{{ call(service_name, procedure.remote_name, procedure.return_type != 'void', procedure.parameters | length > 0, returns=procedure.returns) | indent(width=12) }}
++{{ call(service_id, procedure.remote_id, procedure.return_type != 'void', procedure.parameters | length > 0, returns=procedure.returns) | indent(width=12) }}
+ {% if procedure.return_type != 'void' %}{{ return(procedure.return_type, procedure.return_spec, procedure.return_is_nullable) | indent(width=12) }}
+ {% endif %}
+         }
+@@ -156,14 +156,14 @@ namespace KRPC.Client.Services.{{ service_name }}
+         public {{ property.type }} {{ property_name }} {
+         {% if property.getter %}
+             get {
+-{{ call(service_name, property.getter.remote_name, true, false, returns=property.getter.returns) | indent(width=16) }}
++{{ call(service_id, property.getter.remote_id, true, false, returns=property.getter.returns) | indent(width=16) }}
+ {{ return(property.type, property.return_spec, property.return_is_nullable) | indent(width=16) }}
+             }
+         {% endif %}
+         {% if property.setter %}
+             set {
+ {{ args([{'name': 'value', 'name_value': 'value', 'type': property.type, 'spec': property.return_spec}]) | indent(width=16) }}
+-{{ call(service_name, property.setter.remote_name, false, true) | indent(width=16) }}
++{{ call(service_id, property.setter.remote_id, false, true) | indent(width=16) }}
+             }
+         {% endif %}
+         }
+@@ -376,7 +376,7 @@ namespace KRPC.Client.Services.{{ service_name }}
+         public {{ method.return_type }} {{ method_name }} ({{ sig_parameters(method.parameters) }})
+         {
+ {{ args([{'name': 'this', 'name_value': 'this', 'type': service_name+'.'+class_name, 'spec': cls.spec}] + method.parameters) | indent(width=12) }}
+-{{ call(service_name, method.remote_name, method.return_type != 'void', true, returns=method.returns) | indent(width=12) }}
++{{ call(service_id, method.remote_id, method.return_type != 'void', true, returns=method.returns) | indent(width=12) }}
+ {% if method.return_type != 'void' %}{{ return(method.return_type, method.return_spec, method.return_is_nullable) | indent(width=12) }}
+ {% endif %}
+         }
+@@ -395,7 +395,7 @@ namespace KRPC.Client.Services.{{ service_name }}
+                 throw new ArgumentNullException (nameof (connection));
+ {% if method.parameters | length > 0 %}{{ args(method.parameters) | indent(width=12) }}
+ {% endif %}
+-{{ call(service_name, method.remote_name, method.return_type != 'void', method.parameters | length > 0, true, method.returns) | indent(width=12) }}
++{{ call(service_id, method.remote_id, method.return_type != 'void', method.parameters | length > 0, true, method.returns) | indent(width=12) }}
+ {% if method.return_type != 'void' %}{{ return(method.return_type, method.return_spec, method.return_is_nullable) | indent(width=12) }}
+ {% endif %}
+         }
+@@ -413,14 +413,14 @@ namespace KRPC.Client.Services.{{ service_name }}
+         {% if property.getter %}
+             get {
+ {{ args([{'name': 'this', 'name_value': 'this', 'type': service_name+'.'+class_name, 'spec': cls.spec }]) | indent(width=16) }}
+-{{ call(service_name, property.getter.remote_name, true, true, returns=property.getter.returns) | indent(width=16) }}
++{{ call(service_id, property.getter.remote_id, true, true, returns=property.getter.returns) | indent(width=16) }}
+ {{ return(property.type, property.return_spec, property.return_is_nullable) | indent(width=16) }}
+             }
+         {% endif %}
+         {% if property.setter %}
+             set {
+ {{ args([{'name': 'this', 'name_value': 'this', 'type': service_name+'.'+class_name, 'spec': cls.spec }, {'name': 'value', 'name_value': 'value', 'type': property.type, 'spec': property.return_spec}]) | indent(width=16) }}
+-{{ call(service_name, property.setter.remote_name, false, true) | indent(width=16) }}
++{{ call(service_id, property.setter.remote_id, false, true) | indent(width=16) }}
+             }
+         {% endif %}
+         }
+diff --git a/tools/krpctools/krpctools/clientgen/java.py b/tools/krpctools/krpctools/clientgen/java.py
+index 4b3303dcc..1da658b62 100644
+--- a/tools/krpctools/krpctools/clientgen/java.py
++++ b/tools/krpctools/krpctools/clientgen/java.py
+@@ -132,6 +132,7 @@ class JavaGenerator(Generator[JavaLanguage]):
+                 properties["get" + upper_camel_case(name)] = {
+                     "procedure": info["getter"]["procedure"],
+                     "remote_name": info["getter"]["remote_name"],
++                    "remote_id": info["getter"]["remote_id"],
+                     "parameters": [],
+                     "return_type": info["type"],
+                     "documentation": info["documentation"],
+@@ -142,6 +143,7 @@ class JavaGenerator(Generator[JavaLanguage]):
+                 properties["set" + upper_camel_case(name)] = {
+                     "procedure": info["setter"]["procedure"],
+                     "remote_name": info["setter"]["remote_name"],
++                    "remote_id": info["setter"]["remote_id"],
+                     "parameters": self.generate_context_parameters(
+                         info["setter"]["remote_name"], info["setter"]["procedure"]
+                     ),
+@@ -160,6 +162,7 @@ class JavaGenerator(Generator[JavaLanguage]):
+                     class_properties["get" + upper_camel_case(name)] = {
+                         "procedure": info["getter"]["procedure"],
+                         "remote_name": info["getter"]["remote_name"],
++                        "remote_id": info["getter"]["remote_id"],
+                         "parameters": [],
+                         "return_type": info["type"],
+                         "documentation": info["documentation"],
+@@ -170,6 +173,7 @@ class JavaGenerator(Generator[JavaLanguage]):
+                     class_properties["set" + upper_camel_case(name)] = {
+                         "procedure": info["setter"]["procedure"],
+                         "remote_name": info["setter"]["remote_name"],
++                        "remote_id": info["setter"]["remote_id"],
+                         "parameters": [
+                             self.generate_context_parameters(
+                                 info["setter"]["remote_name"],
+@@ -297,6 +301,7 @@ class JavaGenerator(Generator[JavaLanguage]):
+         parameter_specs += [p["type"]["spec"] for p in info["parameters"]]
+         return {
+             "remote_name": info["remote_name"],
++            "remote_id": info["remote_id"],
+             "return_spec": (
+                 info["return_type"]["spec"]
+                 if info["return_type"]["name"] != "void"
+diff --git a/tools/krpctools/krpctools/clientgen/java.tmpl b/tools/krpctools/krpctools/clientgen/java.tmpl
+index 96dd8b1b4..ed2833808 100644
+--- a/tools/krpctools/krpctools/clientgen/java.tmpl
++++ b/tools/krpctools/krpctools/clientgen/java.tmpl
+@@ -7,8 +7,8 @@ ByteString[] _args = new ByteString[] {
+ {% endfor %}
+ };
+ {% endmacro %}
+-{% macro call(service, procedure, has_return, has_args, is_static=False) %}
+-{% if has_return %}krpc.schema.KRPC.ProcedureResult _data = {% endif %}{% if is_static %}connection{% else %}this.connection{% endif %}.invoke("{{service}}", "{{procedure}}"{% if has_args %}, _args{% endif %});
++{% macro call(service, procedure, procedure_id, has_return, has_args, is_static=False) %}
++{% if has_return %}krpc.schema.KRPC.ProcedureResult _data = {% endif %}{% if is_static %}connection{% else %}this.connection{% endif %}.invoke("{{service}}", "{{procedure}}", (int) {{service_id}}L, (int) {{procedure_id}}L{% if has_args %}, _args{% endif %});
+ {% endmacro %}
+ {% macro return(type, is_static=False) %}
+ {% if type.nullable %}
+@@ -85,7 +85,7 @@ public class {{ service_name }} {
+     public {{ procedure.return_type.name }} {{ procedure_name }}({{ sig_parameters(procedure.parameters) }}) throws RPCException {
+ {% if procedure.parameters | length > 0 %}{{ args(procedure.parameters) | indent(width=8) }}
+ {% endif %}
+-{{ call(service_name, procedure.remote_name, procedure.return_type.name != 'void', procedure.parameters | length > 0) | indent(width=8) }}
++{{ call(service_name, procedure.remote_name, procedure.remote_id, procedure.return_type.name != 'void', procedure.parameters | length > 0) | indent(width=8) }}
+ {% if procedure.return_type.name != 'void' %}{{ return(procedure.return_type) | indent(width=8) }}
+ {% endif %}
+     }
+@@ -245,7 +245,7 @@ public class {{ service_name }} {
+         public {{ method.return_type.name }} {{ method_name }}({{ sig_parameters(method.parameters) }}) throws RPCException
+         {
+ {{ args([{'name': 'this', 'type': {'name': service_name+'.'+class_name, 'spec': 'krpc.client.Types.createClass("'+service_name+'", "'+class_name+'")'}}] + method.parameters) | indent(width=12) }}
+-{{ call(service_name, method.remote_name, method.return_type.name != 'void', true) | indent(width=12) }}
++{{ call(service_name, method.remote_name, method.remote_id, method.return_type.name != 'void', true) | indent(width=12) }}
+ {% if method.return_type.name != 'void' %}{{ return(method.return_type) | indent(width=12) }}
+ {% endif %}
+         }
+@@ -262,7 +262,7 @@ public class {{ service_name }} {
+         {
+ {% if method.parameters | length > 0 %}{{ args(method.parameters) | indent(width=12) }}
+ {% endif %}
+-{{ call(service_name, method.remote_name, method.return_type.name != 'void', method.parameters | length > 0, true) | indent(width=12) }}
++{{ call(service_name, method.remote_name, method.remote_id, method.return_type.name != 'void', method.parameters | length > 0, true) | indent(width=12) }}
+ {% if method.return_type.name != 'void' %}{{ return(method.return_type, true) | indent(width=12) }}
+ {% endif %}
+         }

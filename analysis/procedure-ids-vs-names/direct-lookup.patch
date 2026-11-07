@@ -1,0 +1,37 @@
+diff --git a/core/src/Service/Services.cs b/core/src/Service/Services.cs
+index 270a15f51..2fe1178f6 100644
+--- a/core/src/Service/Services.cs
++++ b/core/src/Service/Services.cs
+@@ -40,12 +40,14 @@ namespace KRPC.Service
+             Signatures = Scanner.Scanner.GetServices ();
+             ServicesById = new Dictionary<uint, ServiceSignature> ();
+             ProceduresById = new Dictionary<string, IDictionary<uint, ProcedureSignature>> ();
++            ProceduresByServiceId = new Dictionary<uint, Dictionary<uint, ProcedureSignature>> ();
+             foreach (var service in Signatures.Values) {
+                 ServicesById [service.Id] = service;
+                 var procedures = new Dictionary<uint, ProcedureSignature> ();
+                 foreach (var procedure in service.Procedures.Values)
+                     procedures [procedure.Id] = procedure;
+                 ProceduresById [service.Name] = procedures;
++                ProceduresByServiceId [service.Id] = procedures;
+             }
+             MappedExceptionTypes = Scanner.Scanner.GetMappedExceptionTypes ();
+         }
+@@ -61,8 +63,17 @@ namespace KRPC.Service
+             return serviceSignature;
+         }
+ 
++        readonly Dictionary<uint, Dictionary<uint, ProcedureSignature>> ProceduresByServiceId;
++
+         public ProcedureSignature GetProcedureSignature (ProcedureCall call)
+         {
++            if (call.ServiceId > 0 && call.ProcedureId > 0) {
++                Dictionary<uint, ProcedureSignature> byId;
++                ProcedureSignature found;
++                if (ProceduresByServiceId.TryGetValue (call.ServiceId, out byId) &&
++                    byId.TryGetValue (call.ProcedureId, out found))
++                    return found;
++            }
+             var serviceSignature = GetServiceSignature (call);
+             var service = serviceSignature.Name;
+             string procedure = call.Procedure;
