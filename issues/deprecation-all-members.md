@@ -65,6 +65,7 @@ Lua warns once per member on each connection. Python stubs also carry PEP 702 `@
 * **Java:** signals carry no reason, because `@Deprecated` has none.
 * **MSVC in C:** no enumerator attribute, so a plain C program gets no warning for a deprecated enum value. The conformance probe compiles as C++ on that compiler.
 * **Websockets testee:** the deprecation tests are expected failures, because it has no `DeprecationSignals` command.
+* **`_call` and `_stream`:** the C++ `_call` and `_stream` functions carry no `[[deprecated]]`. Neither do the C-nano `_call` functions from #1267, once that lands. Each is a way to use a deprecated procedure with no warning.
 
 ### Verification
 

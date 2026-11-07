@@ -27,6 +27,7 @@ The Lua testee picks the `CONNECTION` kind from `conn._error` (`testee.lua`), as
 | `test_concurrency.py::test_wait_holding_another` | `@skip` in C++, C#, Java and Python | Follows a fix for the stalled dispatcher thread |
 | C-nano collections in `test_codec.py` | 9 expected failures are types the testee has no codec for | Add the types to the testee |
 | Leaks in C-nano | The testee leaks what it allocates | Free results, then run under LSan |
+| Failure while building a call in C-nano | A partly filled `krpc_schema_ProcedureCall`, a bad position and a failed allocation have native tests only, from #1267, as the testee has no way to make them fail | Add a testee command, or a failing allocator, and move the tests to the suite |
 | Lua versions other than 5.4 | Conformance runs on 5.4 only, and the client supports 5.1 to 5.4 and LuaJIT | Run the suite on 5.1 |
 | A serial port in a terminal's default mode | The harness's `socat` ports are `raw` | Add a cooked port case, or set the mode in the client |
 
