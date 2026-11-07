@@ -41,7 +41,7 @@ Other details from the trial:
 ## Open Questions
 
 - **Is the split import acceptable, or worth fixing upstream?** Removing it needs a compile-only dependency in rules_dotnet, or asset selection at the framework of the binary. A local wrapper rule was rejected: an empty runtime entry for Protobuf would win the first-entry rule in `deps.json`.
-- **How should Protobuf's version stay in step?** It now appears in `paket.dependencies`, `use_repo` in `MODULE.bazel`, the split import and the `nuget_package` target. A missed `use_repo` or label fails the build. A missed version string in the import or in `nuget_package` builds without an error.
+- **How should Protobuf's version stay in step?** Settled: `//tools/build/dotnet:versions-test` checks each hand-written version against the lock, and the build docs list them. The `.csproj` versions are [csproj-package-versions.md](csproj-package-versions.md).
 - **Should the two rules_dotnet problems be reported upstream?** The patch can go once a release has the fix. The `lib/` behavior may be intended.
 - **Should a test check the generated files against `paket.lock`?** No check catches a hand edit or a missed regeneration, unlike `:requirements_test` for Python. The check needs network access, or a comparison that does not run Paket.
 - **Is an alpha Paket acceptable?** It only runs on an update, and nothing it produces ships beyond the lock file.
