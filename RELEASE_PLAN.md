@@ -17,7 +17,7 @@ The **GitHub** column says how the issue on GitHub stands against this plan:
 | | Release | Theme | Progress |
 | --- | --- | --- | --- |
 | ✅ | [0.7](#07-server-side-functions-streams-and-events-service-improvements) | Server-side functions, streams and events, protocol additions, service improvements | Tagged 2026-10-21 |
-| 🚧 | [0.8](#08-single-connection-client-codegen-then-client-conformance-and-thread-safety) | Single connection, client codegen, then client conformance testing and thread safety | 14 of 22 features done; strict argument decoding in review |
+| 🚧 | [0.8](#08-single-connection-client-codegen-then-client-conformance-and-thread-safety) | Single connection, client codegen, then client conformance testing and thread safety | 14 of 23 features done |
 | ⬜ | [1.0](#10-remaining-protocol-improvements-server-side-function-follow-ups) | Remaining protocol improvements (#906), server side function follow-ups | 0 of 9 done; tick control has a 0.7 stopgap |
 
 ## 0.7: server-side functions, streams and events, service improvements
@@ -159,6 +159,10 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 | ✅ | Lua: `nil` for null values, and a `nil` argument no longer drops the ones after it | #1278 | — |
 | ✅ | Python: `isinstance` and `issubclass` with a class reached through a connection | #1279 | [static-method-binding.md](design/static-method-binding.md) |
 | ✅ | Build and CI: versions dropped from the Java guide's `javac` example, flaky Python client tests listed | #1238, #1246, #1248 | — |
+| ✅ | C++ and C-nano clients and the Arduino library licensed under MIT | #1281 | — |
+| ✅ | C#: each target built for the framework that runs it | #1283 | — |
+| ✅ | Client design pages on the docs site; guides corrected on when a stream ends and a connection stays open | #1287 | — |
+| ✅ | Conformance: `Rate` testee command renamed `GetRate`, `TestService2` and `ConformanceService` definitions shipped in krpctools, more flaky tests listed | #1282, #1284, #1288 | — |
 
 ### Fixes and smaller items
 
@@ -176,17 +180,17 @@ conformance suite, and the scanner rules build on #1237.
 | ✅ | `KerbalAlarmClock.Alarm.PlaySound` has no effect | [#1179](https://github.com/krpc/krpc/issues/1179), fixed by #1262 | bug, mods, service, ksp | [services/kac-remotetech-tests-and-api.md](design/services/kac-remotetech-tests-and-api.md) |
 | ✅ | DockingCamera log spam | [#1180](https://github.com/krpc/krpc/issues/1180), fixed by #1235 | bug, mods, service, ksp | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ⬜ | Fail a call with an argument position past the last parameter; breaking | **To file**: [argument-position-out-of-range.md](issues/argument-position-out-of-range.md) | bug, server | — |
-| 🚧 | Strict argument decoding: fail a call with an argument the server cannot decode in full, each call failing on its own; breaking; in review | PR #1280 | bug, server, protocol, service | — |
+| ✅ | Strict argument decoding: fail a call with an argument the server cannot decode in full, each call failing on its own; breaking | #1280 | bug, server, protocol, service | — |
 | ✅ | Publish the bundled TestServer and ServiceDefinitions for every platform, so `krpc-conformance` and `servicedefs` run on Windows; the TestServer ships only in krpctools, as `krpc-testserver` | [#1228](https://github.com/krpc/krpc/issues/1228), fixed by #1271 | feature, tools | [ksa/build-and-test-tools.md](design/ksa/build-and-test-tools.md), "Service definitions" |
 | ✅ | Run clang-format and clang-tidy over every C and C++ source | [#1177](https://github.com/krpc/krpc/issues/1177), fixed by #1277 | enhancement, client, build, cpp, cnano | — |
 | ⬜ | Audit how each client binds static methods and streams to a connection | [#1195](https://github.com/krpc/krpc/issues/1195) | enhancement, client, python, cpp, cnano, csharp, java, lua | [static-method-binding.md](design/static-method-binding.md) |
-| ⬜ | C++: hold the client strongly, so objects never dangle, add `close()`, and take the client by reference in the public API; breaking | [#1286](https://github.com/krpc/krpc/pull/1286) | bug, client, cpp | — |
+| ✅ | C++: hold the client strongly, so objects never dangle, add `close()`, and take the client by reference in the public API; breaking | #1285, #1286 | bug, client, cpp | — |
 | ⬜ | Clients: scope streams and events with each language's scoping construct, with a conformance test for events; removes Python's `Client.stream`, breaking | **To file**: [scoped-streams-events.md](issues/scoped-streams-events.md) | enhancement, client, python, csharp, java, cpp | — |
 | ✅ | Documentation crefs use the C# service name | [#1188](https://github.com/krpc/krpc/issues/1188), fixed by #1243 | bug, server | — |
 | ✅ | Client disconnect during a yielding call stops the server on .NET | [#1189](https://github.com/krpc/krpc/issues/1189), fixed by #1249 | bug, server, ksa | — |
 | ✅ | Server window does not resize to fit its content | [#1186](https://github.com/krpc/krpc/issues/1186), fixed by #1247 | bug, server, ksp | — |
-| ⬜ | Publish wheels for krpc and krpctools | **To file**: [python-wheels.md](issues/python-wheels.md) | enhancement, client, tools, build, python | — |
-| ⬜ | Update the `krpc` and `krpc-cnano` vcpkg ports for 0.8.0: MIT licenses, copyright files, every C-nano transport | **To file**: [vcpkg-ports-0-8.md](issues/vcpkg-ports-0-8.md) | enhancement, client, build, cpp, cnano | — |
+| ✅ | Publish wheels for krpc and krpctools, in place of sdists | #1289 | enhancement, client, tools, build, python | — |
+| 🚧 | Update the `krpc` and `krpc-cnano` vcpkg ports for 0.8.0: MIT licenses, copyright files, every C-nano transport (done in the repo: #1275, #1281; publishing waits on the release) | **To file**: [vcpkg-ports-0-8.md](issues/vcpkg-ports-0-8.md) | enhancement, client, build, cpp, cnano | — |
 | ⬜ | Deprecation signals for every member kind in every client | **To file**: [deprecation-all-members.md](issues/deprecation-all-members.md) | enhancement, client, tools | — |
 | ✅ | Lua API docs on sphinx-lua-ls, when luadomain breaks on a Sphinx bump | [#1202](https://github.com/krpc/krpc/issues/1202), fixed by #1252 | enhancement, client, docs, lua | — |
 | ⬜ | Move krpctest into krpctools, as a game-agnostic in-game test runner | **To file**: [krpctest-in-krpctools.md](issues/krpctest-in-krpctools.md) | enhancement, tools | [ksa/build-and-test-tools.md](design/ksa/build-and-test-tools.md) |

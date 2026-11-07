@@ -11,10 +11,9 @@ The 0.8.0 ports differ from the published 0.7.0 ports in more than the version:
 | `krpc-cnano` | `license` from `LGPL-3.0-or-later AND Zlib` to `MIT AND Zlib` | The C-nano client moves to MIT |
 | `krpc-cnano` | Remove `-DKRPC_COMMUNICATION_TCP=ON` and the patch to `communication.h` | #1275 compiles every transport in and chooses one at run time |
 
-The transport change is already on `main`. The license changes come with the pull request that relicenses the C++ and C-nano clients. Until it merges, the C-nano port in the repo lists only `COPYING.LESSER`, while the review of microsoft/vcpkg#54568 added `LICENSE` and `COPYING`.
+The ports in the repo already have these changes: the transport change from #1275 and the license changes from #1281.
 
 To do at the 0.8.0 release:
 
-- [ ] Merge the relicense before the release.
 - [ ] Run both release steps after the GitHub release, and check each pull request's diff against the table.
 - [ ] Add the license and transport changes to each pull request's description. The release step writes only the version and a link to the release.
