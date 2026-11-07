@@ -86,6 +86,13 @@ A built enumeration is a different class from the imported one, so `dyn.prograde
 
 The rule in [static-method-binding.md](static-method-binding.md) is unchanged: a static method takes its connection from the service object the class is reached through. A call through an object runs on the object's connection. Built classes already do both, and `test_static_method_connection` and `test_static_method_through_an_object_connection` pass on them. This replaces phase 2 of that doc, which fixes `StaticMethod` on the shared stub classes.
 
+### Other clients
+
+Lua and JavaScript take the same approach. Each builds its services at connect. Its generated modules hold real enumerations, structures and exceptions, where the language has them, and declare the classes and services.
+
+ * **Lua**: annotations, then the importable types, in [lua-type-hints.md](../issues/lua-type-hints.md). Lua gets no runtime stubs.
+ * **JavaScript**: [phase 3b](javascript-client.md#phase-3b-importable-types), on top of its declarations.
+
 ## What Goes
 
 | Item | Note |
@@ -157,7 +164,3 @@ Each phase merges on its own. Milestone `ksp-v0.8.0`.
 | Add a server's extra enumeration values to the generated class | Changes a class shared by every client, based on one connection |
 | Declarations as base classes of built classes | Members the server lacks appear to exist |
 | A warning at connect when the server's definitions differ from the modules, by a hash per service from `clientgen` | The program runs correctly, and only static checking is out of date |
-
-## Open Questions
-
- * **Lua.** [#1201](https://github.com/krpc/krpc/issues/1201) proposes annotations, then runtime stubs "as the Python stubs do". The JavaScript client's [phase 3](javascript-client.md) is already declarations plus built services. This design suggests dropping the second step for Lua.

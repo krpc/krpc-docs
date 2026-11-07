@@ -103,6 +103,7 @@ Each phase is implementable and mergeable on its own.
 | 1 | Browser, WebSockets, unary calls, dynamic stubs | `core`, `dynamic`, `defaults`, `connections`, `concurrency`, `websockets` |
 | 2 | Error types, named arguments. Structures become classes | `error-types`, `named-arguments` |
 | 3 | Generated stubs with TypeScript declarations, docs API reference | — |
+| 3b | Enumerations, structures and exceptions importable with no connection | — |
 | 4 | Streams, events, callbacks, conditions | `streams`, `events`, `callbacks`, `conditions` |
 | 5 | Server side functions built with the `KRPC.Expression` API: streams, events and runs | `functions`, `function-types` |
 | 6 | A compiler from JavaScript functions to server side functions | — |
@@ -326,6 +327,27 @@ export type VesselSituation = EnumValue<"SpaceCenter.VesselSituation">;
   contain a literal so Sphinx does not look them up. The 8 API examples have JavaScript versions,
   type-checked by `//doc:check-scripts-js`, which runs without `strictNullChecks` as the Python
   check ignores optional access.
+
+### Phase 3b: importable types
+
+The generated modules follow the [Python declarations](python-declarations.md): enumerations,
+structures and exceptions become real values, and classes and services stay declarations. A
+default argument then needs no connection:
+
+```js
+import { SpaceCenter } from "@krpc-org/krpc";
+
+function setMode(vessel, mode = SpaceCenter.SASMode.prograde) { ... }
+```
+
+- **Generated values.** Each module exports its enumerations, with their `EnumValue`s, and its
+  structure and exception classes. The modules no longer compile to empty modules.
+- **One class per type where the definitions match**, by the rule in
+  [python-declarations.md](python-declarations.md#one-class-per-type-where-the-definitions-match).
+  The connection uses the module's enumeration, structure or exception where the server's
+  definition matches, so `===` and `instanceof` work on imported types. Otherwise it builds its
+  own, and `equals` compares service, name and value.
+- **Classes and services** are unchanged: declarations, built per connection.
 
 ### Phase 6: function compiler
 

@@ -105,10 +105,9 @@ protocol ([protocol-version.md](protocol/protocol-version.md#what-is-versioned))
 to either bumps the protocol version. An addition the runtime relies on is a handshake feature, so
 a client released before a game, or after it, still connects.
 
-* **Which clients have stubs.** C#, C++, C-nano and Java compile against generated stubs. Python
-  loads its generated stubs when present and builds the other services at connect time, so its stub
-  packages add types and IDE completion. Lua builds every service at connect time, and gains stub
-  packages if pre-generated Lua stubs land ([#1201](https://github.com/krpc/krpc/issues/1201)).
+* **Which clients have stubs.** C#, C++, C-nano and Java compile against generated stubs. Python,
+  Lua and JavaScript build every service at connect time, so their stub packages add types and IDE
+  completion ([python-declarations.md](python-declarations.md), [lua-type-hints.md](../issues/lua-type-hints.md)).
 * **A new game API reaches users the day the mod ships**, with no client release.
 * **A game release publishes every client's stubs**, under the game's version. A language whose
   stubs did not change still gets the new version.
