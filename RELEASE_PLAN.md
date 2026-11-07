@@ -244,6 +244,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | 🚧 | Principia support; phase 1 shipped as a docs page, phases 2 and 3 wait on upstream | [#767](https://github.com/krpc/krpc/issues/767) | feature, mods, service, ksp | [services/principia-service.md](design/services/principia-service.md) |
 | ⬜ | MechJeb2 and Kerbal Engineer Redux services | [#288](https://github.com/krpc/krpc/issues/288) | feature, mods, service, ksp | — |
 | ⬜ | Raster Prop Monitor integration and camera views | [#375](https://github.com/krpc/krpc/issues/375), [#424](https://github.com/krpc/krpc/issues/424) | feature, mods, service, ksp | — |
+| ⬜ | Index of mod integrations: existing work, plus SCANsat, Kerbalism, Near Future Solar and compatibility checks | **To file**: [mod-integrations-index.md](issues/mod-integrations-index.md) | feature, mods, service, ksp | — |
 | ⬜ | Vessel state and staging prediction; parts may be covered by the stage API | [#311](https://github.com/krpc/krpc/issues/311) | feature, service, ksp | — |
 | ⬜ | Lua: documentation for the dynamically built services | [#1182](https://github.com/krpc/krpc/issues/1182) | enhancement, client, docs, lua | — |
 | ⬜ | Lua: pre-generated service stubs, LuaCATS annotations first | [#1201](https://github.com/krpc/krpc/issues/1201) | feature, client, lua | — |
