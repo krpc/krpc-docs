@@ -225,6 +225,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | | Feature | GitHub | Labels | Design doc |
 | --- | --- | --- | --- | --- |
 | ⬜ | MicroPython client, for boards such as the Raspberry Pi Pico; first check that generated stubs fit | **To file**: [micropython-client.md](issues/micropython-client.md) | feature, client, tools | — |
+| ⬜ | Custom transports in every client, as C-nano has | **To file**: [client-custom-transports.md](issues/client-custom-transports.md) | feature, client, python, cpp, csharp, java, lua | — |
 | ⬜ | Per-client receive patience | **To file**: [recv-patience.md](issues/recv-patience.md) | feature, server | [server/recv-timeout-cliff.md](design/server/recv-timeout-cliff.md) |
 | 🚧 | RemoteTech API bindings and KAC alarm actions | **To file**: [remotetech-kac-api.md](issues/remotetech-kac-api.md) | feature, mods, service, ksp | [services/kac-remotetech-tests-and-api.md](design/services/kac-remotetech-tests-and-api.md) |
 | ⬜ | InfernalRobotics input linking and sun tracking | **To file**: [infernal-robotics-input-linking.md](issues/infernal-robotics-input-linking.md) | feature, mods, service, ksp | [services/infernal-robotics-input-linking.md](design/services/infernal-robotics-input-linking.md) |
