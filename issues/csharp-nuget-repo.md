@@ -20,3 +20,30 @@ Proposal:
 `KRPC.Client` compiles against Protobuf's `netstandard2.0` asset, while its .NET 10 tests must load the `net8.0` one, as a NuGet consumer does. Check the tests' `deps.json` after the switch. #1230 keeps this right with an `import_library` that splits the compile-time and run-time assets.
 
 Follows #1230, which moves `KRPC.Client` to `netstandard2.0`, so that both the client and its .NET 10 tests import Google.Protobuf.
+
+## Implementation Notes
+
+A trial of this proposal builds and passes `//:test` on Linux. It departs from the proposal in these places:
+
+- **`KRPC.Client` keeps the split import.** A `@paket.main//google.protobuf` label gave the client's .NET 10 tests the `netstandard2.0` asset, plus System.Memory, System.Buffers, System.Numerics.Vectors and Unsafe. rules_dotnet resolves a package at the framework of the target that depends on it, and `deps.json` keeps the first entry per name and version. It has no compile-only dependency. `Google.Protobuf.netstandard2.0` therefore stays, and takes its files from the `@nuget.*` repos. With it, the client tests' `deps.json` matches the one before the switch.
+- **System.Memory and Unsafe stay hand-listed for the client.** They are `refs` of that import, so the second cost above remains for this one target. Every other hand-listed dependency is gone, such as Castle.Core under Moq.
+- **NDesk.Options stays an `http_archive` and an `import_dll`.** Its assembly sits directly under `lib/`, which `nuget_archive` skips, so the generated target has no assembly. The `.csproj` hint paths and `tools/release/genfiles.py` keep their paths as a result. A follow-up replaces NDesk.Options with System.CommandLine, which `nuget_repo` handles, and that removes this exception. The same follow-up replaces Newtonsoft.Json with System.Text.Json.
+- **rules_dotnet needs a patch.** `_create_rid_native_select` keeps the `_._` placeholders that the TFM selects drop. Each `runtime.*.System.IO.Ports` package holds one per RID, so a binary fails with conflicting actions on `runtimes/<rid>/native/_._`. The fix is one line, applied with `single_version_override`.
+
+Other details from the trial:
+
+- **The lock uses `strategy: min`.** NuGet takes a dependency's lowest allowed version, and Paket takes the highest by default.
+- **Moq and System.IO.Ports are restricted to `net10.0`.** Without that, Moq's dependencies raise Unsafe to 6.1.2 for `netstandard2.0`. `KRPC.Client` still references System.Memory 4.0.1.1 with the restriction, the version a .NET Framework program gets from NuGet.
+- **Paket comes from a `tools` group in the same file.** It is 10.0.0-alpha011, the version rules_dotnet's `paket2bazel` builds on. `//tools/build/dotnet:update` runs it and `paket2bazel` on Bazel's .NET toolchain. Two runs in a row give identical files.
+- **`deps.json` changes are small.** `KRPC.Core.Test` gains System.Diagnostics.EventLog through Castle.Core. Binaries using System.IO.Ports gain empty entries for the native packages.
+- **The native shim no longer depends on one hand-written RID.** The old import selected only `linux-x64`. Only `linux-x64` has been run.
+
+## Open Questions
+
+- **Is the split import acceptable, or worth fixing upstream?** Removing it needs a compile-only dependency in rules_dotnet, or asset selection at the framework of the binary. A local wrapper rule was rejected: an empty runtime entry for Protobuf would win the first-entry rule in `deps.json`.
+- **How should Protobuf's version stay in step?** It now appears in `paket.dependencies`, `use_repo` in `MODULE.bazel`, the split import and the `nuget_package` target. A missed `use_repo` or label fails the build. A missed version string in the import or in `nuget_package` builds without an error.
+- **Should the two rules_dotnet problems be reported upstream?** The patch can go once a release has the fix. The `lib/` behavior may be intended.
+- **Should a test check the generated files against `paket.lock`?** No check catches a hand edit or a missed regeneration, unlike `:requirements_test` for Python. The check needs network access, or a comparison that does not run Paket.
+- **Is an alpha Paket acceptable?** It only runs on an update, and nothing it produces ships beyond the lock file.
+- **Does Windows work?** This has not been run on Windows. Check the path lengths of repos such as `+main_extension+nuget.runtime.maccatalyst-arm64.runtime.native.system.io.ports.v10.0.14`, and that the `win-x64` tools get the Windows build of `System.IO.Ports.dll`. `//tools/build/dotnet:update` has only run on Linux.
+- **Should the `//tools/build/ksp` Protobuf move too?** It stays an `http_archive` at 3.10.1, as proposed. A second Paket group could hold it, which has not been tried.
