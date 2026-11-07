@@ -156,8 +156,8 @@ Each phase merges on its own. Milestone `ksp-v0.8.0`.
 | `.pyi` files only | No run time import, so `def f(mode=SASMode.prograde)` has no equivalent. This is the design #703 moved away from |
 | Add a server's extra enumeration values to the generated class | Changes a class shared by every client, based on one connection |
 | Declarations as base classes of built classes | Members the server lacks appear to exist |
+| A warning at connect when the server's definitions differ from the modules, by a hash per service from `clientgen` | The program runs correctly, and only static checking is out of date |
 
 ## Open Questions
 
- * **Strict mode.** An opt-in warning at connect when the server's definitions differ from the modules. The client cannot read types back from the modules cheaply, so it needs a hash per service from `clientgen`, compared with a hash of the server's definitions. Left for later, as the program still runs correctly and only static checking is out of date.
  * **Lua.** [#1201](https://github.com/krpc/krpc/issues/1201) proposes annotations, then runtime stubs "as the Python stubs do". The JavaScript client's [phase 3](javascript-client.md) is already declarations plus built services. This design suggests dropping the second step for Lua.
