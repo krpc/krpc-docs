@@ -196,6 +196,8 @@ conformance suite, and the scanner rules build on #1237.
 | ✅ | Lua API docs on sphinx-lua-ls, when luadomain breaks on a Sphinx bump | [#1202](https://github.com/krpc/krpc/issues/1202), fixed by #1252 | enhancement, client, docs, lua | — |
 | ⬜ | Move krpctest into krpctools, as a game-agnostic in-game test runner | **To file**: [krpctest-in-krpctools.md](issues/krpctest-in-krpctools.md) | enhancement, tools | [ksa/build-and-test-tools.md](design/ksa/build-and-test-tools.md) |
 | ⬜ | Scanner rules for service, type, parameter and enumeration value names, the C++ helper names, and reserved names | **To file**: [clientgen-qualified-names.md](issues/clientgen-qualified-names.md) | enhancement, server | [protocol/service-definition-rules.md](design/protocol/service-definition-rules.md) |
+| ⬜ | Clients: calls that cannot go in a server side function | **To file**: [calls-a-function-cannot-make.md](issues/calls-a-function-cannot-make.md) | enhancement, client, tools | — |
+| ⬜ | Clients: check whether a per-element function needs a real instance | **To file**: [call-with-arguments-template.md](issues/call-with-arguments-template.md) | question, client | [server-side-functions/server-side-functions.md](design/server-side-functions/server-side-functions.md) |
 
 ## 1.0: remaining protocol improvements, server side function follow-ups
 
@@ -289,9 +291,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | Python: Ctrl-C during a call on Windows, with the single connection | **To file**: [python-ctrl-c-windows.md](issues/python-ctrl-c-windows.md) | bug, client, python | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | ⬜ | Python: trim client frames from server error tracebacks | **To file**: [python-traceback-trim.md](issues/python-traceback-trim.md) | enhancement, client, python | — |
 | ⬜ | Clients: use `Connection` for the entry point in every client | **To file**: [client-class-names.md](issues/client-class-names.md) | enhancement, client | — |
-| ⬜ | Clients: calls that cannot go in a server side function | **To file**: [calls-a-function-cannot-make.md](issues/calls-a-function-cannot-make.md) | enhancement, client, tools | — |
 | ⬜ | C-nano: follow-ups to server side functions: generated functions, heap use, header opt-out, examples, testee cleanups | **To file**: [cnano-functions-follow-ups.md](issues/cnano-functions-follow-ups.md) | enhancement, client, cnano | — |
-| ⬜ | Clients: check whether a per-element function needs a real instance | **To file**: [call-with-arguments-template.md](issues/call-with-arguments-template.md) | question, client | [server-side-functions/server-side-functions.md](design/server-side-functions/server-side-functions.md) |
 | ⬜ | C#: keep the `.csproj` package versions in step with the Bazel lock files; follows the `nuget_repo` import | **To file**: [csproj-package-versions.md](issues/csproj-package-versions.md) | enhancement, build | — |
 
 ### Negative results
