@@ -9,6 +9,6 @@ Add a test under the `functions` and `skipped-arguments` profiles, for each of a
 * `OptionalArguments` called with `a, skip, c`, through `call_function` and `run_function`, returns `afoocnull`.
 * Skipping `x`, which has no default and cannot hold null, raises the argument error when the call is built.
 
-`call_function` passes `values.skipped()` through as it stands. Lua is the only client with the `skipped-arguments` profile. The test waits on the Lua half of #1267.
+`call_function` passes `values.skipped()` through as it stands. Lua is the only client with the `skipped-arguments` profile.
 
 Related: [conformance-coverage-gaps.md](conformance-coverage-gaps.md).

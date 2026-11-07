@@ -8,10 +8,10 @@ This issue indexes the mod support that is planned or worth considering. Each op
 | --- | --- | --- | --- |
 | MechJeb2 | 36k | #288 | The third-party [kRPC.MechJeb](https://genhis.github.io/KRPC.MechJeb) service already exists. Decide whether to link, adopt or replace it. |
 | Kerbal Engineer Redux | 1.92M | #288 | `Vessel.DeltaV` and `Stage` already cover delta-v. Find which stats are missing, and split this from MechJeb2. |
-| Trajectories | 1.11M | PR #1253 | In review. |
+| Trajectories | 1.11M | PR #1253 | Merged. |
 | Principia | not on CKAN | #767 | Phase 1 shipped as a docs page. Phases 2 and 3 wait on upstream. |
 | Raster Prop Monitor | 2.05M | #375, #424 | The count likely includes installs as a dependency of IVA packs. |
-| IndividualRCS | - | PR #1245 | Blocked on whether the patch joins KSPModdingLibs/KSPCommunityPartModules#29. |
+| IndividualRCS | - | PR #1245 | Merged. |
 | RemoteTech, Kerbal Alarm Clock | 689k, 1.33M | [`#<remotetech-kac-api>`](remotetech-kac-api.md) | Complete the existing services. |
 | Infernal Robotics | - | [`#<infernal-robotics-input-linking>`](infernal-robotics-input-linking.md) | Input linking and sun tracking. |
 | Procedural Fairings, DockingCamera, LIDAR | 1.19M (Procedural Fairings) | [`#<mod-compat-tests>`](mod-compat-tests.md) | Existing integrations with no in-game tests. |

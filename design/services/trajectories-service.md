@@ -1,7 +1,7 @@
 # KSPTrajectories service for kRPC
 
-**Status:** in progress, not scheduled. An outside contributor opened
-[PR #1253](https://github.com/krpc/krpc/pull/1253), in review. No issue.
+**Status:** done, in [PR #1253](https://github.com/krpc/krpc/pull/1253) from an outside contributor.
+No issue.
 
 ## Context
 

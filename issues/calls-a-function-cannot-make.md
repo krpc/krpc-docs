@@ -11,9 +11,9 @@ Every client still lets a program build a `ProcedureCall` for these, and the pro
 | Client | How a program gets the call | Other use of the call |
 | --- | --- | --- |
 | C++ | A generated `_call` for each procedure, 163 of them for `KRPC` | None known, as `_stream` builds its own call |
-| C-nano | A generated `_call` for each procedure, 163 of them for `KRPC` once #1267 lands, 150 of those on `Expression` and `Type` | None, as the client has no streams |
+| C-nano | A generated `_call` for each procedure, 163 of them for `KRPC` since #1267, 150 of those on `Expression` and `Type` | None, as the client has no streams |
 | Python, C#, Java | `get_call` or `GetCall` at run time | `add_stream` takes the same call, and `KRPC.AddStream` has no such rejection |
-| Lua | `get_call` at run time, once #1267 lands | None, as the client has no streams |
+| Lua | `get_call` at run time, since #1267 | None, as the client has no streams |
 
 The generated functions cost the most where they can never succeed. `krpc_KRPC_Expression_Add_call` reads as a supported way to embed a call, and its comment says it fills in a call to pass to `krpc_KRPC_Expression_Call`. The `_call` functions add about 2,200 lines to the C-nano `KRPC` header.
 

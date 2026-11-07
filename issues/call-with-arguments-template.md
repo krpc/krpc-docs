@@ -34,8 +34,8 @@ The server needs no instance in the call. The Python and C# function compilers b
 | --- | --- |
 | Python, C#, Java | `get_call` or `GetCall`, which takes an instance |
 | C++ | A generated `_call` member of an instance |
-| C-nano | A generated `_call` function for each procedure, once #1267 lands |
-| Lua | `get_call`, once #1267 lands |
+| C-nano | A generated `_call` function for each procedure, since #1267 |
+| Lua | `get_call`, since #1267 |
 
 A program can build the message by hand with the internal procedure name, such as `Engine_get_HasFuel`. No guide describes this.
 
