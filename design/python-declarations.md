@@ -171,6 +171,8 @@ Each phase merges on its own. Milestone `ksp-v0.8.0`.
 
 ### Phase 2: Client and clientgen
 
+One pull request, with a commit per item. The stubs are the modules being replaced, so the items do not ship apart.
+
  * Generate the modules, with their registration and client type, and the lookup and comparison above. Regenerate the goldens.
  * `connect[T]` on each connect function.
  * Fix the testee's `is_service`, and remove the `test_exposed_members[services]` line from `expected-failures.txt`.
