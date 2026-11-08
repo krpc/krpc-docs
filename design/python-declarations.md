@@ -78,6 +78,7 @@ A built enumeration is a different class from the imported one, so `dyn.prograde
 | No module | One built for this client | As today for a mod's service |
 
  * An enumeration matches on its names and values, and a structure on its field names in order. Field types always come from the server's definition, as they do today.
+ * An exception matches on its name, as its definition holds nothing else. A server error then raises the generated class, so `except` works with an imported exception.
  * These classes hold no client, so sharing them brings back none of the stub defects.
  * A generated class is never altered to fit a server. That would change a class every client shares, based on one connection.
  * A structure already accepts any tuple of the right length.
