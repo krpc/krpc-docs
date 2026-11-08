@@ -1,11 +1,14 @@
 # Move krpctest into krpctools, as a game-agnostic in-game test runner
 
+**Status:** done, merged as [PR #1299](https://github.com/krpc/krpc/pull/1299). KSA, under
+[Later](#later), is still open. See [As built](#as-built) for where the work diverged.
+
 `krpctest` runs kRPC's service tests against a live game. It launches the game, installs the mod
 and the test add-on, connects, and gives tests a `TestCase` with game helpers. No release has
 published it. As written, it cannot work outside a kRPC checkout, so a published package would
 fail on first use.
 
-Design: [build-and-test-tools.md](https://github.com/krpc/krpc-docs/blob/main/design/ksa/build-and-test-tools.md), "In-game test harness"
+Design: [build-and-test-tools.md](../ksa/build-and-test-tools.md), "In-game test harness"
 
 The goal is one package, `krpctools`, that holds every kRPC tool and is versioned with the
 release. `krpctest` moves into it, split into a game-agnostic core and one extension per game.
@@ -61,7 +64,7 @@ fits without changes to the core.
   - KSP takes the newest `ksp-v*` release from GitHub, the archive CKAN also points at.
   - KSA takes the newest `ksa-v*` release from GitHub, the archive Borea and SpaceDock also list.
   - The newest tag on the train, never `releases/latest`, which spans every train
-    ([releases.md](https://github.com/krpc/krpc-docs/blob/main/design/releases.md)).
+    ([releases.md](../releases.md)).
 - **The supported third-party mods ship in krpctools**, in `krpctools/game/ksp/mods.py`. Each
   definition holds its archive URLs and hashes, its dependencies and its presence check, so a mod
   author testing against FAR writes none of it.
@@ -155,3 +158,16 @@ The first is the direction.
 
 - **KSA, at 1.0.** Add `krpctools.game.ksa` with `KSA(Game)` and its test add-on, and port
   `experimental/ksa/test/ksatest.py` onto it.
+
+## As built
+
+PR #1299 landed phases 1 to 4 as one pull request. It differs from the direction above in these
+places:
+
+| Area | As built |
+| --- | --- |
+| kRPC version | No `--krpc-version`. The default release is a pin a genrule writes from `config.bzl`, the version the bundled add-on is built against. Another release takes the krpctools built for it. `--krpc` gives an archive |
+| Release lookup | The KSP train also takes the bare `v*` tags from before the trains split. A version matches exactly. The lookup is retried and cached with the downloads |
+| Mod layout | `krpctools/game/ksp/mods/` holds the definitions in `__init__.py` and the config overlays beside them |
+| Options | `--skip-install-check`, `--skip-mod-install`, `--address` and `--no-launch` replace the `KRPC_TEST_` variables |
+| Repository runners | `tools/game/`, with `//tools/game:test-ksp` and `//tools/game:run-ksp` in place of `//:test-ingame` and `//:run-ksp`, so KSA can add `test-ksa` and `run-ksa` |

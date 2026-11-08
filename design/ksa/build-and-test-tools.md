@@ -36,9 +36,8 @@ install. The KSA prototype has its own `ksatest.py` with the same shape.
 
 * **`--no-launch` and test selection work the same** for both games.
 * **KSA has no mod sets yet.** Its backend installs StarMap and kRPC only.
-* **`krpctest` is not published.** It installs the mod by building it with Bazel, so it runs only
-  from a kRPC checkout. Moving it into `krpctools`, configured per game, is drafted in
-  [krpctest-in-krpctools.md](../../issues/krpctest-in-krpctools.md).
+* **The harness is `krpctools.game`**, a game-agnostic core with one extension per game, moved out
+  of `krpctest` by PR #1299. See [krpctest-in-krpctools.md](../build-tools/krpctest-in-krpctools.md).
 
 ## Service lists
 
