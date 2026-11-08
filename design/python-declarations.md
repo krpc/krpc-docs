@@ -171,8 +171,8 @@ Each phase merges on its own. Milestone `ksp-v0.8.0`.
 
 ### Phase 2: Client and clientgen
 
- * Generate the modules, with their registration and client type, and the lookup and comparison above.
- * `connect[T]` on each connect function. Regenerate the goldens.
+ * Generate the modules, with their registration and client type, and the lookup and comparison above. Regenerate the goldens.
+ * `connect[T]` on each connect function.
  * Fix the testee's `is_service`, and remove the `test_exposed_members[services]` line from `expected-failures.txt`.
  * Build every service from `GetServices`, and remove what is listed under [What Goes](#what-goes).
  * Remove `:conformance-base` and the other base targets.
@@ -180,7 +180,10 @@ Each phase merges on its own. Milestone `ksp-v0.8.0`.
    * The definitions of an enumeration and a structure differing from the module, as conformance runs only the matching case for `TestService` and the no-module case for `ConformanceService`.
    * Each declaration's signature against the service built from the same definitions, as the drift test.
  * Update service tests and tools that call a static method on an imported class.
- * Changelog `client/python`: "**Breaking:** Remove `use_pregenerated_stubs`, as services are always built from the server's definitions (#NNN)".
+ * Changelog `client/python`:
+   * "**Breaking:** Remove `use_pregenerated_stubs`, as services are always built from the server's definitions (#NNN)"
+   * "**Breaking:** Calling a static method on a class imported from `krpc.services` raises a `TypeError` (#NNN)"
+   * "Add `connect[T]`, a connection typed with a mod's services (#NNN)"
 
 ### Phase 3: Docs
 
