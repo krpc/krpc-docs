@@ -157,8 +157,9 @@ Measured with the definitions of all 11 shipped services (2,419 procedures) and 
 | `import krpc` | About 130 ms with stubs, about 145 ms without |
 | A call, excluding the network | About 89 ns built, 136 ns stub |
 | Conformance with no stubs in the runfiles | 588 passed, 3 failed. The failures were test setup, fixed by [#1298](https://github.com/krpc/krpc/pull/1298), which gives 591 passed |
+| In-game tests on built services | 686 passed, 0 failed: 17 `SpaceCenter` files, all of `UI` and `Drawing` |
 
-The in-game tests have not run on built services, and exceptions were not prototyped.
+Exceptions were not prototyped.
 
 ## Plan
 
@@ -166,12 +167,12 @@ Each phase merges on its own. Milestone `ksp-v0.8.0`.
 
 ### Phase 1: Evidence and conformance
 
- * [#1298](https://github.com/krpc/krpc/pull/1298), in review: make `:conformance-base` run with no stubs.
- * Run a subset of the in-game tests with `use_pregenerated_stubs=False`, covering `SpaceCenter`, `UI` and `Drawing`. Failures here change the plan.
+ * Done: [#1298](https://github.com/krpc/krpc/pull/1298) makes `:conformance-base` run with no stubs.
+ * Done: a subset of the in-game tests with `use_pregenerated_stubs=False`, covering `SpaceCenter`, `UI` and `Drawing`. All passed, so the plan stands.
 
 ### Phase 2: Client and clientgen
 
-One pull request, with a commit per item. The stubs are the modules being replaced, so the items do not ship apart.
+One pull request, with a commit per item. The stubs are the modules being replaced, so the items do not ship apart. The docs are in it too, as a change updates the pages it makes false.
 
  * Generate the modules, with their registration and client type, and the lookup and comparison above. Regenerate the goldens.
  * `connect[T]` on each connect function.
@@ -185,13 +186,20 @@ One pull request, with a commit per item. The stubs are the modules being replac
  * Changelog `client/python`:
    * "**Breaking:** Remove `use_pregenerated_stubs`, as services are always built from the server's definitions (#NNN)"
    * "**Breaking:** Calling a static method on a class imported from `krpc.services` raises a `TypeError` (#NNN)"
-   * "Add `connect[T]`, a connection typed with a mod's services (#NNN)"
+   * "Add `connect[T]` and `connect_local[T]`, which connect with a client type a generated module declares, such as `krpc.connect[MyModClient]()` for a mod's service (#NNN)"
 
-### Phase 3: Docs
+Docs:
 
  * `python.rst`: replace "Service Stubs" with type checking, importing types, and what a mismatch does.
  * `client-design/python.rst`: replace "Pre-Generated and Dynamic Services". `client-design.rst`: the "Service stubs" column.
  * `extending/extending-other-services.rst` and `extending/clientgen.rst`: a mod's members work at run time, and a mod's generated module gives type hints and shared types when imported before connecting. `python.rst` shows `connect[T]`.
+
+### Phase 3: Follow-ups
+
+Each a pull request stacked on phase 2, merged in turn.
+
+ * Type the function compiler's expressions. The `KRPC.Expression` declaration is typed, unlike the stub's `StaticMethod`, which shows the places where a value was looser than the call it reached.
+ * Conformance: split a `definitions` profile out of `dynamic`, for building the services at connect, and add a `declarations` profile for the generated types. Python has both, and Lua takes `declarations` with [lua-type-hints.md](../issues/lua-type-hints.md).
 
 ## Alternatives Considered
 

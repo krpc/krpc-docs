@@ -12,6 +12,7 @@ Notes:
 - A mod's members work at run time, and a module out of date with the server affects only type checking.
 - The annotations are comments, so the modules load on Lua 5.1 to 5.4 and LuaJIT.
 - `clientgen` gains `clientgen-*-lua.txt` golden files, as for the other languages.
+- With step 2, the Lua client takes the conformance `declarations` profile, which Python has.
 - The planned JavaScript client takes the same approach.
 - Related: #1182 gives the built classes their documentation, for interactive help. #1202 moves the Lua API docs to sphinx-lua-ls, which can also read these annotations.
 

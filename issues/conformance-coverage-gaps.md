@@ -8,7 +8,6 @@ Each gap below was checked against `client/conformance/tests/`. Where a client i
 
 | Test | Gap | Effect |
 |---|---|---|
-| `test_objects.py::test_static_method_through_an_object_connection` and the other `two_connections` tests | They use `ConformanceService`, which has no generated stubs | Python's shared stub classes are never reached, and a static method through an object binds to the first client |
 | `test_calls.py::test_abandoned_id`, `test_concurrency.py::test_interrupted_wait` | `error()` is called with no check of the kind | A wrong error type passes |
 | `test_connection.py::test_close_twice` | Checks only that no error is raised | C-nano closes the descriptor twice and ignores `EBADF` |
 | `test_values.py::test_structure_equality` | Lua lists the test with no parameters, for its enum field | The other fields go unchecked on Lua |
@@ -49,7 +48,6 @@ These state behavior the spec already implies:
 These are one client's own API, so they belong in `client/<client>/test`:
 
  * C-nano: reusing a result variable, the length of bytes returned in a caller's buffer, the `KRPC_CHECK` modes, and a small `KRPC_BUFFER_SIZE`.
- * Python: passing an object between a client with stubs and one without.
  * C#: a static method's exception types on a connection with no service object.
 
 ## Other Conformance Work
@@ -65,5 +63,4 @@ This issue also tracks the other open conformance work. Each item has its own is
 | [conformance-serial-settle-time.md](conformance-serial-settle-time.md) | Wait for the serial link instead of a fixed second | Driver |
 | [conformance-wait-until-polls.md](conformance-wait-until-polls.md) | Wake waits on the testee's notifications | Driver |
 | [conformance-self-removing-callback.md](conformance-self-removing-callback.md) | A driver helper for a callback that runs a command on itself | Driver |
-| [#1298](https://github.com/krpc/krpc/pull/1298) | Run Python's `:conformance-base` with no stubs. [python-declarations.md](python-declarations.md) then removes the stub path, and the `two_connections` row above with it | Build and tests |
 | [conformance-skipped-arguments-get-call.md](conformance-skipped-arguments-get-call.md) | Skipped arguments in a call built for a server side function | Tests |
