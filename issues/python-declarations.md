@@ -8,6 +8,6 @@ Replace them with one implementation:
  * **`clientgen` writes importable `.py` modules for type checking.** Enumerations, structures and exceptions are real classes, so `def f(mode=SASMode.prograde)` needs no connection. Classes and services are declarations whose bodies raise a `TypeError` naming the fix.
  * **Types match by definition.** Where the server's definition matches the module, the client uses the generated class, so `==`, `is` and `isinstance` work on imported types. Otherwise it builds its own, and `==` compares service, name and value.
 
-This is a breaking change for 0.8. The conformance prerequisite is #<conformance-python-no-stubs>. It also replaces the Python part of #1195.
+This is a breaking change for 0.8. The conformance prerequisite is #1298. It also replaces the Python part of #1195.
 
 Design: `design/python-declarations.md` in the planning repo.

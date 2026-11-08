@@ -123,7 +123,7 @@ Measured with the definitions of all 11 shipped services (2,419 procedures) and 
 | Building every service | About 130 ms at connect |
 | `import krpc` | About 130 ms with stubs, about 145 ms without |
 | A call, excluding the network | About 89 ns built, 136 ns stub |
-| Conformance with no stubs in the runfiles | 588 passed, 3 failed. The failures are test setup, see [conformance-python-no-stubs.md](../issues/conformance-python-no-stubs.md) |
+| Conformance with no stubs in the runfiles | 588 passed, 3 failed. The failures were test setup, fixed by [#1298](https://github.com/krpc/krpc/pull/1298), which gives 591 passed |
 
 The in-game tests have not run on built services, and exceptions were not prototyped.
 
@@ -133,7 +133,7 @@ Each phase merges on its own. Milestone `ksp-v0.8.0`.
 
 ### Phase 1: Evidence and conformance
 
- * [conformance-python-no-stubs.md](../issues/conformance-python-no-stubs.md): make `:conformance-base` run with no stubs.
+ * [#1298](https://github.com/krpc/krpc/pull/1298), in review: make `:conformance-base` run with no stubs.
  * Run a subset of the in-game tests with `use_pregenerated_stubs=False`, covering `SpaceCenter`, `UI` and `Drawing`. Failures here change the plan.
 
 ### Phase 2: Client and clientgen
