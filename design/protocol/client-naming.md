@@ -83,6 +83,10 @@ Some clients put services on an object of their own, beside its members:
 
 The [reserved names](service-definition-rules.md#reserved-names) keep services off these members.
 
+The Python client does not check this itself. `Client._load_services` sets each service with
+`setattr(self, snake_case(service.name), ...)`, so a server whose definitions break the rule, such
+as a service named `Close` or `Stream`, replaces the `Client` method of that name.
+
 ## Tests
 
 The `TestService` fixtures in `tools/TestServer/src/TestServiceNames.cs` hold names each client
