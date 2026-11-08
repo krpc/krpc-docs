@@ -29,7 +29,7 @@ Each use case then works with no choice to make:
 | Use case | Result |
 |---|---|
 | Type hints | The generated modules, which assume the server matches |
-| A mod with its own service | Built at connect. Type checkers do not know it |
+| A mod with its own service | Built at connect. Type checkers know it through a module from `clientgen` |
 | A mod adding members to a shipped class | The members exist at run time. Type checkers do not know them |
 | A server of another version | The services match the server. Type checkers see the client's version |
 
@@ -65,18 +65,20 @@ class ReferenceFrame(metaclass=DeclaredClass):
  * **The error is the one [static-method-binding.md](static-method-binding.md) decided.** It is a `TypeError` naming the fix: reach the class through a connection, as `conn.space_center.ReferenceFrame`.
  * **Built classes do not inherit from declarations.** A member the declaration has and the server lacks would otherwise appear to exist.
  * **`DeclaredClass` compares names.** `isinstance` and `issubclass` compare the service and class names of the built class and its bases, which also suits [inheritance](protocol/inheritance.md). Calling a declaration raises the same `TypeError`.
- * **`krpc/services/__init__.py` stays, reduced.** It declares the attributes of `Client` for type checkers, and lists the modules. At run time a client has an attribute only for each service the server has.
+ * **`krpc/services/__init__.py` stays, reduced.** It declares the attributes of `Client` for type checkers, and imports the modules so they register. At run time a client has an attribute only for each service the server has.
 
 ### One class per type where the definitions match
 
-A built enumeration is a different class from the imported one, so `dyn.prograde == imported.prograde` is false and `coerce_to` raises `ValueError`. At connect, the client therefore looks up each enumeration, structure and exception in the generated module:
+A built enumeration is a different class from the imported one, so `dyn.prograde == imported.prograde` is false and `coerce_to` raises `ValueError`. At connect, the client therefore looks up each enumeration, structure and exception in the registry of generated classes:
 
 | Definitions | Class used | Effect |
 |---|---|---|
 | Match | The generated class, shared by every client | `==`, `is` and `isinstance` work |
 | Differ | One built for this client | The server's values all work. `==` and `coerce_to` compare service, name and value. `is` is false |
-| No module | One built for this client | As today for a mod's service |
+| Not registered | One built for this client | As for a mod with no module |
 
+ * **Generated modules register their classes on import.** A module adds its enumerations, structures and exceptions to a registry in `krpc`, by service and name. A mod's module therefore works the same way as a shipped one. Import it before connecting, as a client looks only at classes registered by then.
+ * **A later registration replaces an earlier one.** `import krpc` registers the shipped modules first, so a module a user generates for a newer server takes their place. A client keeps the classes it found at connect.
  * An enumeration matches on its names and values, and a structure on its field names in order. Field types always come from the server's definition, as they do today.
  * An exception matches on its name, as its definition holds nothing else. A server error then raises the generated class, so `except` works with an imported exception.
  * These classes hold no client, so sharing them brings back none of the stub defects.
@@ -139,7 +141,7 @@ Each phase merges on its own. Milestone `ksp-v0.8.0`.
 
 ### Phase 2: Client and clientgen
 
- * Generate the modules, and the lookup and comparison above. Regenerate the goldens.
+ * Generate the modules, with their registration, and the lookup and comparison above. Regenerate the goldens.
  * Fix the testee's `is_service`, and remove the `test_exposed_members[services]` line from `expected-failures.txt`.
  * Build every service from `GetServices`, and remove what is listed under [What Goes](#what-goes).
  * Remove `:conformance-base` and the other base targets.
@@ -153,7 +155,7 @@ Each phase merges on its own. Milestone `ksp-v0.8.0`.
 
  * `python.rst`: replace "Service Stubs" with type checking, importing types, and what a mismatch does.
  * `client-design/python.rst`: replace "Pre-Generated and Dynamic Services". `client-design.rst`: the "Service stubs" column.
- * `extending/extending-other-services.rst` and `extending/clientgen.rst`: a mod's members work at run time, and generating declarations is only for type checking.
+ * `extending/extending-other-services.rst` and `extending/clientgen.rst`: a mod's members work at run time, and a mod's generated module gives type hints and shared types when imported before connecting.
 
 ## Alternatives Considered
 
@@ -164,4 +166,6 @@ Each phase merges on its own. Milestone `ksp-v0.8.0`.
 | `.pyi` files only | No run time import, so `def f(mode=SASMode.prograde)` has no equivalent. This is the design #703 moved away from |
 | Add a server's extra enumeration values to the generated class | Changes a class shared by every client, based on one connection |
 | Declarations as base classes of built classes | Members the server lacks appear to exist |
+| A list of the shipped modules for the lookup | A mod's module is never found, so its types differ from the client's |
+| Entry points, `krpc.services`, for a mod's module | Order no longer matters, but a mod must ship a package in place of one file |
 | A warning at connect when the server's definitions differ from the modules, by a hash per service from `clientgen` | The program runs correctly, and only static checking is out of date |
