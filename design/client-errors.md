@@ -359,7 +359,7 @@ if (error == KRPC_ERROR_SERVER && KRPC_IS_EXCEPTION(KRPC_EXCEPTION_KRPC_ARGUMENT
 
 ### Type ids
 
-The server names an exception by its `service` and `name` strings. Comparing them would put the
+The server names an exception by its `service` and `exception` strings. Comparing them would put the
 names in flash, which [procedure-ids.md](protocol/procedure-ids.md) avoided for calls. Exceptions
 get ids by the same rule, and so do the other types of a service, so a later client or a later API
 that needs them finds them in place:
@@ -382,8 +382,10 @@ that needs them finds them in place:
   class, enumeration or structure type. clientgen never hashes.
 - **`KRPC.Error` gains `uint32 service_id = 5` and `uint32 exception_id = 6`,** 0 for an error
   with no exception.
-- **The fields are additive under protocol version 2.** The other clients ignore them, and keep
-  matching by name.
+- **`KRPC.Error.name` is renamed `exception`,** as `ProcedureCall` names its `procedure`. The
+  field number stays 2, so the wire is unchanged, and only code built from the `.proto` changes.
+- **The other fields are additive under protocol version 2.** The other clients ignore them, and
+  keep matching by name.
 - **clientgen defines the ids per exception,** as the pair `service_id, exception_id` in
   `KRPC_EXCEPTION_<SERVICE>_<NAME>`. `KRPC_IS_EXCEPTION(KRPC_EXCEPTION_...)` compares the pair
   with the last error's `service` and `exception`.
@@ -495,7 +497,7 @@ and structure, in one pull request.
 
 | Phase | Change |
 | --- | --- |
-| E0 | Type ids. The hash, the `Id` on each type attribute, the scanner's unique type names and its error for a shared or 0 id within a service. The ids in `GetServices` and `Type`, `KRPC.Error.service_id` and `exception_id` on every server error, and the servicedefs JSON. The protocol and extending docs |
+| E0 | Type ids. The hash, the `Id` on each type attribute, the scanner's unique type names and its error for a shared or 0 id within a service. The ids in `GetServices` and `Type`, `KRPC.Error.service_id` and `exception_id` on every server error, `KRPC.Error.name` renamed `exception`, and the servicedefs JSON. The protocol and extending docs |
 | E1 | Spec and testees. The categories, which situations raise which, the argument and encoding split, `StreamError` for every removal, the message rule, and no raw internal error. Tests narrowed from "encoding or argument" (`test_codec.py`, `test_values.py`), from "connection or argument" (`test_localsocket_path_too_long`), and from "a type of its own" in `test_mapped_exceptions`. A conventions section naming each client's `RemoteError` type, which the testees report in `native_types`; the Python testee reports kRPC types as well as builtins. Each testee classifies by the new types. The `TIMEOUT` kind goes, its number reserved. Clients that fail a narrowed test list it until their phase |
 | E2 | Python and C++. `RemoteError` under `RuntimeError` and `std::runtime_error`. `RPCError` renamed `ServerError`, the base of every generated exception with no native type. `FunctionCompilationError` renamed `CompilationError`. C++ mapped exceptions raised as the native type, with an alias as the generated name; Python keeps its classes. `StreamRemovedException` translated to `StreamError`. Python's encoder raises the argument error for a wrong length, a negative unsigned value and a null key or element. Python's decoding leaks wrapped. Python's `StreamError` for a function with arguments becomes `ValueError`. Python's service definition errors as in the situations table. C++'s null function result as `EncodingError` |
 | E3 | C# and Java. `RemoteException`, unchecked in Java, and `throws IOException` dropped. `RPCException` renamed `ServerException`, `FunctionCompilationException` renamed `CompilationException`, `StreamException` added in C#. The generated classes of mapped exceptions removed, except those with no native type; C#'s mapping moves to `lang/csharp.py`, for every service. C#'s "Stream has no value" and Java's connection endings and interrupts as above. The connection error during and after a call. Decoding errors as `EncodingException`, with their cause's message. C#'s mismatched function type and Java's null object id as the argument error |
