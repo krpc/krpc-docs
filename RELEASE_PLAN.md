@@ -301,11 +301,11 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 
 | | Item | Issue | Design doc |
 | --- | --- | --- | --- |
-| ⬜ | Clients: defects shared between the threaded clients | [client-design-shared-defects.md](issues/client-design-shared-defects.md) | — |
+| ⬜ | Clients: defects more than one client shares | [client-design-shared-defects.md](issues/client-design-shared-defects.md) | — |
 | ⬜ | Generate the client API references from the client sources | [client-api-reference-autodoc.md](issues/client-api-reference-autodoc.md) | — |
 | ⬜ | C#: defects found writing the design doc | [client-csharp-defects.md](issues/client-csharp-defects.md) | — |
 | ⬜ | C#: keep the `.csproj` package versions in step with the Bazel lock files; follows the `nuget_repo` import | [csproj-package-versions.md](issues/csproj-package-versions.md) | — |
-| ⬜ | C++: defects found reviewing the client lifetime change | [client-cpp-defects.md](issues/client-cpp-defects.md) | — |
+| ⬜ | C++: client defects | [client-cpp-defects.md](issues/client-cpp-defects.md) | — |
 | ⬜ | Clients: a manual ASan, UBSan and TSan run for C++ and C-nano | [sanitizer-testing.md](issues/sanitizer-testing.md) | — |
 | ⬜ | Java: defects found writing the design doc | [client-java-defects.md](issues/client-java-defects.md) | — |
 | ⬜ | Python: defects found writing the design doc | [client-python-defects.md](issues/client-python-defects.md) | — |

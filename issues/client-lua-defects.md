@@ -16,3 +16,12 @@ Each was confirmed by running it against a TestServer, except where marked as re
 * On Lua 5.1, `_encode_varint` writes `math.huge` as 2^63 - 1 for any unsigned parameter, and `_decode_varint` reads a real 2^63 - 1 as `inf`. Confirmed on Lua 5.1.
 * A `__gc` finalizer that makes a call can run between the write and the read of another call. The finalizer's call reads the wrong response, and the connection ends with `Response with an unknown id`. Confirmed with a collection forced at that point.
 * `krpc.platform.sleep` spins on `os.time()`, holds a CPU core and rounds to whole seconds. The Lua doc scripts use it with fractions such as `0.1`. Read from code.
+
+## From the parity audit and the client guide rewrite
+
+Still open from the client API parity audit (2026-07-21) and the client guide rewrite (2026-10-29), re-checked against `main` on 2026-11-09.
+
+* **The encoder does not check a value against its parameter.** An enumeration takes any number (`test_undeclared_enum_value`), a number out of its type's range is sent (`test_out_of_range[...]`), and arguments past the last parameter are dropped (`test_too_many_arguments[...]`).
+* **A `uint64` above the `sint64` range reads as negative** (`test_default_values[uint64-extremes]`), as Lua integers are signed 64-bit. This is a limit of the language, so it belongs in `unsupported.txt`, not `expected-failures.txt`. The guide's Numeric Limits note describes it.
+* **No stall timeout** (`test_stall`). The guide leaves it out until the API exists.
+* **A refusal's status and a disconnect's reason are only in the message** (`test_handshake_refused[*]`, `test_handshake_disconnect[known]`), and RPC errors carry only a message (`test_exception_name`). The guide already describes the fixed behavior.

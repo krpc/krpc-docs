@@ -140,7 +140,8 @@ Replaced by [python-declarations.md](python-declarations.md), which removes `Sta
   `ReferenceFrame.CreateRelative`.
 * The spec text of `test_static_method_connection` states the rule above: the connection comes
   from the service object or the connection argument.
-* Close #1195. Mark `python-static-method-binding` fixed in [defects.md](client-conformance/defects.md).
+* Close #1195. Remove the static method item from
+  [client-python-defects.md](../issues/client-python-defects.md).
 
 ### Phase 4: Bound classes in C#, Java and C++
 

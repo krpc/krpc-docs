@@ -6,7 +6,7 @@ to C7 and a coverage pass are built ([harness.md](harness.md) "Built in C1" to "
 [client-tests.md](client-tests.md) "Built in C6" and "Built after C6"). The PRs planned under "Pull
 requests" below merged as one, #1220. Since C7 the tests are the source of the spec's requirement
 lists. Client defects the suite finds are recorded as expected failures, and fixing them is
-follow-up work ([defects.md](defects.md), [open-items.md](open-items.md)). Facts below were
+follow-up work, in the client defects issues. Facts below were
 surveyed before the single connection (#1219) and client codegen (#1172) merged.
 
 This folder replaces three earlier docs: the conformance sketch (`client-conformance.md`), the
@@ -20,8 +20,8 @@ client testing standard (`client-testing.md`) and the client API parity audit
 | [harness.md](harness.md) | The driver, the testee protocol, the scripted server, Bazel, expected failures |
 | [test-service.md](test-service.md) | `TestService` as it stands, the changes, and the new `ConformanceService` |
 | [client-tests.md](client-tests.md) | What stays in each client's own suite, and what the suite replaces |
-| [defects.md](defects.md) | Open client defects from the audits, each with the requirement that catches it |
-| [open-items.md](open-items.md) | Client, spec and docs items found while the client guides were rewritten |
+| [defects.md](defects.md) | Client defects from the audits, the parity between clients, and the defect rulings |
+| [client-guides.md](client-guides.md) | The client guide rewrite: its decisions and the doc examples run |
 
 Generating the exception mapping and the service list is a separate piece of work that lands
 first: [client-codegen.md](../client-codegen.md). Its G1, G3 and G5 merged in

@@ -13,3 +13,13 @@ Writing the client's design doc turned up these defects. Paths are relative to `
 * Generated `fromValue` returns `null` for an undeclared value, so `Encoder.decode` gives `null` in a position that cannot hold one. The reason given for `test_undeclared_enum_result`, "holds any number", does not match. Confirmed by running.
 * `StreamManager.registered` is weak on `StreamImpl`. A thread that keeps only the condition of a removed stream, whose handle is collected, deadlocks in `close()` if a callback waits for that condition. Read from code.
 * `StreamManager` names its waker threads `kRPC stream waker`. Python and C# name theirs `krpc-waker`, and the other Java threads are `krpc-reader` and `krpc-dispatcher`. Rename it to `krpc-waker`, and update `doc/src/client-design/java.rst`. Read from code.
+
+## From the parity audit and the client guide rewrite
+
+Still open from the client API parity audit (2026-07-21) and the client guide rewrite (2026-10-29), re-checked against `main` on 2026-11-09.
+
+* **The connection error is wrapped or replaced.** The fix needs an exception design first: calls declare only the checked `RPCException`, and `ConnectionException` is an `IOException`. The guide says nothing about the connection closing until then.
+  - A call after a close, an unknown response id or a malformed size raises `RPCException`, with the `ConnectionException` as its cause (`test_call_after_end[close]`, `test_unknown_id`, `test_malformed_size`).
+  - A stream or event ended by a close or a connection failure ends with `StreamException("Connection closed")`, without the reason (`test_end_callback[connection-failure]`, `test_wake_waiter[close]`).
+* **A server that closes the socket during the handshake makes `newInstance` throw a bare `EOFException`**, not `ConnectionException` (`test_handshake_lost`). `handshake` catches only timeouts and parse errors.
+* **A stream added before any call through its service raises an untyped `RPCException`** for the service's exception, as the types are registered when a service object is made (`test_procedure_exception[first-CustomException]`).

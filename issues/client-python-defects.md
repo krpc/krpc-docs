@@ -13,3 +13,13 @@ Writing the client's design doc turned up these defects. Paths are relative to `
 * **An `ImportError` in any stub downgrades silently.** `services_init.py.tmpl` catches it around all the stub imports, so every service turns dynamic with no message.
 * **Without stubs, a service the server lacks is `None`.** `services_init.py.tmpl` swaps each stub class for a function returning `None`, and `Client.__init__` assigns the result to an attribute for every shipped service. `_load_services` replaces only the services the server has, so a call through another fails with an error about `NoneType`. Declaring these attributes and `_services` entries only when the stubs import gives an `AttributeError` naming the service. `_load_services` already handles a missing `_services` entry, and no other code reads it.
 * **A value is stored before it is announced.** A read between the reader's store and the dispatcher's announce sees the value, and the late announce then wakes a later wait. The `@flaky` entries for `test_held_stream_ending`, `test_wait_on_condition_object` and `test_spurious_wake[stream]` come from this gap.
+
+## From the parity audit and the client guide rewrite
+
+Still open from the client API parity audit (2026-07-21) and the client guide rewrite (2026-10-29), re-checked against `main` on 2026-11-09.
+
+* **Any iterable coerces to a list,** so a string passed for a list becomes a list of characters (`test_wrong_collection[string-for-list]`).
+* **Plain calls check only that an unsigned number is not negative.** `2**32+1` to a `uint32` arrives as 1. `run()` checks the range (`test_out_of_range[sint32-above]`).
+* **Ordering a remote object against another type raises `NotImplementedError`** in `ClassBase.__lt__` and the other comparisons, in place of returning `NotImplemented`.
+* **A procedure and a property with one name lose the procedure, and enumeration values that differ only in case collapse** (audit 38, 40). Not re-checked since the client naming contract (#1237).
+* **Docstrings can be lost** when a type is first built from another service (audit 48). Not re-checked.
