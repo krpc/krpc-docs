@@ -40,6 +40,7 @@ The commits are "Signal the deprecation of every member kind in every client" an
 | Struct | `[Obsolete]` | `[[deprecated]]` | `@Deprecated` | `DeprecationWarning` | `KRPC_DEPRECATED` | stderr |
 | Struct field | `[Obsolete]` | `[[deprecated]]` | `@Deprecated` | `DeprecationWarning` on read | `KRPC_DEPRECATED` | none |
 | Exception | `[Obsolete]` | `[[deprecated]]` | `@Deprecated` | `DeprecationWarning` | none | none |
+| Stream or call of a procedure | lambda warns | `_stream`, `_call` | none | `DeprecationWarning` | `_call` | stderr |
 
 Lua warns once per member on each connection. Python stubs also carry PEP 702 `@deprecated`.
 
@@ -57,6 +58,9 @@ Lua warns once per member on each connection. Python stubs also carry PEP 702 `@
 
 * **Header suppression:** generated C++ headers warned about their own deprecated types. C++ and C-nano headers now suppress the warning for their own code only, so a use in a program still warns.
 * **Enum and struct members:** a deprecated enum or struct also deprecates its values or fields.
+* **Streams and calls:** a stream, or the call built for a server side function, signals a deprecated procedure. Python and Lua warn in `get_call`, which `add_stream` and compiled functions go through. A review found this missing in every client but C#.
+* **Service marker:** a deprecated service is marked itself, on the C# extension method and `Service` class and the C++ and Java service class. Python and Lua keep it out of the client's attributes, and the attribute-miss hook warns. C-nano has no service type.
+* **Nearest reason:** a member with no reason takes its class's reason before its service's. `DeprecatedService.ReasonedClass` tests it.
 
 ### Gaps
 
@@ -65,7 +69,7 @@ Lua warns once per member on each connection. Python stubs also carry PEP 702 `@
 * **Java:** signals carry no reason, because `@Deprecated` has none.
 * **MSVC in C:** no enumerator attribute, so a plain C program gets no warning for a deprecated enum value. The conformance probe compiles as C++ on that compiler.
 * **Websockets testee:** the deprecation tests are expected failures, because it has no `DeprecationSignals` command.
-* **`_call` and `_stream`:** the C++ `_call` and `_stream` functions carry no `[[deprecated]]`. Neither do the C-nano `_call` functions from #1267. Each is a way to use a deprecated procedure with no warning.
+* **Java streams and calls:** `addStream` and `getCall` name a method in a string, so `javac` gives no note.
 
 ### Verification
 
