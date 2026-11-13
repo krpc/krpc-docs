@@ -17,6 +17,7 @@ carry, and keeps a KSA change from paying for KSP work it does not touch.
 | --- | --- |
 | [server.md](server.md) | The StarMap mod: tick hook, settings file, server window, `core` workarounds |
 | [api-coverage.md](api-coverage.md) | The `KSA` service: its rules, gaps against KSP's services, and the phases that fill them |
+| [api-v2026.11.10.md](api-v2026.11.10.md) | `KSA` service additions for game build 2026.11.10.5801: atmosphere, life support, kitten condition, EVA supplies |
 | [grpc.md](grpc.md) | An in-process gRPC server, unary calls now and streams after 0.8 |
 | [repo-layout.md](repo-layout.md) | Monorepo or split, the directory layout, the Bazel build of the KSA mod |
 | [build-and-test-tools.md](build-and-test-tools.md) | In-game test harness, `run-<game>`, servicedefs, clientgen and docgen service lists |
