@@ -1,6 +1,6 @@
 # Mod integration framework
 
-**Status:** in progress, for 0.8. Phases 1 to 3 implemented, not yet merged. The rest is a proposal
+**Status:** in progress, for 0.8. Phases 1 to 4 implemented, not yet merged. The rest is a proposal
 (2026-11-12), updated as each phase is built. Issue:
 [mod-integration-framework.md](../../../issues/mod-integration-framework.md).
 
@@ -348,9 +348,9 @@ True
 | SpaceCenter | `<Mod>Available` for each mod it supports, such as `FARAvailable` and `RealChuteAvailable` |
 
 * **`Available` is about the mod, not the vessel.** It works in every game scene, MechJeb's
-  included. Infernal Robotics and MechJeb also have `Ready`: whether the active vessel's servos,
-  or its MechJeb core, can be used. MechJeb's `APIReady` is renamed `Ready`, as the service is
-  unreleased.
+  included. MechJeb also has `Ready`: whether the active vessel has a MechJeb core. MechJeb's
+  `APIReady` is renamed `Ready`, as the service is unreleased. Infernal Robotics' `Ready` goes in
+  [phase 4](mod-api.md#infernal-robotics-without-ready).
 * **No version property.** A mod's version as players know it is its release, the number GitHub,
   CKAN and SpaceDock list. Nothing in an install carries it for every mod. The assembly's
   attributes often stay at an old number: Near Future Solar 1.3.3 has file version 0.4.0.0, and
@@ -452,14 +452,17 @@ Implemented on branch `mod-binding`, not yet merged. Checked in game on 2026-11-
 ### Phase 4: `ModAPI`, loaded at startup
 
 One `ModAPI` class per integration, bound when kRPC loads. A failed mod disables only its own
-integration, and is recorded for reporting. `Addon.cs`, `APILoader` and the vendored KAC and IR
-wrappers go. Design: [mod-api.md](mod-api.md).
+integration, and is recorded for reporting. `Addon.cs`, `APILoader`, the minimum versions and the
+vendored KAC and IR wrappers go, and so does Infernal Robotics' `Ready`. Design:
+[mod-api.md](mod-api.md).
+
+Implemented on branch `mod-api`, not yet merged. Checked in game on 2026-11-12: every integration's tests at its pinned version, 335 passed, with each mod loaded at startup and no stub warning in the logs.
 
 ### Phase 5: `RequiresMod`
 
 ```csharp
 [KRPCService (Id = 16)]
-[RequiresMod (typeof (ScanSatAPI))]
+[RequiresMod (typeof (API))]
 public static class ScanSat
 ```
 
@@ -474,7 +477,6 @@ Every `CheckAPI` goes, and Trajectories gains the check it lacks. Design:
 * A mod with several versions lists each: "Tested with KSPCommunityPartModules 0.5.1 and 0.4.0".
 * The Supported Mods list in `space-center.tmpl` takes its mods from SpaceCenter's `supports`, with
   each mod's link and tested versions. Its prose about what each mod adds stays in the template.
-* The C# minimum versions stay separate. They state what loads, and the docs state what was tested.
 
 Bumping a pin in the registry updates the tests and the docs in the same commit.
 
@@ -509,10 +511,10 @@ moves to a 0.8 core, ahead of its first mod integration
 | One `ImageFormat` for every service, or one per service | One, in StdLib, the game-agnostic home of `ColorRGB` and `ColorRGBA`, so KSA services can use it too. It must land before 0.8 ships, as the copies are unreleased |
 | `ModAPI` and `RequiresMod` public in core | Yes: a third-party service author uses them as kRPC's own services do. The extending docs gain a page in phase 5 |
 | The registry's format | Starlark, written out as JSON. Bazel cannot read JSON or TOML in a `BUILD` file without a module extension, and Starlark keeps comments on the pins. Python reads the JSON |
-| The C# minimum versions in the registry | No. They are part of each binding, beside the members it needs. The registry holds the tested version |
+| Minimum mod versions | None. Each binding names the members it needs, and a missing one fails only the RPCs that use it. A version cut-off would disable a mod that mostly works. The registry holds the tested versions, and the docs show them |
 | Generate or check the lists | Generate from the registry wherever the consumer can read it: Bazel, the docs build, the Python tools run after a build. Check the files read with no build: the `.csproj` files and `KRPC.sln`, the root `CHANGELOG.md`, which GitHub renders, `COMPONENTS` in `changelog.py`, which the changelog-hints workflow imports, and clientgen's Python module map, which ships in the krpctools wheel |
 | Service ids | Generated into a `ServiceInfo.cs` per service, compiled from `$(bazel-bin)` as `AssemblyInfo.cs` is, and shipped in the generated sources archive |
-| LIDAR | Keep its `BUILD.bazel` and code as they are, with a registry entry so the generated lists include it. It was deprecated in 0.8 (#1263), so the deprecation policy removes it in 1.0. The alternative is to drop it in 0.8 as a hard break, with no release in which it is deprecated first |
+| LIDAR | Keep its `BUILD.bazel`, with a registry entry so the generated lists include it. Its binding becomes a `ModAPI` in phase 4, so `APILoader` can go. It was deprecated in 0.8 (#1263), so the deprecation policy removes it in 1.0. The alternative is to drop it in 0.8 as a hard break, with no release in which it is deprecated first |
 | How the tests tell a mod loaded | Through the `Available` property clients read too, and the version by the SHA-256 of the installed assembly, which the registry records per version. The registry holds no presence checks |
 | A mod version property | None. No source in an install gives every mod's release version, and a property that misreports some mods is worse than none |
 | When a stock fallback runs | Only when the mod is not installed. A player with FAR installed gets FAR's values or an error, as a stock value in their place is wrong without notice. A missing member or a failed load makes the RPC throw |

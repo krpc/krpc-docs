@@ -30,7 +30,7 @@ An attribute names the integration a service, class or member needs:
 
 ```csharp
 [KRPCService (Id = 16)]
-[RequiresMod (typeof (ScanSatAPI))]
+[RequiresMod (typeof (API))]
 public static class ScanSat
 ```
 
@@ -38,16 +38,16 @@ public static class ScanSat
   attribute applies.
 * **Bound by the scanner.** The type must be a `ModAPI` subclass, or the member is a scanner error.
   The scanner stores the `ModAPI` instance with each procedure.
-* **The check** is the integration's `CheckAvailable`: "SCANsat is not available: <reason>", or
-  "not ready" when its per-scene object is missing ([mod-api.md](mod-api.md#load-every-mod-api-at-startup)).
+* **The check** is the integration's `CheckAvailable`: "SCANsat is not available: <reason>"
+  ([mod-api.md](mod-api.md#a-failed-load-disables-that-mod-only)).
   `Invoke`, `ExecuteCallInto` and `CheckExpressionGameScene` call it, so server side functions are
   covered. It runs before the game scene check, as the missing mod is the more useful error.
-* **Evaluated per call.** KAC and IR become ready and unready as scenes change.
+* **One field read per call.** An integration's availability is fixed once the load pass has run.
 * **`Available` is exempt.** A static property of that name skips the check, as it reports
-  whether the mod is present. The in-game tests rely on this name. `Ready` keeps the check.
+  whether the mod is present. The in-game tests rely on this name. MechJeb's `Ready` keeps the check.
 * **Member level.** SpaceCenter tags the members that fail without FAR or RealAntennas. Members
   with a stock fallback, such as the FAR branches in `Flight.cs`, keep their own code. They take
-  the fallback when `IsInstalled` is false, and otherwise call `CheckAvailable`.
+  the fallback when `CheckInstalled` returns false.
 
 Clients and the wire protocol do not change. The exception stays `InvalidOperationException`.
 
