@@ -10,7 +10,7 @@ This issue indexes the mod support that is planned or worth considering. Each op
 | Kerbal Engineer Redux | 1.92M | #288 | `Vessel.DeltaV` and `Stage` already cover delta-v. Find which stats are missing, and split this from MechJeb2. |
 | Trajectories | 1.11M | PR #1253 | Merged. |
 | Principia | not on CKAN | #767 | Phase 1 shipped as a docs page. Phases 2 and 3 wait on upstream. |
-| Raster Prop Monitor | 2.05M | #375, #424 | The count likely includes installs as a dependency of IVA packs. |
+| Raster Prop Monitor | 2.05M | #375, #424, [design](../design/services/raster-prop-monitor.md) | The count likely includes installs as a dependency of IVA packs. Four phases: persistent variables, monitors, script pages, cameras. |
 | IndividualRCS | - | PR #1245 | Merged. |
 | [Near Future Solar](https://github.com/post-kerbin-mining-corporation/NearFutureSolar) | 1.50M | - | `SolarPanel` wraps the curved panels' `ModuleCurvedSolarPanel`, with in-game tests. Implemented and passing in game, awaiting a PR. |
 | [B9PartSwitch](https://github.com/blowfishpro/B9PartSwitch) | 2.02M | - | Setting a `PartField` did not switch the subtype: B9PartSwitch acts only on the UI control's `onFieldChanged`, which `PartField` now calls as the right-click menu does. In-game tests switch the subtype in the editor and check resources and mass there and in flight. Implemented and passing in game, awaiting a PR. |
