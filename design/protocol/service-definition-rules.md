@@ -1,8 +1,9 @@
 # Service definition rules
 
 **Status:** partly done. The identifier, shape, duplicate and id rules are implemented. The member
-key rule is a proposal, [#1237](https://github.com/krpc/krpc/issues/1237), and the rules for
-services, types, parameters and enumeration values are a proposal with no PR yet
+key rule is a proposal, [#1237](https://github.com/krpc/krpc/issues/1237). The service and type name
+rules are built, on the local branches `type-ids` and `service-names`. The rules for parameters
+and enumeration values are a proposal with no PR yet
 ([issue](../../issues/clientgen-qualified-names.md)).
 
 What the scanner accepts in a service definition, and why. Clients name things after these rules and
@@ -18,8 +19,8 @@ as [partial loading](../server/partial-loading.md) describes. The problem is rep
 | [Ids](#ids), hashed or set by hand | Implemented, [PR #1265](https://github.com/krpc/krpc/pull/1265) |
 | [Member keys](#member-keys): case-insensitive, with accessor keys | Proposal, #1237. The `ConfigNode` clashes are removed ([PR #1261](https://github.com/krpc/krpc/pull/1261), [PR #1273](https://github.com/krpc/krpc/pull/1273)) |
 | [Helper keys](#helper-keys) for the C++ `_stream` and `_call` functions | Proposal |
-| [Service and type names](#service-and-type-names) unique case-insensitively | Proposal. Type names are built with type ids, phase E0 of [client-errors.md](../client-errors.md#type-ids) |
-| [Type ids](#ids), hashed or set by hand | Proposal, phase E0 of [client-errors.md](../client-errors.md#type-ids) |
+| [Service and type names](#service-and-type-names) unique case-insensitively | Built. Type names with type ids, phase E0 of [client-errors.md](../client-errors.md#type-ids), on branch `type-ids`. Service names, types named as their service, and one class per service on branch `service-names`, stacked on it |
+| [Type ids](#ids), hashed or set by hand | Built, phase E0 of [client-errors.md](../client-errors.md#type-ids), on branch `type-ids` |
 | [Parameters and enumeration values](#parameters-and-enumeration-values) | Proposal |
 
 ## What the rules guarantee
@@ -54,7 +55,7 @@ uses `_` to join its parts, e.g. `Vessel_get_Name`, so a part never contains one
 
 | Kind | Rule |
 | --- | --- |
-| Service | A public static class with `KRPCService`, not nested in another service. Several classes may declare one service name, and they merge |
+| Service | A public static class with `KRPCService`, not nested in another service. One class declares each service |
 | Procedure, property | Public static, declared in a service |
 | Class, exception | A public non-static class, nested in its service unless it names the service in its attribute |
 | Enumeration | A public enum over `int`, placed as a class is |
@@ -127,8 +128,10 @@ class `Bound` in some clients, and those clients escape a member of either name.
 
 * **Service names are unique, compared case-insensitively.** `Foo` and `FOO` would share the Python
   module `krpc.services.foo`, the C++ and C-nano header name, the C-nano `KRPC_FOO_` constants, and
-  the Python and Lua attribute `conn.foo`. Two classes that declare one service name exactly still
-  merge, as they do today.
+  the Python and Lua attribute `conn.foo`.
+* **One class declares each service.** Merging the classes that declared one name has failed since
+  service ids became a hash of the name, as both classes take one id and the scan reports a clash.
+  With different ids, the service took the id and game scene of the class scanned first.
 * **The classes, enumerations, structures and exceptions of a service are unique together, compared
   case-insensitively.** Enumerations `Mode` and `MODE` would share the C-nano `KRPC_S_MODE_`
   constants, and a class and an enumeration of one name would share a C# namespace.
