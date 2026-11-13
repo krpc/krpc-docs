@@ -571,7 +571,7 @@ run time:
 | Structures | Field reads, and `new` of a captured structure class with an object of fields |
 | Math | `Math` functions and constants to `StdLib` procedures. `Math.round` uses `StdLib.RoundHalfUp`, as it rounds a half toward positive infinity |
 | Printing | `console.log` to `StdLib.Print`. A constant argument is formatted on the client, as `String` formats it |
-| Statements | Blocks, `const`, `let`, `if`, `while`, `do`, `for`, `for...of` over a collection, `break`, `continue`, `return`, `++`, `--`, compound assignment, destructuring assignment |
+| Statements | Blocks, `const`, `let`, `if`, `switch`, `while`, `do`, `for`, `for...of` over a collection, `break`, `continue`, `return`, `++`, `--`, compound assignment, destructuring assignment |
 | Functions | Arrow functions passed to the collection methods, and local functions, as below |
 | Exceptions | `throw new Error(m)`, `TypeError`, `RangeError` and captured service exception classes. `try`, `catch` and `finally` |
 
@@ -599,13 +599,16 @@ run time:
   - Ruled out: a copy per set of argument types, which never fails but grows the function, and
     could follow if the errors prove common. Default values as types, which give no collection
     types and change the code's meaning.
+- **`switch`** compiles to the server's `SwitchWithFallThrough`, with JavaScript's fall-through
+  and `break`. The server node lands first, see
+  [server-side-functions/switch.md](server-side-functions/switch.md).
 - **Exceptions map through the client's own table.** `Error` raises `KRPC.Error`, `TypeError`
   raises `KRPC.ArgumentException` and `RangeError` `KRPC.ArgumentOutOfRangeException`. A handler
   that starts with `if (e instanceof RangeError)` catches each exception the client raises as a
   `RangeError`. `e.message` is the message, the only part of an exception a function exposes.
 - **A function that returns a value** returns on every path, as in Python. A variable is read only
   after every path to the read assigns it.
-- **Not supported:** `async`, `await`, generators, `this`, classes, `for...in`, `switch`, labels,
+- **Not supported:** `async`, `await`, generators, `this`, classes, `for...in`, labels,
   spread, tagged templates, regular expressions, and recursion. Each is a `CompilationError`
   naming it. A getter name such as `getMeanAltitude()` is an error that names
   the property form.
@@ -687,7 +690,7 @@ Each step is mergeable on its own.
 | Step | Adds |
 | --- | --- |
 | 6a | The API, captures, `types`, the two stages and the test harness. Expressions: constants, members, operators, numbers, truth, strings, `Math`, `console.log`. The guide's compiled examples that are single expressions gain JavaScript tabs |
-| 6b | Collections, structures, statements, state variables, exceptions. The rest of the guide's compiled examples |
+| 6b | Collections, structures, statements, state variables, exceptions. The rest of the guide's compiled examples. Needs the server's switch nodes |
 | 6c | The synchronous declarations from `clientgen`, `OnServer`, and the typed signatures |
 
 #### Rules for programs
@@ -717,7 +720,6 @@ Each step is mergeable on its own.
 
 #### Open items
 
-- **`switch`.** Compiles to a chain of `if` statements, with fall-through as the hard part.
 - **Typed empty values.** Whether `t.list(t.double).empty()` reads well, or a `cast` helper does.
 
 ## Pages and TLS
