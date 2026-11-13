@@ -188,8 +188,8 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 | --- | --- | --- | --- |
 | ⬜ | Scanner rules for service, type, parameter and enumeration value names, and the C++ helper names | [clientgen-qualified-names.md](issues/clientgen-qualified-names.md) | [protocol/service-definition-rules.md](design/protocol/service-definition-rules.md) |
 | ⬜ | Clients: escape a service or type name that meets a client's own name | [client-name-escapes.md](issues/client-name-escapes.md) | [protocol/client-reserved-names.md](design/protocol/client-reserved-names.md) |
-| ⬜ | Clients: use `Connection` for the entry point in every client | [client-class-names.md](issues/client-class-names.md) | — |
-| ⬜ | Clients: one shape for errors, with a `RemoteError` base and a subclass per category | [client-errors.md](issues/client-errors.md) | [client-errors.md](design/client-errors.md) |
+| 🚧 | Clients: use `Connection` for the entry point in every client, with `Transport` for the layer under it and `Remote<Kind>` for the generated bases. Built on branch `client-consistency`, not yet submitted | [client-class-names.md](issues/client-class-names.md) | — |
+| 🚧 | Clients: one shape for errors, with a `RemoteError` base and a subclass per category. Type ids merged (#1324); E1 to E5 built on branch `client-consistency`, with the naming work, not yet submitted | [client-errors.md](issues/client-errors.md) | [client-errors.md](design/client-errors.md) |
 | ⬜ | Server side functions: name types, exceptions and fields by id, and the C-nano examples with them | [function-api-by-id.md](issues/function-api-by-id.md) | [client-errors.md](design/client-errors.md#type-ids) |
 | ⬜ | Clients: calls that cannot go in a server side function | [calls-a-function-cannot-make.md](issues/calls-a-function-cannot-make.md) | — |
 | ⬜ | Clients: check whether a per-element function needs a real instance | [call-with-arguments-template.md](issues/call-with-arguments-template.md) | [server-side-functions/server-side-functions.md](design/server-side-functions/server-side-functions.md) |
