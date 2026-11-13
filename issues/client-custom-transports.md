@@ -10,6 +10,7 @@ Examples of what this allows, with no new dependency in the client:
 * Bluetooth, or a tunnel the program opens itself, such as TLS. SSL support was closed as "use a
   proxy or tunnel", and this removes the need for a separate process.
 * A fake link in a test, which injects faults and delays.
+* Websockets and serial IO from the Python client in the in-game tests, which [ingame-protocol-tests.md](ingame-protocol-tests.md) leaves out until the client can use them.
 
 ## What Each Client Depends On
 

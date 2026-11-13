@@ -193,7 +193,7 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 | ⬜ | Server side functions: name types, exceptions and fields by id, and the C-nano examples with them | [function-api-by-id.md](issues/function-api-by-id.md) | [client-errors.md](design/client-errors.md#type-ids) |
 | ⬜ | Clients: calls that cannot go in a server side function | [calls-a-function-cannot-make.md](issues/calls-a-function-cannot-make.md) | — |
 | ⬜ | Clients: check whether a per-element function needs a real instance | [call-with-arguments-template.md](issues/call-with-arguments-template.md) | [server-side-functions/server-side-functions.md](design/server-side-functions/server-side-functions.md) |
-| ⬜ | In-game tests for websockets, serial IO and local sockets, for what `TestServer` and the unit tests do not reach | [ingame-protocol-tests.md](issues/ingame-protocol-tests.md) | — |
+| ⬜ | In-game tests for local sockets and server restarts, for what `TestServer` and the unit tests do not reach | [ingame-protocol-tests.md](issues/ingame-protocol-tests.md) | — |
 | 🚧 | Update the `krpc` and `krpc-cnano` vcpkg ports for 0.8.0: MIT licenses, copyright files, every C-nano transport (done in the repo: #1275, #1281; publishing waits on the release) | [vcpkg-ports-0-8.md](issues/vcpkg-ports-0-8.md) | — |
 | ⬜ | Docs: refresh the third-party projects page: a community note, listings by PR or Discord, a one-time prune | [docs-third-party-page.md](issues/docs-third-party-page.md) | — |
 | ⬜ | Docs: service index pages without the "API" suffix, each with an example showing the service's name in each client, and one page for a small service | [docs-service-index-pages.md](issues/docs-service-index-pages.md) | — |
