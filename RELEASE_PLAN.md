@@ -211,6 +211,7 @@ conformance suite, and the scanner rules build on #1237.
 | ⬜ | In-game tests for websockets, serial IO and local sockets, for what `TestServer` and the unit tests do not reach | [ingame-protocol-tests.md](issues/ingame-protocol-tests.md) | — |
 | ⬜ | Lua: `platform.sleep` busy-waits, to whole seconds | [lua-platform-sleep.md](issues/lua-platform-sleep.md) | — |
 | ⬜ | Clients: use `Connection` for the entry point in every client | [client-class-names.md](issues/client-class-names.md) | — |
+| ⬜ | SpaceCenter: setting the IVA camera mode fails silently straight after a launch, and leaves the IVA when already in it | [camera-iva-mode-setter.md](issues/camera-iva-mode-setter.md) | — |
 
 <details>
 <summary>Done (17)</summary>
