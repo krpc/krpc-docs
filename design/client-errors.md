@@ -1,7 +1,7 @@
 # Client errors
 
 **Status:** in progress. Phases E1 to E4 are built, with no PR yet, and the build departs from
-this design as [Deviations](#deviations) lists. [Exception ids](#exception-ids), phase E0, and
+this design as [Deviations](#deviations) lists. [Type ids](#type-ids), phase E0, and
 [C-nano](#c-nano), phase E5, are a proposal. Issue: [client-errors.md](../issues/client-errors.md).
 
 The errors each client raises grew one client at a time. They differ in their names, their bases,
@@ -357,25 +357,40 @@ if (error == KRPC_ERROR_SERVER && KRPC_IS_EXCEPTION(KRPC_EXCEPTION_KRPC_ARGUMENT
   printf("No such save\n");
 ```
 
-### Exception ids
+### Type ids
 
 The server names an exception by its `service` and `name` strings. Comparing them would put the
 names in flash, which [procedure-ids.md](protocol/procedure-ids.md) avoided for calls. Exceptions
-get ids by the same rule:
+get ids by the same rule, and so do the other types of a service, so a later client or a later API
+that needs them finds them in place:
 
-- **id = the first 4 bytes of SHA-256 of the exception's name,** read as a little-endian
-  `uint32`, as for a procedure. An `Id` on `[KRPCException]` sets one by hand.
-- **Ids are per service,** as procedure ids are. Third party services name exceptions
-  independently, so one id space for the server could clash between them. The service id
-  scopes the exception id, and a clash within one service is fixed by that service's author.
-- **A shared id or an id of 0 within a service is a scanner error,** as for procedures.
-- **`KRPC.Exception` gains `uint32 id = 6`,** which `GetServices` reports, so clientgen never
-  hashes. **`KRPC.Error` gains `uint32 service_id = 5` and `uint32 exception_id = 6`,** 0 for an
-  error with no exception. The fields are additive under protocol version 2. The other clients
-  ignore them, and keep matching by name.
+- **id = the first 4 bytes of SHA-256 of the type's name,** read as a little-endian `uint32`, as
+  for a procedure. An `Id` on `[KRPCClass]`, `[KRPCEnum]`, `[KRPCStruct]` and `[KRPCException]`
+  sets one by hand.
+- **The classes, enumerations, structures and exceptions of a service share one id space.** Third
+  party services name types independently, so the service id scopes the type id. A clash within
+  one service is fixed by that service's author.
+- **The scanner enforces unique type names in a service,** compared case-insensitively. This is
+  the type name rule of
+  [service-definition-rules.md](protocol/service-definition-rules.md#service-and-type-names), which
+  E0 builds. A shared id, or an id of 0, within a service is a scanner error, as for procedures.
+- **Procedures keep their own id space.** A service level procedure often shares a class's name,
+  such as `RemoteTech.Comms` and `DockingCamera.Camera`. An id is always read where its kind is
+  known, so the two spaces never meet.
+- **`GetServices` reports every type id:** `uint32 id` on `Class` (5), `Enumeration` (7), `Struct`
+  (6) and `Exception` (6). **`Type` gains `uint32 service_id = 6` and `uint32 id = 7`** for a
+  class, enumeration or structure type. clientgen never hashes.
+- **`KRPC.Error` gains `uint32 service_id = 5` and `uint32 exception_id = 6`,** 0 for an error
+  with no exception.
+- **The fields are additive under protocol version 2.** The other clients ignore them, and keep
+  matching by name.
 - **clientgen defines the ids per exception,** as the pair `service_id, exception_id` in
   `KRPC_EXCEPTION_<SERVICE>_<NAME>`. `KRPC_IS_EXCEPTION(KRPC_EXCEPTION_...)` compares the pair
   with the last error's `service` and `exception`.
+
+Server side functions name types and exceptions by strings too, such as `Type.ClassType` and
+`Expression.Throw`. Variants that take ids are separate work, in
+[function-api-by-id.md](../issues/function-api-by-id.md).
 
 Hashing the strings in the client, with a small hash such as FNV-1a, was the alternative. It needs
 no protocol change, but puts a hash routine and two string callbacks in flash. It also adds a
@@ -480,7 +495,7 @@ and structure, in one pull request.
 
 | Phase | Change |
 | --- | --- |
-| E0 | Exception ids. The hash, the `Id` on `[KRPCException]` and the scanner error for a shared or 0 id within a service. `KRPC.Exception.id` in `GetServices`, `KRPC.Error.service_id` and `exception_id` on every server error, and the servicedefs JSON. The protocol and extending docs |
+| E0 | Type ids. The hash, the `Id` on each type attribute, the scanner's unique type names and its error for a shared or 0 id within a service. The ids in `GetServices` and `Type`, `KRPC.Error.service_id` and `exception_id` on every server error, and the servicedefs JSON. The protocol and extending docs |
 | E1 | Spec and testees. The categories, which situations raise which, the argument and encoding split, `StreamError` for every removal, the message rule, and no raw internal error. Tests narrowed from "encoding or argument" (`test_codec.py`, `test_values.py`), from "connection or argument" (`test_localsocket_path_too_long`), and from "a type of its own" in `test_mapped_exceptions`. A conventions section naming each client's `RemoteError` type, which the testees report in `native_types`; the Python testee reports kRPC types as well as builtins. Each testee classifies by the new types. The `TIMEOUT` kind goes, its number reserved. Clients that fail a narrowed test list it until their phase |
 | E2 | Python and C++. `RemoteError` under `RuntimeError` and `std::runtime_error`. `RPCError` renamed `ServerError`, the base of every generated exception with no native type. `FunctionCompilationError` renamed `CompilationError`. C++ mapped exceptions raised as the native type, with an alias as the generated name; Python keeps its classes. `StreamRemovedException` translated to `StreamError`. Python's encoder raises the argument error for a wrong length, a negative unsigned value and a null key or element. Python's decoding leaks wrapped. Python's `StreamError` for a function with arguments becomes `ValueError`. Python's service definition errors as in the situations table. C++'s null function result as `EncodingError` |
 | E3 | C# and Java. `RemoteException`, unchecked in Java, and `throws IOException` dropped. `RPCException` renamed `ServerException`, `FunctionCompilationException` renamed `CompilationException`, `StreamException` added in C#. The generated classes of mapped exceptions removed, except those with no native type; C#'s mapping moves to `lang/csharp.py`, for every service. C#'s "Stream has no value" and Java's connection endings and interrupts as above. The connection error during and after a call. Decoding errors as `EncodingException`, with their cause's message. C#'s mismatched function type and Java's null object id as the argument error |
@@ -500,8 +515,8 @@ Each phase carries these for the clients it changes.
 - **C-nano pages.** `doc/src/cnano.rst` (configuration, handling errors, the transport API and the
   code reference), `doc/src/client-design/cnano.rst` (errors and the spec mapping), and the
   examples `Errors.c` and `ConnectingCustom.c`. The C-nano row of `client-design.rst`.
-- **Protocol and extending docs, for E0.** `communication-protocols/` for the two fields, and
-  `extending/` for the exception id rule and its `Id`.
+- **Protocol and extending docs, for E0.** `communication-protocols/` for the new fields, and
+  `extending/` for the type id rule, its `Id` and unique type names.
 - **Client guides.** `doc/src/python.rst` (errors, server side functions, streams and the API
   reference), `doc/src/cpp.rst`, `doc/src/csharp.rst`, `doc/src/java.rst` and `doc/src/lua.rst`
   ("The error is a string").

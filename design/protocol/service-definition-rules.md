@@ -18,7 +18,8 @@ as [partial loading](../server/partial-loading.md) describes. The problem is rep
 | [Ids](#ids), hashed or set by hand | Implemented, [PR #1265](https://github.com/krpc/krpc/pull/1265) |
 | [Member keys](#member-keys): case-insensitive, with accessor keys | Proposal, #1237. The `ConfigNode` clashes are removed ([PR #1261](https://github.com/krpc/krpc/pull/1261), [PR #1273](https://github.com/krpc/krpc/pull/1273)) |
 | [Helper keys](#helper-keys) for the C++ `_stream` and `_call` functions | Proposal |
-| [Service and type names](#service-and-type-names) unique case-insensitively | Proposal |
+| [Service and type names](#service-and-type-names) unique case-insensitively | Proposal. Type names are built with type ids, phase E0 of [client-errors.md](../client-errors.md#type-ids) |
+| [Type ids](#ids), hashed or set by hand | Proposal, phase E0 of [client-errors.md](../client-errors.md#type-ids) |
 | [Parameters and enumeration values](#parameters-and-enumeration-values) | Proposal |
 
 ## What the rules guarantee
@@ -73,6 +74,9 @@ are an error. The check runs within each kind, so a class and an enumeration of 
 A service or procedure id that is 0, or shared by two of them, is a scanner error. Explicit service
 ids 1 to 255 are reserved for the services that ship with kRPC. See
 [procedure ids](procedure-ids.md#collisions).
+
+The classes, enumerations, structures and exceptions of a service share a second id space, by the
+same rule, with the same error. See [type ids](../client-errors.md#type-ids).
 
 ## Member keys
 
