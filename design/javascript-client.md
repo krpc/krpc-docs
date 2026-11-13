@@ -117,6 +117,7 @@ phases are not scheduled, and the release plan lists them as one item.
 | later | Server: pages served by the mod, an origin check | — | Not scheduled |
 | later | Server: TLS (`wss://`), with a user's certificate or a generated one | — | Not scheduled |
 | later | Node.js transports (TCP, local socket) at `@krpc-org/krpc/node`, after checking the local socket on Windows | `tcpip`, `localsocket` | Not scheduled |
+| later | Benchmarks: a JavaScript client in `//tools/benchmarks`, as each other client has | — | Not scheduled |
 
 `races` and `ordering` stay out: see [Concurrency](#concurrency), and JavaScript has no ordering
 of objects.
