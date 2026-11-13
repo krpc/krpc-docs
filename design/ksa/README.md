@@ -83,7 +83,7 @@ Related, outside this folder:
 | Borea listing ([borea.md](borea.md)) | Listed from `ksa-v0.2.0` |
 | KSA build v2026.11.10.5801 and StarMap 0.5.4 | Built and tested in game, not yet in a PR |
 | Release scripts for the KSA train | Built, not yet in a PR |
-| API additions for v2026.11.10.5801 ([api-v2026.11.10.md](api-v2026.11.10.md)) | Proposal |
+| API additions for v2026.11.10.5801 ([api-v2026.11.10.md](api-v2026.11.10.md)) | Phases 1 to 4 built and tested in game, not yet in a PR |
 
 ## Phases
 
