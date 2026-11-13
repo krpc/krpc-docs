@@ -187,6 +187,7 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 | ⬜ | Scanner rules for service, type, parameter and enumeration value names, and the C++ helper names | [clientgen-qualified-names.md](issues/clientgen-qualified-names.md) | [protocol/service-definition-rules.md](design/protocol/service-definition-rules.md) |
 | ⬜ | Clients: escape a service or type name that meets a client's own name | [client-name-escapes.md](issues/client-name-escapes.md) | [protocol/client-reserved-names.md](design/protocol/client-reserved-names.md) |
 | ⬜ | Clients: use `Connection` for the entry point in every client | [client-class-names.md](issues/client-class-names.md) | — |
+| ⬜ | Clients: one shape for errors, with a `RemoteError` base and a subclass per category | [client-errors.md](issues/client-errors.md) | [client-errors.md](design/client-errors.md) |
 | ⬜ | Deprecation signals for every member kind in every client | [deprecation-all-members.md](issues/deprecation-all-members.md) | — |
 | 🚧 | Audit how each client binds static methods and streams to a connection; the Python part done by #1302. C#, Java and C++ (generated `Bind` for classes with static methods, Java `addStream` and `getCall` taking only a static method's arguments, guide docs) ready for a PR | [#1195](https://github.com/krpc/krpc/issues/1195) | [static-method-binding.md](design/static-method-binding.md) |
 | ⬜ | Clients: calls that cannot go in a server side function | [calls-a-function-cannot-make.md](issues/calls-a-function-cannot-make.md) | — |
