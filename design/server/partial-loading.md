@@ -157,6 +157,24 @@ version too old, or an essential member missing:
 * **Reported** in the popup, in a group of its own, see
   [problem reporting](problem-reporting.md#mod-failures).
 
+### A mod the service replaces
+
+The MechJeb service is a port of Genhis' standalone KRPC.MechJeb mod. A player who updates kRPC with
+the old mod still installed has two services named `MechJeb`.
+
+* **The scanner leaves out both**, by the [clash](#clashes) rule. kRPC keeps running. The popup
+  lists the clash, which does not say what to do about it.
+* **The MechJeb integration reports the cause.** Its `Bind` checks `IModAssemblies` for a
+  `KRPC.MechJeb` assembly outside kRPC's own folder. If one is loaded, `Bind` throws
+  `ModConflictException` with the fix: "remove GameData/KRPC.MechJeb, kRPC now includes the MechJeb
+  service". The popup lists it under [mod failures](problem-reporting.md#mod-failures).
+* **Core has no MechJeb-specific code.** The check is ordinary `Bind` code, and the exception is one
+  more row of the [exceptions](#exceptions) table. A later service that replaces a mod does the same.
+
+Both DLLs are named `KRPC.MechJeb.dll`. How KSP loads two assemblies of one name is not yet checked,
+so `IModAssemblies` needs to give each assembly's path, and the check matches by path, not by name.
+One in-game run with the old mod installed settles it.
+
 ### Run-time failures
 
 A missing member that is not essential binds as a stub, and its integration stays available. A call
@@ -243,6 +261,7 @@ and how the failure is [reported](problem-reporting.md#mod-failures):
 | `ModVersionException` : `ModIncompatibleException` | Core, version below the minimum | Disabled |
 | `ModTypeMissingException` : `ModIncompatibleException` | `Require.Type` | Disabled |
 | `ModMemberMissingException` : `MissingMemberException` | `Require`, at load; a stub, at a call | Disabled at load; one RPC fails at a call |
+| `ModConflictException` : `ModIncompatibleException` | An integration's `Bind`, on a conflicting mod, see [A mod the service replaces](#a-mod-the-service-replaces) | Disabled; the popup shows the integration's message |
 | Any other exception from `Bind` | A bug in the integration | Disabled |
 
 `ModMemberMissingException` derives from `MissingMemberException`, so the stubs keep their current
@@ -266,7 +285,7 @@ members. [Problem reporting](problem-reporting.md#changes) lands with it.
 | `core` scanner | Errors and warnings with a severity; the type cascade; the clash removals; a whole-kRPC failure flag |
 | `core` `Services` | Built from the partial scan; services without an id left out of `ServicesById`; public `ServiceProblems`, with the failed mods |
 | `core` mods | `ModAPI`, `ModAPIs`, `ModBinder`, `MemberBinder.Require`, `IModAssemblies`, the mod exceptions, `ServiceProblems.Mods` |
-| Mod integrations | KAC, IR, FAR, RealFuels, AGExt and RemoteTech each become one `ModAPI`. KAC and IR look up their live object per scene. `APILoader` is removed |
+| Mod integrations | KAC, IR, FAR, RealFuels, AGExt and RemoteTech each become one `ModAPI`. KAC and IR look up their live object per scene. `APILoader` is removed. MechJeb becomes one too, with the check for the old KRPC.MechJeb mod |
 | `server` (KSP) | `ServicesChecker` checks at startup and disables kRPC only on a whole-kRPC failure |
 | `tools/ServiceDefinitions` | Unchanged: it passes no lists, so it fails on any error or warning |
 | Changelogs | Server: a broken service member disables that member, and a mod that fails to load disables only its integration |
