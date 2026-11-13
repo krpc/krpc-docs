@@ -10,10 +10,10 @@ and planning notes that do not ship with the mod.
  * `design/` — one doc per feature/issue, filed by area: `autopilot/`, `protocol/`, `services/`,
    `build-tools/`, `ksa/`. Docs spanning all areas (audits, sweeps) sit in `design/` itself.
  * `analysis/` — test plans and results for the tools and clients, with their findings.
- * `RELEASE_PLAN.md` — the authoritative list of planned work, by milestone, with each item's issue,
-   labels and design doc.
+ * `RELEASE_PLAN.md` — the authoritative list of planned work, by milestone, with each item's issue
+   and design doc.
  * `issues/` — the issues: one work item per file, the title as the heading, then the body.
-   Milestone and labels live in `RELEASE_PLAN.md`. They are not filed on GitHub.
+   The milestone lives in `RELEASE_PLAN.md`. They are not filed on GitHub.
 
 ## Tracking work
 
