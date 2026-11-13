@@ -1,6 +1,8 @@
 # Static method binding
 
-**Status:** proposal. Issue [#1195](https://github.com/krpc/krpc/issues/1195).
+**Status:** in progress. Issue [#1195](https://github.com/krpc/krpc/issues/1195). Phase 2 done by
+[#1302](https://github.com/krpc/krpc/pull/1302). Phases 1, 3 and 4 implemented together, not yet
+in a PR. [Implementation notes](#implementation-notes) lists where they diverge from the plan.
 
 A static class method has no object to carry the connection. This doc audits how each client binds
 one to a connection, for a call, a stream and a call builder, and plans one rule for all of them.
@@ -42,7 +44,7 @@ connection. cnano passes the connection to every function.
 
 | Client | Call | Through an object | Stream | Call builder |
 | --- | --- | --- | --- | --- |
-| Python | `conn.test_service.TestClass.static_method(a, b)` | `obj.static_method(a, b)` | `conn.add_stream(conn.test_service.TestClass.static_method, a, b)` | `get_call(...)`, same shape |
+| Python | `conn.test_service.TestClass.static_method(a, b)` | `obj.static_method(a, b)` | `conn.add_stream(conn.test_service.TestClass.static_method, a, b)` | `conn.get_call(...)`, same shape |
 | Lua | `conn.test_service.TestClass.static_method(a, b)` | `obj.static_method(a, b)` | none | none |
 | JS (branch) | `conn.testService.TestClass.staticMethod(a, b)` | unsupported | not yet | not yet |
 | C# | `TestClass.StaticMethod(connection, a, b)` | not in C# | `connection.AddStream(() => TestClass.StaticMethod(connection, a, b))` | `Connection.GetCall(() => ...)`, same shape |
@@ -61,20 +63,24 @@ Two models are in use, and they split by whether the language's classes are valu
 Both models pass the connection once for a call. The defects are in the wrappers and in one
 Python path.
 
+The audit predates [#1302](https://github.com/krpc/krpc/pull/1302), which replaced the Python
+client's shared stub classes with classes built per connection. That fixed findings 2 to 4. The
+Python rows above still hold.
+
 ### Findings
 
 | # | Client | Finding | Severity |
 | --- | --- | --- | --- |
 | 1 | Java | `addStream(Class, name, args...)` and `getCall(Class, name, args...)` take the connection again as the first of `args`. Both drop it unchecked, so `null` or another connection works there. A service procedure through the same overload takes no connection. | API wart, the one #1195 names |
-| 2 | Python | `StaticMethod.__get__` writes `_client` onto the shared stub class when called through an object. The first client to do this binds the class for every client. A later client's static call through an object runs on the first connection, and fails once that connection closes. Objects it creates belong to the wrong connection. | Bug, shipped in v0.7.0 ([defects.md](client-conformance/defects.md) `python-static-method-binding`) |
-| 3 | Python | The conformance suite misses finding 2. `ConformanceService` and `TestService` have no pre-generated stubs, so the testee takes the dynamic path, whose classes are per client. `test_static_method_through_an_object_connection` passes. | Test gap |
-| 4 | Python | A stub class imported directly (`from krpc.services.spacecenter import ReferenceFrame`) has no client. Its static methods fail with an `AttributeError` on `_client`, or work after some earlier call through an object bound it (finding 2). | Confusing error |
+| 2 | Python | `StaticMethod.__get__` writes `_client` onto the shared stub class when called through an object. The first client to do this binds the class for every client. A later client's static call through an object runs on the first connection, and fails once that connection closes. Objects it creates belong to the wrong connection. | Bug, shipped in v0.7.0. Fixed by #1302 |
+| 3 | Python | The conformance suite misses finding 2. `ConformanceService` and `TestService` have no pre-generated stubs, so the testee takes the dynamic path, whose classes are per client. `test_static_method_through_an_object_connection` passes. | Test gap. Gone with #1302: every path builds classes per connection |
+| 4 | Python | A stub class imported directly (`from krpc.services.spacecenter import ReferenceFrame`) has no client. Its static methods fail with an `AttributeError` on `_client`, or work after some earlier call through an object bound it (finding 2). | Confusing error. Fixed by #1302: a `TypeError` naming `conn.space_center.ReferenceFrame` |
 | 5 | C# | In a stream or `GetCall` lambda, the static method's connection argument is skipped and never evaluated. The stream runs on the connection `AddStream` is called on. This matches a service object or an object in the lambda, which also carry a connection the stream does not use. | Consistent, no change |
 | 6 | C++ | Consistent: the connection once, for the call, the stream and the call builder. | None |
 | 7 | Lua, cnano | Consistent. No streams. | None |
 | 8 | JS | Matches Python. A static method through an object is unsupported, which suits JavaScript (a static method lives on the constructor). | None |
 | 9 | Docs | Only the Java guide (`java.rst`) describes a static method, and it documents the doubled connection. The other client guides do not show how to call or stream one. | Docs gap |
-| 10 | Python | A class reached through a connection with the pre-generated stubs is a `WrappedClass`, which is not a type. `isinstance(vessel, conn.space_center.Vessel)` and `issubclass` were always false, since the 2023 client rewrite. The dynamic path builds real per-client classes, so conformance misses it, as for finding 3. | Bug, fixed on branch `python-isinstance`: the wrapper checks against the stub class it wraps. Separate from the binding fix in phase 2 |
+| 10 | Python | A class reached through a connection with the pre-generated stubs is a `WrappedClass`, which is not a type. `isinstance(vessel, conn.space_center.Vessel)` and `issubclass` were always false, since the 2023 client rewrite. The dynamic path builds real per-client classes, so conformance misses it, as for finding 3. | Bug, fixed by [#1279](https://github.com/krpc/krpc/pull/1279) |
 
 ## Decision
 
@@ -98,7 +104,7 @@ object's connection.
 | Client | Change |
 | --- | --- |
 | Java | `connection.addStream(TestClass.class, "staticMethod", a, b)` and `connection.getCall(...)` likewise, matching a service procedure. |
-| Python | Through an object, bind to that object's client without touching the shared class. An unbound stub class raises an error naming the fix. |
+| Python | Done by #1302. Through an object, a static method runs on the object's connection. A class imported from `krpc.services` raises a `TypeError` naming the fix. |
 | C#, C++, Lua, cnano, JS | No change. |
 | Docs | Each client guide shows a static method call and, where the client has them, its stream. |
 
@@ -119,29 +125,24 @@ Each phase merges on its own. Milestone `ksp-v0.8.0` (clients release with KSP).
 * Changelog `client/java`: "**Deprecated:** Passing the connection to `addStream` and `getCall`
   for a static method, which now take only its arguments (#1195)".
 
-### Phase 2: Python binding
+### Phase 2: Python binding (done)
 
-Replaced by [python-declarations.md](python-declarations.md), which removes `StaticMethod` and the shared stub classes. The rule and the `TypeError` for an imported class stay.
-
-* `StaticMethod.__get__` through an object binds to `_wrapped_subclass(obj._client, type(obj))`
-  and never writes `_client` onto the shared class.
-* Called on an unbound stub class, a static method raises a `TypeError`: reach the class through a
-  connection, as `conn.space_center.ReferenceFrame`.
-* A native test in `client/python/krpc/test`: two connections through the pre-generated `KRPC`
-  stub, static calls through objects from each, then one connection closed. This covers the
-  internals that the conformance suite cannot reach (finding 3).
-* Changelog `client/python`: "Fix static methods called through an object running on another
-  connection (#1195)".
+Done by [#1302](https://github.com/krpc/krpc/pull/1302), as
+[python-declarations.md](python-declarations.md) planned. It removed `StaticMethod`, `WrappedClass`
+and the shared stub classes. Each connection builds its own classes, so a static method through an
+object runs on the object's connection. A class imported from `krpc.services` is a declaration for
+type checkers, and calling it raises a `TypeError` naming the class reached through a connection.
+The conformance tests reach the same classes as a program, so no native test is needed.
 
 ### Phase 3: Docs and spec
 
-* A short "Static Methods" section in each client guide (Python, Lua, C#, Java, C++, C, C-nano),
+* A short "Static Methods" section in each client guide (Python, Lua, C#, Java, C++, C-nano),
   with a call and, where supported, a stream. Examples in `doc/src/scripts/`, using
   `ReferenceFrame.CreateRelative`.
 * The spec text of `test_static_method_connection` states the rule above: the connection comes
   from the service object or the connection argument.
 * Close #1195. Remove the static method item from
-  [client-python-defects.md](../issues/client-python-defects.md).
+  [client-python-defects.md](../issues/client-python-defects.md), which #1302 fixed.
 
 ### Phase 4: Bound classes in C#, Java and C++
 
@@ -192,6 +193,19 @@ the one place that names the connection, as a service object is, so the rule abo
   doc examples compile in the build. Bound classes are client API, so they get no conformance test.
 * Changelog `client/csharp`, `client/java`, `client/cpp`: "Add `Bind` to classes with static
   methods, for calling them without passing the connection (#1195)", in each client's casing.
+
+## Implementation notes
+
+Where phases 1, 3 and 4 diverge from the plan:
+
+| Phase | Divergence |
+| --- | --- |
+| 1 | The old form drops its connection unchecked, as before, in place of throwing for another connection. A check on this one form only would differ from C# lambdas and Java `Bound` streams, which ignore the connection they carry. The Java client has no run-time deprecation signal, so the old form is deprecated in the docs only, and it has no test. |
+| 3 | The examples call `Orbit.ReferencePlaneDirection`. `ReferenceFrame.CreateRelative` takes every argument in Java, C++ and C-nano, and a stream of it creates a frame per update. |
+| 3 | The shared client design page gains a "Static Methods" section with the rule and the bound classes. |
+| 4 | C++ `Bound` methods forward to the static method, inside a `-Wdeprecated-declarations` suppression for a deprecated one, so the warning shows only at the caller. |
+| 4 | Every C#, Java and C++ example that builds an expression uses the bound form, including the client guides, the home page and the tutorials. |
+| 4 | `Bound` is tested in the conformance suite, in place of native tests: a `bound-classes` profile for C#, Java and C++, and a `bound` flag on the testee's `Invoke`. A call over two connections checks that each `Bound` calls over its own. C++ lists the bound stream and call message tests as unsupported, as its `Bound` is a shorthand for calls. |
 
 ## Alternatives considered
 

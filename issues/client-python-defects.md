@@ -3,7 +3,6 @@
 Writing the client's design doc turned up these defects. Paths are relative to `client/python/`, and known conformance failures are in `conformance/expected-failures.txt`.
 
 * **`types._wrapped_subclasses` pins every client.** Its values are subclasses whose `_client` is the weak key, and each stub service adds one in `__init__`. With stubs installed, a closed and dropped client is never collected. Without them it is.
-* **Static methods through an object bind to the first client.** `StaticMethod.__get__` writes `_client` onto the shared stub class. A later client's `obj.static_method()` then runs on the first connection, and raises `ConnectionError` once that connection closes.
 * **Passing an object between a stub and a dynamic client.** `Types.coerce_to` reads `_service_name`, which a stub class lacks, and `Client._encode_call` catches only `ValueError`. The call raises `AttributeError` in either direction.
 * **A malformed size after a buffered message escapes.** `Connection.has_message` accepts a six byte prefix of value 0, and `Session._handle_buffered` then gets an uncaught `MalformedSize`. A call raises it raw. The reader thread dies with the connection not failed, so streams stop silently until the next call.
 * **An update sent with a response is lost for an event inside a value.** `Session._stream_id` registers only a directly returned stream or event. `StreamManager.update` drops the update if the caller has not decoded the value yet, so a firing is lost. No bundled service returns such a value.
