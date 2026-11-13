@@ -28,7 +28,8 @@ An integration is one class. Its fields are bound in `Bind` and read by its RPCs
 ```csharp
 sealed class ScanSatAPI : ModAPI
 {
-    public ScanSatAPI () : base ("SCANsat", "SCANsat") { }
+    // The name and assembly, generated from the registry
+    public ScanSatAPI () : base (ServiceInfo.Mods.SCANsat) { }
 
     internal static Func<double, double, CelestialBody, int, bool> IsCovered;
     internal static Func<object> SettingsInstance;
@@ -43,8 +44,13 @@ sealed class ScanSatAPI : ModAPI
 ```
 
 * **`ModAPI`** takes the display name, the assembly name and an optional minimum version. Core
-  checks the assembly and the version before `Bind`.
-  * `IsAvailable` is set by core. A service's `Available` RPC returns it.
+  checks the assembly and the version before `Bind`. The name and the assembly come from the
+  registry, generated into the service's `ServiceInfo.cs` as its id is
+  ([phase 1d](README.md#1d-available-and-modversion)). The minimum version stays in the C#.
+  * `IsAvailable` is set by core. A service's `Available` RPC returns it, or SpaceCenter's
+    `<Mod>Available`.
+  * `Version` is the installed version string, read by core from the assembly. A service's
+    `ModVersion` RPC returns it, or SpaceCenter's `<Mod>ModVersion`.
   * `CheckAvailable ()` throws `InvalidOperationException`: "SCANsat is not available: <reason>".
     [`RequiresMod`](requires-mod.md) calls it.
   * One instance per integration, found by the load pass, and reached by

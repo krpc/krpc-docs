@@ -43,8 +43,9 @@ public static class ScanSat
   `Invoke`, `ExecuteCallInto` and `CheckExpressionGameScene` call it, so server side functions are
   covered. It runs before the game scene check, as the missing mod is the more useful error.
 * **Evaluated per call.** KAC and IR become ready and unready as scenes change.
-* **`Available` is exempt.** A static property named `Available` skips the check, as it reports
-  whether the mod is present. The in-game tests rely on this name.
+* **`Available` and `ModVersion` are exempt.** The static properties of these names skip the
+  check, as they report whether the mod is present and at which version. The in-game tests rely on
+  these names. `Ready` keeps the check.
 * **Member level.** SpaceCenter tags the members that fail without FAR or RealAntennas. Members
   with a stock fallback, such as the FAR branches in `Flight.cs`, keep their own code.
 
@@ -65,8 +66,8 @@ Clients and the wire protocol do not change. The exception stays `InvalidOperati
 * `core/test`: the scanner rejects a type that is not a `ModAPI`. A call to a tagged procedure, a
   class member and a server side function each fail with the message when the fake integration is
   unavailable. `Available` does not.
-* In game: one test per mod service, run without its mod, checks one RPC's message. It goes in
-  `ModServiceTestCase` ([phase 2](README.md#phase-2-test-helpers-in-krpctools)).
+* In game: one test per mod service, in a class that requires no mods, calls one RPC and checks
+  its message.
 
 ## Changelog
 
