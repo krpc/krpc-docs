@@ -1,7 +1,7 @@
 # JavaScript client for the browser
 
-**Status:** in progress. Phases 1 to 3 are implemented on the local branch `js-client`, with
-flags enumerations and deprecation signals, and not yet submitted. No GitHub issue yet. The
+**Status:** in progress. Phases 1 to 6 are implemented locally, with flags
+enumerations and deprecation signals, and not yet submitted. No GitHub issue yet. The
 client's current design is on the docs site, in `doc/src/client-design/js.rst`, and the
 "as built" sections below record how each phase landed.
 
@@ -733,6 +733,86 @@ Each step is mergeable on its own.
   in a hidden property types captures only, and a spread or `structuredClone` drops the property.
 - **A separate entry point**, `@krpc-org/krpc/compiler`, passed to `connect`. `import()` gives the
   same split with no step for the program.
+
+### Phase 6a as built
+
+```js
+const apex = await conn.run(
+  ({ flight, gravity }) => flight.meanAltitude + flight.speed ** 2 / (2 * gravity),
+  { flight, gravity: 9.81 },
+);
+const ratio = await conn.compile(({ vessel }, payload) => (vessel.mass + payload) / vessel.mass,
+  { vessel }, [types.double]);
+```
+
+| Item | Decision |
+| --- | --- |
+| Bodies | One expression, or a block of one `return`. Statements are 6b |
+| No captures | No parameters, or a first parameter that is a name the body does not read, such as `_`. Biome's recommended `noEmptyPattern` rejects `({}, x) =>` |
+| `types` | `TypeValue` objects, exported from the package. A captured `types` builds types in the function, and `cast` gives a value a type, so `t.nullable(t.double).cast(null)` compiles now |
+| Null receivers | A member of an object that can be null compiles, and the server raises a `TypeError` for null, as JavaScript does. Arithmetic on a number that can be null is a `CompilationError` that suggests `??`, as JavaScript would give `null + 1 === 1` |
+| String indexing | `s[i]` and `s.at(i)` out of range raise on the server, where JavaScript gives `undefined` |
+| String order | `<` on strings is a `CompilationError`. The server orders numbers only |
+| Number strings | The server formats a number, as .NET does. Constants format on the client |
+| Structures | Field reads move to 6b with structure construction. `GetField` takes the server's field name, which the client's `Struct` does not keep |
+| Errors | `CompilationError` with `line` and `column`, both counting from 1, in the function's source. The message ends `(line 1, column 7 of the function)` |
+| Value naming | `registry.ts` maps a service object, class, enumeration values object, structure class and exception class to what it names, so the compiler reads captured values without the generated modules |
+
+- **Tests.** `//client/js:compiler-test`, in `//client/js:test`: 38 `node:test` cases against a
+  `TestServer` over WebSockets, through `client_test`. Each compile checks the compiler's types
+  against the server's. Arithmetic, bitwise operators, truth, strings and `Math` run on both
+  sides. V8 computes some powers, such as `7 ** -2`, one bit from .NET's `Math.Pow`, so those
+  cases are left out. Two golden trees.
+- **Size.** esbuild with splitting, gzipped: a program that never compiles loads 36 KB, and the
+  compiler chunk, with acorn, is 47 KB.
+- **Docs.** The guide's single-expression compiled examples gain JavaScript tabs. The JavaScript
+  guide leads its server side functions section with compiled functions, and keeps the
+  expression API after them.
+
+### Phase 6b as built
+
+| Item | Decision |
+| --- | --- |
+| Later uses type values | An empty array, `Set` or `Map`, a `null`, a state variable that starts empty and a local function's parameters take their type from a later use. The use notes the type and the function compiles again, as in Python. A read of a variable holding `null` compiles as `null` until then, so `best === null` before `best = engine` types it |
+| Variables | Numbers in variables are doubles. `var` is a `CompilationError` |
+| Arrays | A literal or captured array is a tuple where a tuple goes and a list elsewhere, built where it is used. `Map.keys()` and the like give lists, so `Array.from` takes them |
+| `for` and `do` | Lowered to `While`. With a `continue`, the update or test runs at the start of the body on every pass but the first, as the server's `Continue` jumps there |
+| `switch` | Each clause is a case of `SwitchWithFallThrough`, an empty clause a no-op that falls through. A number discriminant compares as a double |
+| Exceptions | A leading `if (e instanceof X)` chain dispatches by the class the client raises an exception as. Each branch catches its names, innermost first, and records a branch number, as Python's handlers do. An `else throw e` leaves the rest uncaught. `e.message` is the only member of `e` |
+| State | A captured plain object's property that the function assigns, or changes with `push`, `add`, `set`, `delete`, `clear` or an element assignment |
+| `toSorted` | Takes a comparator `(a, b) => K(a) - K(b)`, compiled to `OrderBy` on `K`, or `K(b) - K(a)` on its negation. With none, strings only |
+| Map reads | `get` of a missing key gives `null`, as `undefined` in JavaScript |
+| Not supported | `findIndex` and `indexOf` compile to a loop. Callbacks take one parameter, with no index. Mutating array methods (`sort`, `splice` and others) name their copying forms |
+
+- **Tests.** `test/statements.test.ts`: 20 cases, 58 compiler tests in all, mostly run on both
+  sides.
+- **Docs.** Every compiled example in the shared guide has a JavaScript tab, and the state and
+  control loop sections become tabs. Two examples type a callback's parameter with JSDoc until
+  6c types the bodies.
+
+### Phase 6c as built
+
+```ts
+const mass = await conn.run(({ vessel }) => vessel.mass, { vessel });   // number
+const fn = await conn.compile(({ s }, x) => s.int32ToString(x), { s }, [types.int32]);
+await conn.run(fn, 1);   // string; run(fn, "a") is a type error
+```
+
+| Item | Decision |
+| --- | --- |
+| Server forms | Each generated module declares `export declare namespace Server`, with `Service` and each class extending `ServerObject<"Svc.Class">`. A property is a property, readonly without a setter, and a method returns its value. Enumerations, structures and exceptions on the server form of a service are the client's, through a local `ClientService` alias |
+| Registries | `ServerTypes` and `ClientTypes` in `src/server.ts`, which each module extends with `declare module "@krpc-org/krpc"`. `RemoteService` gained a brand, `RemoteService<"Svc">`, as `RemoteObject` has |
+| `OnServer`, `OnClient` | `OnServer` maps objects and services through their brands, and collections and plain objects through their members. A method returning a `Promise` on a captured value, such as a class's static method, returns its value. Enumerations, structures and bytes pass through. `OnClient` maps back by the `ServerObject` brand |
+| Parameters | `compile<C, R, const L extends readonly TypeLike[] = []>` infers the tuple of type values, and `ValuesOf<L>` gives the parameters' types. A union of type value forms would also infer from a class's static methods |
+| `ServerFunction<P, R>` | A `KRPC.Expression` with phantom types. `run<R, P>` checks the arguments; `R` comes first so `run<number>(expr)` still compiles. `addStream` takes `ServerFunction<[], R>` |
+| In-package paths | `tsconfig.json` maps `@krpc-org/krpc` to `./src/index` with no extension. With `.ts`, tsc 5.9 crashed resolving the augmentation from a project that has only `index.d.ts` |
+| Docs comments | The server forms reuse the client's documentation, so a link to a property names its getter |
+
+- **Tests.** `test/types.check.ts`, compiled with the native tests and never run, with
+  `@ts-expect-error` lines for a getter form, a Promise read, a wrong argument, a stream of a
+  function with parameters and an event of a number. The guide's JavaScript examples are checked
+  against the server forms too, so their JSDoc workarounds went.
+- **Goldens.** The JavaScript clientgen goldens grow by the server namespace and registries.
 
 ## Pages and TLS
 
