@@ -1,7 +1,9 @@
 # JavaScript client for the browser
 
-**Status:** in progress. Phase 1 is implemented and not yet submitted; see
-[Phase 1 as built](#phase-1-as-built). No GitHub issue yet.
+**Status:** in progress. Phases 1 to 3 are implemented on the local branch `js-client`, with
+flags enumerations and deprecation signals, and not yet submitted. No GitHub issue yet. The
+client's current design is on the docs site, in `doc/src/client-design/js.rst`, and the
+"as built" sections below record how each phase landed.
 
 ## Goal
 
@@ -327,6 +329,23 @@ export type VesselSituation = EnumValue<"SpaceCenter.VesselSituation">;
   contain a literal so Sphinx does not look them up. The 8 API examples have JavaScript versions,
   type-checked by `//doc:check-scripts-js`, which runs without `strictNullChecks` as the Python
   check ignores optional access.
+
+### Flags and deprecation as built
+
+Ported from main after the rebase of 2026-11-11, where every other client already had both.
+
+- **Flags enumerations.** A flags value is a `FlagsValue`, a subclass of `EnumValue` with `union`,
+  `intersection`, `difference` and `contains`, as JavaScript has no operator overloading. The
+  `Enumeration` keeps each combination it makes, so combinations compare with `===`. A number
+  with a flag the enumeration lacks is an `EncodingError`. clientgen types a flags enumeration
+  as `FlagsValue`.
+- **Deprecation signals.** A procedure warns when called. A service, class, enumeration,
+  enumeration value, structure, structure field or exception is a getter that warns when read.
+  The codec and `equals` read fields through `StructValue.fieldOf`, so decoding and encoding
+  give no warning. Members inherit deprecation from their container, as in the other clients.
+- **The warning** is `process.emitWarning(message, "DeprecationWarning")` when the runtime has it,
+  and `console.warn` otherwise, once per member on a connection. clientgen adds `@deprecated` to
+  procedures, methods and services too.
 
 ### Phase 3b: importable types
 
