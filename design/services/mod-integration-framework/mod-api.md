@@ -34,9 +34,8 @@ or the class predates phase 4:
 | Integration | Class |
 | --- | --- |
 | Trajectories | `TrajectoriesAPI`, as `API` holds the static delegates its `Statics` binds |
-| RemoteTech | `RemoteTechAPI`, as `API` is the alias for SpaceCenter's RemoteTech class |
 | MechJeb | `Bindings`, the binding class of [phase 3](binding.md) |
-| FAR, AGExt, RealFuels, RealAntennas | Named after the mod, in SpaceCenter's `ExternalAPI` namespace |
+| FAR, AGExt, RealFuels, RealAntennas, RemoteTech | Named after the mod, in SpaceCenter's `ExternalAPI` namespace |
 
 SCANsat's integration:
 
@@ -90,9 +89,11 @@ sealed class API : ModAPI
 * **`Statics (typeof (RemoteTech), "RemoteTech.API.API")`** binds every static delegate property
   of the first type to the static method of the same name in the second. It replaces `APILoader`
   for RemoteTech, Trajectories, FAR, AGExt and LIDAR.
-* **RemoteTech** has its `ModAPI` in the RemoteTech service, as the registry lists the mod there.
-  Its `Bind` sets the delegates of SpaceCenter's RemoteTech class, which SpaceCenter's pilot uses
-  too.
+* **RemoteTech** has its `ModAPI` in SpaceCenter, as SpaceCenter's autopilot uses it and the
+  RemoteTech service is optional. It names the mod directly, as SpaceCenter's registry entry does
+  not list it. The autopilot calls `HasFlightComputer`, `AddSanctionedPilot` and
+  `RemoveSanctionedPilot` every physics frame, so those are required. The RemoteTech service reads
+  this `ModAPI`.
 * **No null checks.** `Bind` has no `if` on a lookup.
 
 ### Load every mod API at startup
@@ -104,12 +105,14 @@ loaded the assemblies.
 
 * The pass searches only the assemblies that reference `KRPC.Core`. It catches
   `ReflectionTypeLoadException` from a broken mod, and takes the types that did load.
-* No integration has per-scene state. An RPC that needs a live object of the mod reads it when
-  called:
+* An integration may override `NotReady`, which gives the reason the mod cannot serve a call
+  yet, or null. `CheckAvailable`, and so each `[RequiresMod]` call, checks it once the
+  integration is available. `Available` does not. Kerbal Alarm Clock uses it, as below. An RPC
+  that needs a live object of the mod reads it when called:
 
 | Integration | Live object |
 | --- | --- |
-| Kerbal Alarm Clock | `APIInstance` and its alarm list. KAC creates the instance in `Awake`, in flight, the space center, the tracking station and the editor. The KAC service is limited to every scene but the mission builder, apart from `Available`. The space center's facilities count as the space center |
+| Kerbal Alarm Clock | `APIInstance` and its alarm list. KAC creates the instance in `Awake`, in flight, the space center, the tracking station and the editor. The KAC service is limited to every scene but the mission builder, apart from `Available`. The space center's facilities count as the space center. `NotReady` holds a call until the instance exists and KAC's `APIReady` is set, after it loads the save's alarms |
 | Infernal Robotics | `Controller.Instance`, which exists for the whole flight scene. The service runs only in flight |
 | Every other integration | None, or one found through the vessel, such as Raster Prop Monitor's computers and MechJeb's core |
 
@@ -202,8 +205,8 @@ service, and the old DLL is skipped. There is no conflict check.
 | KAC | `KACWrapper` replaced by a `ModAPI`. `Available` no longer depends on the scene. The service is limited to every scene but the mission builder |
 | IR | `IRWrapper` replaced by a `ModAPI`, with the servo and group adapters it uses. `Ready` goes, and the group state members give the errors above |
 | LIDAR | Its `API.Load` becomes a `ModAPI` with `Statics`, so `APILoader` can go |
-| SpaceCenter | FAR, RealFuels, AGExt and RealAntennas each become a `ModAPI`. `<Mod>Available` returns `IsAvailable`. The FAR and AGExt fallbacks call `CheckInstalled` |
-| RemoteTech | A `ModAPI` that binds SpaceCenter's RemoteTech class |
+| SpaceCenter | FAR, RealFuels, AGExt, RealAntennas and RemoteTech each become a `ModAPI`. `<Mod>Available` returns `IsAvailable`. The FAR and AGExt fallbacks call `CheckInstalled` |
+| RemoteTech | Uses SpaceCenter's RemoteTech `ModAPI` |
 
 ## Tests
 
@@ -225,6 +228,7 @@ service, and the old DLL is skipped. There is no conflict check.
 **Keep the vendored KAC and IR wrappers.** Rejected. They bind lazily, so a broken member shows up
 on first use in a scene, and they fail differently from every other integration.
 
-**Keep per-scene readiness in `ModAPI`.** Rejected. KAC's instance exists in every scene kRPC
-serves, and IR's controller for the whole of flight. The one gap is IR's group state just after a
-scene loads. It covers a few members, and they report it in their error.
+**Keep per-scene readiness in `ModAPI`.** First rejected, then adopted in review (2026-11-13) as
+`NotReady`. KAC's list RPCs read its alarms in the frames before KAC has loaded them, so each KAC
+call needs the check, and a hook in `ModAPI` runs it on every call with no code in the RPCs. IR's
+group state stays per object, as it concerns one vessel's groups.
