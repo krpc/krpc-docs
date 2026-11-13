@@ -14,6 +14,7 @@ This issue indexes the mod support that is planned or worth considering. Each op
 | IndividualRCS | - | PR #1245 | Merged. |
 | [Near Future Solar](https://github.com/post-kerbin-mining-corporation/NearFutureSolar) | 1.50M | - | `SolarPanel` wraps the curved panels' `ModuleCurvedSolarPanel`, with in-game tests. Implemented and passing in game, awaiting a PR. |
 | [B9PartSwitch](https://github.com/blowfishpro/B9PartSwitch) | 2.02M | - | Setting a `PartField` did not switch the subtype: B9PartSwitch acts only on the UI control's `onFieldChanged`, which `PartField` now calls as the right-click menu does. In-game tests switch the subtype in the editor and check resources and mass there and in flight. Implemented and passing in game, awaiting a PR. |
+| [TweakScale](https://github.com/TweakScale/TweakScale), [TweakScale Rescaled](https://github.com/JonnyOThan/TweakScale) | 1.52M, 1.07M | - | Mass, thrust, torque and resources read correctly on scaled parts. `Part.Cost` ignored module costs, and now adds them as the game's ship cost does. TweakScale's own cost does not follow the scale, and adds nothing in flight. In-game tests for both. Implemented and passing in game, awaiting a PR. |
 | RemoteTech, Kerbal Alarm Clock | 689k, 1.33M | [remotetech-kac-api](remotetech-kac-api.md) | Complete the existing services. |
 | Infernal Robotics | - | [infernal-robotics-input-linking](infernal-robotics-input-linking.md) | Input linking and sun tracking. |
 | Procedural Fairings, DockingCamera, LIDAR | 1.19M (Procedural Fairings) | [mod-compat-tests](mod-compat-tests.md) | Existing integrations with no in-game tests. |
@@ -34,7 +35,6 @@ Kerbalism also needs a compatibility fix. It replaces `ModuleScienceExperiment` 
 | Mod | Downloads | Work |
 | --- | --- | --- |
 | Real Solar System, Kopernicus, Realism Overhaul, RP-1 | 1.32M, 1.41M, 985k, 581k | Check reference frames, orbits and the auto-pilot at real scale and on changed bodies. Only RealFuels is integrated so far. |
-| TweakScale, TweakScale Rescaled | 1.52M, 1.07M | Check mass and thrust on scaled parts. |
 | Contract Configurator | 1.50M | Check its contracts and parameters through the contracts API. |
 
 ## Considered and Not Planned
@@ -49,6 +49,6 @@ Kerbalism also needs a compatibility fix. It replaces `ModuleScienceExperiment` 
 ## Suggested Order
 
 1. Near Future Solar, as a small fix for a known gap. Implemented, awaiting a PR.
-2. Smoke tests on Real Solar System and Kopernicus, then B9PartSwitch and TweakScale. A bug here returns wrong values with no error. B9PartSwitch is implemented, awaiting a PR.
+2. Smoke tests on Real Solar System and Kopernicus, then B9PartSwitch and TweakScale. A bug here returns wrong values with no error. B9PartSwitch and TweakScale are implemented, awaiting a PR.
 3. A SCANsat service, as the first new integration.
 4. Kerbalism, scoped separately because it spans a service and compatibility work.
