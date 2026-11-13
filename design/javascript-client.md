@@ -1,10 +1,11 @@
 # JavaScript client for the browser
 
 **Status:** in progress. Phases 1 to 6 are complete and implemented locally, with flags
-enumerations, deprecation signals and a web browser control panel tutorial. They are not yet
-submitted. Phase 7 is the rest of the 0.8 work. The later phases are not scheduled. The client's
-current design is on the docs site, in `doc/src/client-design/js.rst`, and the "as built"
-sections below record how each phase landed.
+enumerations, deprecation signals and a web browser control panel tutorial. Phase 7, the rest of
+the 0.8 work, is in progress: links in the server forms and npm publishing are done, also local.
+A first Windows CI run and the submission remain. The later phases are not scheduled. The
+client's current design is on the docs site, in `doc/src/client-design/js.rst`, and the "as
+built" sections below record how each phase landed.
 
 ## Goal
 
@@ -810,13 +811,27 @@ await conn.run(fn, 1);   // string; run(fn, "a") is a type error
 | Parameters | `compile<C, R, const L extends readonly TypeLike[] = []>` infers the tuple of type values, and `ValuesOf<L>` gives the parameters' types. A union of type value forms would also infer from a class's static methods |
 | `ServerFunction<P, R>` | A `KRPC.Expression` with phantom types. `run<R, P>` checks the arguments; `R` comes first so `run<number>(expr)` still compiles. `addStream` takes `ServerFunction<[], R>` |
 | In-package paths | `tsconfig.json` maps `@krpc-org/krpc` to `./src/index` with no extension. With `.ts`, tsc 5.9 crashed resolving the augmentation from a project that has only `index.d.ts` |
-| Docs comments | The server forms reuse the client's documentation, so a link to a property names its getter |
+| Docs comments | The server forms reuse the client's documentation, so a link to a property names its getter. Phase 7 fixed the links |
 
 - **Tests.** `test/types.check.ts`, compiled with the native tests and never run, with
   `@ts-expect-error` lines for a getter form, a Promise read, a wrong argument, a stream of a
   function with parameters and an event of a number. The guide's JavaScript examples are checked
   against the server forms too, so their JSDoc workarounds went.
 - **Goldens.** The JavaScript clientgen goldens grow by the server namespace and registries.
+
+### Phase 7 as built
+
+Done: links in the server forms, npm publishing. To do: a first Windows CI run, the submission.
+
+- **Links in the server forms.** Clientgen parses each comment a second time for a server form,
+  where a link to a property names the property: `{@link Vessel.mass}` in place of
+  `{@link Vessel.getMass}`. The other links already resolve there. Folded into the 6c commit.
+- **npm publishing.** Release step `69-release-npm.py` publishes the release tarball as
+  `@krpc-org/krpc` with public access, using `NPM_TOKEN` from the credentials file. The token is a
+  granular one with write access to `@krpc-org` and 2FA bypass, and lasts at most 90 days, so
+  each release makes a new one. Preflight checks the token with `/-/whoami`, and fails if the
+  version is already on npm. The guide installs from npm, but does not link the package page:
+  the release's linkcheck runs before the first publish.
 
 ## Pages and TLS
 
@@ -869,17 +884,12 @@ Ruled out:
 
 ## Open items
 
-- **Local socket on Windows, unverified.** Node's `net.connect({ path })` takes only named pipes on
+- **Local socket on Windows, unverified, not scheduled.** Node's `net.connect({ path })` takes only named pipes on
   Windows, and libuv has no Unix-domain sockets there. The server's local socket on Windows is a
   Unix-domain socket. A Node client on Windows may then get TCP and not the local socket, short of
   a native add-on. Check before the Node transports phase.
-- **Origin check.** The server ignores the `Origin` header of a WebSocket upgrade, so any web page
+- **Origin check, not scheduled.** The server ignores the `Origin` header of a WebSocket upgrade, so any web page
   open in the player's browser can connect to the game. Until the pages phase, the guide
   recommends the server's connection approval for a game with a browser open.
 - **Windows CI, phase 7.** The client's job is in the Windows matrix, but has not run yet.
   `rules_js` supports Windows with caveats.
-- **npm publishing, phase 7.** The release builds the tarball as a GitHub asset. Publishing it to
-  npm under `@krpc-org` is a release step still to add.
-- **Links in the server forms, phase 7.** The server forms of 6c reuse the client's documentation
-  comments, so a link to a property names its getter, as `Vessel.getMass`. Clientgen parses each
-  comment once, for the client form.
