@@ -52,6 +52,16 @@ as TWR and time to atmosphere.
   stream holds its value while it waits. After 5 s of real time with no result, it throws, with
   `SimManager.failMessage`. The impact procedures need it too: `ImpactProcessor.Update` reads
   `SimulationProcessor.LastStage`.
+  * A change is a switch, staging or a change in the part count. Staging keeps the vessel, and a
+    script that stages and then reads `Stages` must not see the stages from before.
+  * A run reads the parts on the main thread and finishes on a worker. A run in flight at a change
+    started before it, so the service then waits for two new results (`SimManager.ResultsReady`).
+  * The worker publishes a result inside `SimManager.locker`. A read holds that lock, so
+    `GetBurnTime` and `ImpactProcessor` see the stages the service checked, never a null from a
+    failed run.
+* **Impact while paused.** `ImpactProcessor.Update` returns early while
+  `FlightEngineerCore.gamePaused` is set, and the server runs while the game is paused. The
+  service clears the flag for its call and restores it.
 * **Burn time for any delta-v.** `ManoeuvreProcessor` computes burn time for the first node only,
   through its private static `GetBurnTime (double, ref double, ref double)`. The service binds that
   method and takes the delta-v as an argument. A node's burn time is `BurnTime (vessel, node.DeltaV)`.
