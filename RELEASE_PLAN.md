@@ -21,7 +21,7 @@ Finished items are collapsed under **Done** in each section.
 | | Release | Theme | Progress |
 | --- | --- | --- | --- |
 | ✅ | [0.7](#07-server-side-functions-streams-and-events-service-improvements) | Server-side functions, streams and events, protocol additions, service improvements | Tagged 2026-10-21 |
-| 🚧 | [0.8](#08-single-connection-client-codegen-then-client-conformance-and-thread-safety) | Single connection, client codegen, then client conformance testing and thread safety | 16 of 24 features done |
+| 🚧 | [0.8](#08-single-connection-client-codegen-then-client-conformance-and-thread-safety) | Single connection, client codegen, then client conformance testing and thread safety | 16 of 26 features done |
 | ⬜ | [1.0](#10-remaining-protocol-improvements-server-side-function-follow-ups) | Remaining protocol improvements (#906), server side function follow-ups | 0 of 9 done; tick control has a 0.7 stopgap |
 
 ## 0.7: server-side functions, streams and events, service improvements
@@ -29,7 +29,7 @@ Finished items are collapsed under **Done** in each section.
 Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 2026-10-21.
 
 <details>
-<summary>Done (40)</summary>
+<summary>Done (41)</summary>
 
 ### Protocol and server
 
@@ -45,6 +45,7 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 | ✅ | Object lifetime and removal | #1051, #1072, #1120 | [object-lifetime.md](design/object-lifetime.md) |
 | ✅ | Physics tick synchronization (tick hold, stopgap for #251), auto-pilot update timing | #1070 | [server/tick-hold.md](design/server/tick-hold.md), [autopilot/update-timing.md](design/autopilot/update-timing.md) |
 | ✅ | Local socket transport | #1065 | [protocol/local-transports.md](design/protocol/local-transports.md) |
+| ✅ | More communication protocols; local sockets landed in 0.7, gRPC moved to #1187 | [#899](https://github.com/krpc/krpc/issues/899) | [protocol/local-transports.md](design/protocol/local-transports.md) |
 | ✅ | Definition ordering | #1044 | [protocol/definition-ordering.md](design/protocol/definition-ordering.md) |
 | ✅ | RPCs deprecated in 0.6.0 removed | #1140 | — |
 | ✅ | Game state and scene handling (no game loaded, scene checks, scene loads) | #1041, #1119, #1121, #1131 | — |
@@ -90,18 +91,23 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 
 ## 0.8: single connection, client codegen, then client conformance and thread safety
 
+One connection per client in place of separate RPC and stream connections, on protocol version 2,
+with client behavior set by a runtime specification and checked by a conformance suite across every
+client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
+
 ### Features
 
 | | Feature | Issue | Design doc |
 | --- | --- | --- | --- |
-| 🚧 | Scanner errors disable only the broken members, a broken mod disables only its integration, listed in one popup | [#1227](https://github.com/krpc/krpc/issues/1227) | [server/partial-loading.md](design/server/partial-loading.md), [server/problem-reporting.md](design/server/problem-reporting.md) |
 | 🚧 | Client name collisions: a scanner rule banning clashing member names, a contract for client naming, the clashing `ConfigNode` methods removed (done: #1261, #1273) | [#1237](https://github.com/krpc/krpc/issues/1237) | [protocol/service-definition-rules.md](design/protocol/service-definition-rules.md), [protocol/client-naming.md](design/protocol/client-naming.md) |
 | ⬜ | Inheritance for remote objects; additive, UI and Drawing first, then robotics and #900 modules | [#905](https://github.com/krpc/krpc/issues/905) | [protocol/inheritance.md](design/protocol/inheritance.md) |
 | 🚧 | Flags enumerations, for `SpaceCenter.MapFilter`, with conformance tests; breaking for `MapFilterType.All`. Implemented for the server and every client, not yet submitted | [krpc-enum-flags.md](issues/krpc-enum-flags.md) | — |
 | ⬜ | Flags enumerations in server side functions: `Expression.Not`, and the Python and C# compilers' operators; follows the flags enumerations PR | [krpc-enum-flags-functions.md](issues/krpc-enum-flags-functions.md) | — |
+| 🚧 | Scanner errors disable only the broken members, a broken mod disables only its integration, listed in one popup | [#1227](https://github.com/krpc/krpc/issues/1227) | [server/partial-loading.md](design/server/partial-loading.md), [server/problem-reporting.md](design/server/problem-reporting.md) |
 | ⬜ | `RequiresMod` attribute: the server checks that a service's mod is available before each RPC | [requires-mod-attribute.md](issues/requires-mod-attribute.md) | [server/partial-loading.md](design/server/partial-loading.md) |
 | 🚧 | Python: build every service from the server's definitions, with generated declarations for type checking; removes `use_pregenerated_stubs` and replaces the Python part of #1195. Phases 1 to 2b merged, and two phase 3 follow-ups: typed function compiler, `definitions` and `declarations` conformance profiles. Open: pyright on generated modules, `<Service>Client` escaped, `--bundle`, a connect per game | [python-declarations.md](issues/python-declarations.md), PRs #1298, #1302, #1303, #1304, #1305, #1306 | [python-declarations.md](design/python-declarations.md) |
 | 🚧 | JavaScript client for the browser, on WebSockets, in phases. Phases 1 to 3 implemented, not yet submitted | **To write** | [javascript-client.md](design/javascript-client.md) |
+| 🚧 | Trajectories service; a PR from an outside contributor | PR #1253, **add milestone** | [services/trajectories-service.md](design/services/trajectories-service.md) |
 | ⬜ | MechJeb2 and Kerbal Engineer Redux services | [#288](https://github.com/krpc/krpc/issues/288), **add milestone** | — |
 
 <details>
@@ -128,34 +134,10 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 
 </details>
 
-* **Single connection first.** It changes connection setup and threading in every client, so the
-  conformance suite is written against it rather than rewritten after it.
-* **The protocol version goes to 2 with it.** A 0.7 client and a 0.8 server then fail at the
-  handshake with a clear error, in either direction.
-* **Procedure ids change with it.** Deriving them from names renumbers every procedure, which only
-  C-nano sees. Version 2 already rejects 0.7 clients, so it needs no version of its own.
-* **Request ids go with it, on the same branch.** The single connection's client reader matches
-  responses by id, so phase 1 of request ids is part of it. Pipelining and out-of-order completion
-  are later additions.
-* **Client codegen before conformance.** It is a separate piece of work. Its exception tables and
-  error message format settle two client disagreements, so the suite's error tests start out
-  passing.
-* **Thread safety goes with conformance.** The single connection changes client threading, and
-  the conformance suite's threading tests are where the guarantees get pinned and checked across
-  clients.
-* **Spec before client fixes.** The single connection lands to a minimal client bar, then the
-  conformance infrastructure, then the spec one section per PR, reviewed as requirement text.
-  Client fixes against the spec come after, so the single connection is not reworked to a spec
-  still being written ([client-conformance/](design/client-conformance/README.md) "Sequencing").
-* **Not released until the stack lands.** A later PR in the stack may still change client
-  behavior or API.
-* **A hard break.** The 0.8 server speaks only the single connection, with no transition period.
-  Clients older than 0.8 cannot connect to it.
-
 ### Merged
 
 <details>
-<summary>Done (29)</summary>
+<summary>Done (30)</summary>
 
 | | Item | PRs | Design doc |
 | --- | --- | --- | --- |
@@ -188,29 +170,24 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 | ✅ | Build and CI: service imports sorted in generated Python stubs, tool package tests started once the Python client is built | #1292, #1293 | — |
 | ✅ | C# tools: System.CommandLine and System.Text.Json replace NDesk.Options and Newtonsoft.Json; `krpc-testserver` and `krpc-servicedefs` reject unknown options, service definitions written in a fixed order | #1296 | — |
 | ✅ | Python: an `RPCError` for a server error naming a class that is not an exception, and a deprecated procedure keeps its signature | #1300, #1301 | — |
+| ✅ | Conformance: run Python's `:conformance-base` with no stubs, as it loads them today; first phase of the Python declarations work | #1298 | [python-declarations.md](design/python-declarations.md) |
 
 </details>
 
 ### Fixes and smaller items
 
-Everything but the `RemoveStream` change, the argument position check, strict argument decoding, the
-portable tool bundles, the connection binding audit and the scanner rules can ship in a 0.7.x release
-if 0.8 is far off. The `RemoveStream` change breaks the `KRPC` service, the argument position check
-and strict decoding break clients that send such values, the bundles and the audit depend on the
-conformance suite, and the scanner rules build on #1237.
-
 | | Item | Issue | Design doc |
 | --- | --- | --- | --- |
-| 🚧 | Audit how each client binds static methods and streams to a connection; the Python part done by #1302 | [#1195](https://github.com/krpc/krpc/issues/1195) | [static-method-binding.md](design/static-method-binding.md) |
-| 🚧 | Update the `krpc` and `krpc-cnano` vcpkg ports for 0.8.0: MIT licenses, copyright files, every C-nano transport (done in the repo: #1275, #1281; publishing waits on the release) | [vcpkg-ports-0-8.md](issues/vcpkg-ports-0-8.md) | — |
-| ⬜ | Deprecation signals for every member kind in every client | [deprecation-all-members.md](issues/deprecation-all-members.md) | — |
 | ⬜ | Scanner rules for service, type, parameter and enumeration value names, and the C++ helper names | [clientgen-qualified-names.md](issues/clientgen-qualified-names.md) | [protocol/service-definition-rules.md](design/protocol/service-definition-rules.md) |
 | ⬜ | Clients: escape a service or type name that meets a client's own name | [client-name-escapes.md](issues/client-name-escapes.md) | [protocol/client-reserved-names.md](design/protocol/client-reserved-names.md) |
+| ⬜ | Clients: use `Connection` for the entry point in every client | [client-class-names.md](issues/client-class-names.md) | — |
+| ⬜ | Deprecation signals for every member kind in every client | [deprecation-all-members.md](issues/deprecation-all-members.md) | — |
+| 🚧 | Audit how each client binds static methods and streams to a connection; the Python part done by #1302 | [#1195](https://github.com/krpc/krpc/issues/1195) | [static-method-binding.md](design/static-method-binding.md) |
 | ⬜ | Clients: calls that cannot go in a server side function | [calls-a-function-cannot-make.md](issues/calls-a-function-cannot-make.md) | — |
 | ⬜ | Clients: check whether a per-element function needs a real instance | [call-with-arguments-template.md](issues/call-with-arguments-template.md) | [server-side-functions/server-side-functions.md](design/server-side-functions/server-side-functions.md) |
-| ⬜ | In-game tests for websockets, serial IO and local sockets, for what `TestServer` and the unit tests do not reach | [ingame-protocol-tests.md](issues/ingame-protocol-tests.md) | — |
 | ⬜ | Lua: `platform.sleep` busy-waits, to whole seconds | [lua-platform-sleep.md](issues/lua-platform-sleep.md) | — |
-| ⬜ | Clients: use `Connection` for the entry point in every client | [client-class-names.md](issues/client-class-names.md) | — |
+| ⬜ | In-game tests for websockets, serial IO and local sockets, for what `TestServer` and the unit tests do not reach | [ingame-protocol-tests.md](issues/ingame-protocol-tests.md) | — |
+| 🚧 | Update the `krpc` and `krpc-cnano` vcpkg ports for 0.8.0: MIT licenses, copyright files, every C-nano transport (done in the repo: #1275, #1281; publishing waits on the release) | [vcpkg-ports-0-8.md](issues/vcpkg-ports-0-8.md) | — |
 | ⬜ | SpaceCenter: setting the IVA camera mode fails silently straight after a launch, and leaves the IVA when already in it | [camera-iva-mode-setter.md](issues/camera-iva-mode-setter.md) | — |
 
 <details>
@@ -268,85 +245,95 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 
 ### Features
 
+#### Protocol and server
+
 | | Feature | Issue | Design doc |
 | --- | --- | --- | --- |
-| ⬜ | MicroPython client, for boards such as the Raspberry Pi Pico; first check that generated stubs fit | [micropython-client.md](issues/micropython-client.md) | — |
 | ⬜ | Events that carry a value: a core stream of the unsent firings as a list, no protocol change; waits for a service that needs it | [events-with-values.md](issues/events-with-values.md) | — |
-| ⬜ | Custom transports in every client, as C-nano has | [client-custom-transports.md](issues/client-custom-transports.md) | — |
-| ⬜ | Per-client receive patience | [recv-patience.md](issues/recv-patience.md) | [server/recv-timeout-cliff.md](design/server/recv-timeout-cliff.md) |
-| 🚧 | RemoteTech API bindings and KAC alarm actions | [remotetech-kac-api.md](issues/remotetech-kac-api.md) | [services/kac-remotetech-tests-and-api.md](design/services/kac-remotetech-tests-and-api.md) |
-| ⬜ | InfernalRobotics input linking and sun tracking | [infernal-robotics-input-linking.md](issues/infernal-robotics-input-linking.md) | [services/infernal-robotics-input-linking.md](design/services/infernal-robotics-input-linking.md) |
-| ⬜ | Autopilot extensions: bank-to-turn, heterogeneous actuators, output filter knobs, sign convention refactor | — | [autopilot/bank-to-turn.md](design/autopilot/bank-to-turn.md), [autopilot/heterogeneous-actuators.md](design/autopilot/heterogeneous-actuators.md), [autopilot/output-filter-manual-knobs.md](design/autopilot/output-filter-manual-knobs.md), [autopilot/sign-convention-refactor.md](design/autopilot/sign-convention-refactor.md) |
-| ⬜ | Python: asyncio conveniences over `submit`, after the single connection | [python-asyncio-client.md](issues/python-asyncio-client.md) | [protocol/request-ids.md](design/protocol/request-ids.md) |
 | ⬜ | Streams and events over serial IO, after the single connection; needs flow control | [#1204](https://github.com/krpc/krpc/issues/1204) | [protocol/single-connection.md](design/protocol/single-connection.md) |
+| ⬜ | Per-client receive patience | [recv-patience.md](issues/recv-patience.md) | [server/recv-timeout-cliff.md](design/server/recv-timeout-cliff.md) |
 | ⬜ | gRPC support, possibly through an external bridge; the game's runtime cannot host it | [#1187](https://github.com/krpc/krpc/issues/1187) | [protocol/grpc-support.md](design/protocol/grpc-support.md) |
-| 🚧 | Principia support; phase 1 shipped as a docs page, phases 2 and 3 wait on upstream | [#767](https://github.com/krpc/krpc/issues/767) | [services/principia-service.md](design/services/principia-service.md) |
-| ⬜ | Raster Prop Monitor integration and camera views | [#375](https://github.com/krpc/krpc/issues/375), [#424](https://github.com/krpc/krpc/issues/424) | [services/raster-prop-monitor.md](design/services/raster-prop-monitor.md) |
-| ⬜ | Index of mod integrations: existing work, plus SCANsat, Kerbalism, Near Future Solar and compatibility checks | [mod-integrations-index.md](issues/mod-integrations-index.md) | — |
-| ⬜ | Vessel state and staging prediction; parts may be covered by the stage API | [#311](https://github.com/krpc/krpc/issues/311) | — |
+
+#### Clients
+
+| | Feature | Issue | Design doc |
+| --- | --- | --- | --- |
+| ⬜ | Custom transports in every client, as C-nano has | [client-custom-transports.md](issues/client-custom-transports.md) | — |
+| ⬜ | Python: asyncio conveniences over `submit`, after the single connection | [python-asyncio-client.md](issues/python-asyncio-client.md) | [protocol/request-ids.md](design/protocol/request-ids.md) |
 | ⬜ | Lua: documentation for the dynamically built services | [#1182](https://github.com/krpc/krpc/issues/1182) | — |
 | ⬜ | Lua: pre-generated type hints, LuaCATS annotations first, as the Python declarations | [lua-type-hints.md](issues/lua-type-hints.md) | [python-declarations.md](design/python-declarations.md) |
+| ⬜ | MicroPython client, for boards such as the Raspberry Pi Pico; first check that generated stubs fit | [micropython-client.md](issues/micropython-client.md) | — |
 
-<details>
-<summary>Done (3)</summary>
+#### Services and mod integrations
 
 | | Feature | Issue | Design doc |
 | --- | --- | --- | --- |
-| ✅ | Trajectories service; a PR from an outside contributor | PR #1253 | [services/trajectories-service.md](design/services/trajectories-service.md) |
-| ✅ | Per-thruster RCS control through IndividualRCS; a PR from an outside contributor | PR #1245 | — |
-| ✅ | More communication protocols; local sockets landed in 0.7, gRPC moved to #1187 | [#899](https://github.com/krpc/krpc/issues/899) | [protocol/local-transports.md](design/protocol/local-transports.md) |
-
-</details>
+| ⬜ | Vessel state and staging prediction; parts may be covered by the stage API | [#311](https://github.com/krpc/krpc/issues/311) | — |
+| ⬜ | Autopilot extensions: bank-to-turn, heterogeneous actuators, output filter knobs, sign convention refactor | — | [autopilot/bank-to-turn.md](design/autopilot/bank-to-turn.md), [autopilot/heterogeneous-actuators.md](design/autopilot/heterogeneous-actuators.md), [autopilot/output-filter-manual-knobs.md](design/autopilot/output-filter-manual-knobs.md), [autopilot/sign-convention-refactor.md](design/autopilot/sign-convention-refactor.md) |
+| ⬜ | Index of mod integrations: existing work, plus SCANsat, Kerbalism, Near Future Solar and compatibility checks | [mod-integrations-index.md](issues/mod-integrations-index.md) | — |
+| 🚧 | RemoteTech API bindings and KAC alarm actions | [remotetech-kac-api.md](issues/remotetech-kac-api.md) | [services/kac-remotetech-tests-and-api.md](design/services/kac-remotetech-tests-and-api.md) |
+| ⬜ | InfernalRobotics input linking and sun tracking | [infernal-robotics-input-linking.md](issues/infernal-robotics-input-linking.md) | [services/infernal-robotics-input-linking.md](design/services/infernal-robotics-input-linking.md) |
+| 🚧 | Principia support; phase 1 shipped as a docs page, phases 2 and 3 wait on upstream | [#767](https://github.com/krpc/krpc/issues/767) | [services/principia-service.md](design/services/principia-service.md) |
+| ⬜ | Raster Prop Monitor integration and camera views | [#375](https://github.com/krpc/krpc/issues/375), [#424](https://github.com/krpc/krpc/issues/424) | [services/raster-prop-monitor.md](design/services/raster-prop-monitor.md) |
+| ⛔ | Per-thruster RCS control through IndividualRCS; a PR from an outside contributor | PR #1245 | — |
 
 ### Fixes, tests and tooling
 
+#### Server and protocol
+
 | | Item | Issue | Design doc |
 | --- | --- | --- | --- |
-| ⬜ | Find out what users see with a mismatched client, server or service, per client; document the symptoms in the docs | [client-server-mismatch.md](issues/client-server-mismatch.md) | [protocol-compatibility.md](design/protocol-compatibility.md) |
-| ⬜ | Windows CI: C-nano serial transport tests, over a named pipe | [#1200](https://github.com/krpc/krpc/issues/1200) | — |
+| ⬜ | Raise the default receive timeout | [recv-timeout-default.md](issues/recv-timeout-default.md) | [server/recv-timeout-cliff.md](design/server/recv-timeout-cliff.md) |
 | ⬜ | Reject a string argument holding invalid UTF-8 in the KSP mod; measure the cost first | [invalid-utf8-arguments.md](issues/invalid-utf8-arguments.md) | — |
+| ⬜ | Find out what users see with a mismatched client, server or service, per client; document the symptoms in the docs | [client-server-mismatch.md](issues/client-server-mismatch.md) | [protocol-compatibility.md](design/protocol-compatibility.md) |
+| ⬜ | Compiled delegates for the KSA control inputs; waits on a `KRPC.Core` release with `Accessor` | [ksa-control-inputs-delegates.md](issues/ksa-control-inputs-delegates.md) | — |
+
+#### Client spec and conformance
+
+| | Item | Issue | Design doc |
+| --- | --- | --- | --- |
+| ⬜ | Conformance: coverage gaps found writing the client design docs, and the tracker for the other conformance items | [conformance-coverage-gaps.md](issues/conformance-coverage-gaps.md) | [client-conformance/](design/client-conformance/README.md) |
+| ⬜ | Client spec: rule on the behavior clients differ on | [conformance-spec-rulings.md](issues/conformance-spec-rulings.md) | [client-conformance/spec.md](design/client-conformance/spec.md) |
+| ⬜ | Client spec: one callback thread per connection | [spec-callback-thread-per-connection.md](issues/spec-callback-thread-per-connection.md) | [client-conformance/spec.md](design/client-conformance/spec.md) |
+| ⬜ | Conformance: skipped arguments in a call built for a server side function, after [#1267](https://github.com/krpc/krpc/issues/1267) | [conformance-skipped-arguments-get-call.md](issues/conformance-skipped-arguments-get-call.md) | — |
+| ⬜ | Race points for the C# and Python clients, for the conformance `races` profile | [conformance-forced-races.md](issues/conformance-forced-races.md) | [client-conformance/harness.md](design/client-conformance/harness.md) |
+| ⬜ | Conformance: a driver helper for a callback that runs a command on itself | [conformance-self-removing-callback.md](issues/conformance-self-removing-callback.md) | [client-conformance/harness.md](design/client-conformance/harness.md) |
+| ⬜ | Conformance: replace guessed sleeps with forced orders | [conformance-settle-sleeps.md](issues/conformance-settle-sleeps.md) | [client-conformance/harness.md](design/client-conformance/harness.md) |
+| ⬜ | Conformance: wake waits on the testee's notifications | [conformance-wait-until-polls.md](issues/conformance-wait-until-polls.md) | [client-conformance/harness.md](design/client-conformance/harness.md) |
+| ⬜ | Conformance: wait for the serial link instead of a fixed second | [conformance-serial-settle-time.md](issues/conformance-serial-settle-time.md) | [client-conformance/harness.md](design/client-conformance/harness.md) |
+
+#### Clients
+
+| | Item | Issue | Design doc |
+| --- | --- | --- | --- |
+| ⬜ | Clients: defects shared between the threaded clients | [client-design-shared-defects.md](issues/client-design-shared-defects.md) | — |
+| ⬜ | Generate the client API references from the client sources | [client-api-reference-autodoc.md](issues/client-api-reference-autodoc.md) | — |
+| ⬜ | C#: defects found writing the design doc | [client-csharp-defects.md](issues/client-csharp-defects.md) | — |
+| ⬜ | C#: keep the `.csproj` package versions in step with the Bazel lock files; follows the `nuget_repo` import | [csproj-package-versions.md](issues/csproj-package-versions.md) | — |
+| ⬜ | C++: defects found reviewing the client lifetime change | [client-cpp-defects.md](issues/client-cpp-defects.md) | — |
+| ⬜ | Clients: a manual ASan, UBSan and TSan run for C++ and C-nano | [sanitizer-testing.md](issues/sanitizer-testing.md) | — |
+| ⬜ | Java: defects found writing the design doc | [client-java-defects.md](issues/client-java-defects.md) | — |
+| ⬜ | Python: defects found writing the design doc | [client-python-defects.md](issues/client-python-defects.md) | — |
+| ⬜ | Python: Ctrl-C during a call on Windows, with the single connection | [python-ctrl-c-windows.md](issues/python-ctrl-c-windows.md) | [protocol/single-connection.md](design/protocol/single-connection.md) |
+| ⬜ | Python: trim client frames from server error tracebacks | [python-traceback-trim.md](issues/python-traceback-trim.md) | — |
+| ⬜ | clientgen: a Python `--include` given as a file path makes a wrong import; take a module name only; follows the Python declarations | [clientgen-python-include-paths.md](issues/clientgen-python-include-paths.md) | [python-declarations.md](design/python-declarations.md) |
+| ⬜ | Lua: defects found writing the design doc | [client-lua-defects.md](issues/client-lua-defects.md) | — |
+| ⬜ | Lua 5.1: `math.huge` stands for the largest integer, so 2^63 - 1 reads as infinity | [lua-51-math-huge.md](issues/lua-51-math-huge.md) | — |
+| ⛔ | luasocket release pin, blocked upstream on lunarmodules/luasocket#469 | [#1203](https://github.com/krpc/krpc/issues/1203) | [build-tools/lua-socket-unix-on-windows.md](design/build-tools/lua-socket-unix-on-windows.md) |
+| ⬜ | C-nano: defects found writing the design doc | [client-cnano-defects.md](issues/client-cnano-defects.md) | — |
+| ⬜ | C-nano: retry POSIX serial reads and writes interrupted by a signal, and loop short writes | [cnano-serial-eintr.md](issues/cnano-serial-eintr.md) | — |
+| ⬜ | C-nano: follow-ups to server side functions: generated functions, heap use, header opt-out, examples, testee cleanups | [cnano-functions-follow-ups.md](issues/cnano-functions-follow-ups.md) | — |
+| ⬜ | Websockets testee: defects found writing the design doc | [client-websockets-defects.md](issues/client-websockets-defects.md) | — |
+
+#### Tests, build and CI
+
+| | Item | Issue | Design doc |
+| --- | --- | --- | --- |
 | 🚧 | Autopilot test-plan gaps | [autopilot-test-gaps.md](issues/autopilot-test-gaps.md) | [autopilot/test-plan.md](design/autopilot/test-plan.md) |
 | 🚧 | Mod compatibility tests | [mod-compat-tests.md](issues/mod-compat-tests.md) | [services/mod-compat-test-coverage.md](design/services/mod-compat-test-coverage.md), [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ⬜ | NUnit 5 | [nunit-5-migration.md](issues/nunit-5-migration.md) | [build-tools/nunit-5-migration.md](design/build-tools/nunit-5-migration.md) |
+| ⬜ | Windows CI: C-nano serial transport tests, over a named pipe | [#1200](https://github.com/krpc/krpc/issues/1200) | — |
 | ⬜ | Build `KRPC.IO.Ports` from source in the net472 `KRPC.Core`, in place of the prebuilt DLL | [core-serial-ports.md](issues/core-serial-ports.md) | — |
-| ⬜ | Race points for the C# and Python clients, for the conformance `races` profile | [conformance-forced-races.md](issues/conformance-forced-races.md) | [client-conformance/harness.md](design/client-conformance/harness.md) |
-| ⬜ | Conformance: wait for the serial link instead of a fixed second | [conformance-serial-settle-time.md](issues/conformance-serial-settle-time.md) | [client-conformance/harness.md](design/client-conformance/harness.md) |
-| ⬜ | Conformance: wake waits on the testee's notifications | [conformance-wait-until-polls.md](issues/conformance-wait-until-polls.md) | [client-conformance/harness.md](design/client-conformance/harness.md) |
-| ⬜ | Conformance: replace guessed sleeps with forced orders | [conformance-settle-sleeps.md](issues/conformance-settle-sleeps.md) | [client-conformance/harness.md](design/client-conformance/harness.md) |
-| ⬜ | Conformance: a driver helper for a callback that runs a command on itself | [conformance-self-removing-callback.md](issues/conformance-self-removing-callback.md) | [client-conformance/harness.md](design/client-conformance/harness.md) |
-| ⬜ | Conformance: coverage gaps found writing the client design docs, and the tracker for the other conformance items | [conformance-coverage-gaps.md](issues/conformance-coverage-gaps.md) | [client-conformance/](design/client-conformance/README.md) |
-| ⬜ | Clients: a manual ASan, UBSan and TSan run for C++ and C-nano | [sanitizer-testing.md](issues/sanitizer-testing.md) | — |
-| ⬜ | Client spec: rule on the behavior clients differ on | [conformance-spec-rulings.md](issues/conformance-spec-rulings.md) | [client-conformance/spec.md](design/client-conformance/spec.md) |
-| ⬜ | Conformance: skipped arguments in a call built for a server side function, after [#1267](https://github.com/krpc/krpc/issues/1267) | [conformance-skipped-arguments-get-call.md](issues/conformance-skipped-arguments-get-call.md) | — |
-| ⬜ | Clients: defects shared between the threaded clients | [client-design-shared-defects.md](issues/client-design-shared-defects.md) | — |
-| ⬜ | C#: defects found writing the design doc | [client-csharp-defects.md](issues/client-csharp-defects.md) | — |
-| ⬜ | C++: defects found reviewing the client lifetime change | [client-cpp-defects.md](issues/client-cpp-defects.md) | — |
-| ⬜ | Java: defects found writing the design doc | [client-java-defects.md](issues/client-java-defects.md) | — |
-| ⬜ | Python: defects found writing the design doc | [client-python-defects.md](issues/client-python-defects.md) | — |
-| ⬜ | Lua: defects found writing the design doc | [client-lua-defects.md](issues/client-lua-defects.md) | — |
-| ⬜ | C-nano: defects found writing the design doc | [client-cnano-defects.md](issues/client-cnano-defects.md) | — |
-| ⬜ | Websockets testee: defects found writing the design doc | [client-websockets-defects.md](issues/client-websockets-defects.md) | — |
-| ⛔ | luasocket release pin, blocked upstream on lunarmodules/luasocket#469 | [#1203](https://github.com/krpc/krpc/issues/1203) | [build-tools/lua-socket-unix-on-windows.md](design/build-tools/lua-socket-unix-on-windows.md) |
-| ⬜ | Generate the client API references from the client sources | [client-api-reference-autodoc.md](issues/client-api-reference-autodoc.md) | — |
-| ⬜ | Client spec: one callback thread per connection | [spec-callback-thread-per-connection.md](issues/spec-callback-thread-per-connection.md) | [client-conformance/spec.md](design/client-conformance/spec.md) |
-| ⬜ | Lua 5.1: `math.huge` stands for the largest integer, so 2^63 - 1 reads as infinity | [lua-51-math-huge.md](issues/lua-51-math-huge.md) | — |
-| ⬜ | Compiled delegates for the KSA control inputs; waits on a `KRPC.Core` release with `Accessor` | [ksa-control-inputs-delegates.md](issues/ksa-control-inputs-delegates.md) | — |
-| ⬜ | C-nano: retry POSIX serial reads and writes interrupted by a signal, and loop short writes | [cnano-serial-eintr.md](issues/cnano-serial-eintr.md) | — |
-| ⬜ | Raise the default receive timeout | [recv-timeout-default.md](issues/recv-timeout-default.md) | [server/recv-timeout-cliff.md](design/server/recv-timeout-cliff.md) |
-| ⬜ | Python: Ctrl-C during a call on Windows, with the single connection | [python-ctrl-c-windows.md](issues/python-ctrl-c-windows.md) | [protocol/single-connection.md](design/protocol/single-connection.md) |
-| ⬜ | Python: trim client frames from server error tracebacks | [python-traceback-trim.md](issues/python-traceback-trim.md) | — |
-| ⬜ | C-nano: follow-ups to server side functions: generated functions, heap use, header opt-out, examples, testee cleanups | [cnano-functions-follow-ups.md](issues/cnano-functions-follow-ups.md) | — |
-| ⬜ | C#: keep the `.csproj` package versions in step with the Bazel lock files; follows the `nuget_repo` import | [csproj-package-versions.md](issues/csproj-package-versions.md) | — |
-| ⬜ | clientgen: a Python `--include` given as a file path makes a wrong import; take a module name only; follows the Python declarations | [clientgen-python-include-paths.md](issues/clientgen-python-include-paths.md) | [python-declarations.md](design/python-declarations.md) |
-
-<details>
-<summary>Done (1)</summary>
-
-| | Item | Issue | Design doc |
-| --- | --- | --- | --- |
-| ✅ | Conformance: run Python's `:conformance-base` with no stubs, as it loads them today; first phase of the Python declarations work | [#1298](https://github.com/krpc/krpc/pull/1298) | [python-declarations.md](design/python-declarations.md) |
-
-</details>
 
 ### Negative results
 
