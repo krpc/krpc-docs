@@ -1,6 +1,6 @@
 # Mod binding
 
-**Status:** implemented (2026-11-12), not yet merged, on branch `mod-binding`. Phase 3 of the
+**Status:** implemented (2026-11-12), not yet merged, on branch `mod-api`. Phase 3 of the
 [mod integration framework](README.md), for 0.8. Issue:
 [mod-integration-framework.md](../../../issues/mod-integration-framework.md). The branch starts
 with the three `MemberBinder` commits for KAC, IR, FAR and RealFuels from 2026-11-03, and extends

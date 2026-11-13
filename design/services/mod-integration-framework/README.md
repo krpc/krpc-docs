@@ -1,7 +1,10 @@
 # Mod integration framework
 
 **Status:** implemented, for 0.8. All seven phases are built and checked in game, not yet merged.
-The design dates from 2026-11-12, and each phase records where it diverged. Issue:
+The design dates from 2026-11-12, and each phase records where it diverged.
+
+The phases go in as three pull requests, one branch each in a stack: `service-registry` (phases 1
+and 2), `mod-api` (phases 3 and 4, one commit per integration) and `requires-mod` (phases 5 to 7). Issue:
 [mod-integration-framework.md](../../../issues/mod-integration-framework.md).
 
 The entry point for the shared machinery behind kRPC's mod integrations: the build, the binding to
@@ -447,7 +450,7 @@ The phase also merges the `ImageFormat` copies:
 * It is StdLib's first enumeration. Every client generates and builds it as any service's enum,
   and the docs list it with StdLib's structs.
 
-Implemented on branch `mod-binding`, not yet merged. Checked in game on 2026-11-12: every integration's tests at its pinned version, 337 passed, with no stub warning in the logs. The negative control, one misspelled member in each of the 13 integrations, failed only the tests that use those members, each with the stub's message, and logged one warning per member.
+Implemented on branch `mod-api`, not yet merged. Checked in game on 2026-11-12: every integration's tests at its pinned version, 337 passed, with no stub warning in the logs. The negative control, one misspelled member in each of the 13 integrations, failed only the tests that use those members, each with the stub's message, and logged one warning per member.
 
 ### Phase 4: `ModAPI`, loaded at startup
 
@@ -482,7 +485,7 @@ Implemented on branch `requires-mod`, not yet merged. Checked in game on 2026-11
 
 Bumping a pin in the registry updates the tests and the docs in the same commit.
 
-Implemented on branch `tested-mod-versions`, not yet merged. Where it diverged:
+Implemented on branch `requires-mod`, not yet merged. Where it diverged:
 
 * docgen is unchanged. `doc/mods.bzl` writes rst include files from the registry in Starlark: a
   link target and a `|<title> tested|` substitution per mod, and two tables for SpaceCenter.
@@ -498,7 +501,7 @@ and no failure, through a `TestingTools` procedure that reads `ServiceProblems.M
 class that requires a mod gets the check with no code. A pin bump that removes a member then fails
 in CI, before a player sees it.
 
-Implemented on branch `no-stubs-check`, not yet merged. The procedure is
+Implemented on branch `requires-mod`, not yet merged. The procedure is
 `TestingTools.ModProblems`, a map from mod name to the problem. A required mod is matched to its
 integration by name. A failed check leaves the game running, and each later class with the same
 mods checks again. Checked in game on 2026-11-13: SCANsat and KAC, 36 passed. A misspelled SCANsat
