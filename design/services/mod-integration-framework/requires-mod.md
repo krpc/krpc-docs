@@ -1,6 +1,6 @@
 # `RequiresMod`: the server checks a service's mod
 
-**Status:** implemented (2026-11-13), not yet merged, on branch `requires-mod`. Not yet run in
+**Status:** implemented (2026-11-13), not yet merged, on branch `requires-mod`. Checked in
 game. Phase 5 of the [mod integration framework](README.md), for 0.8.
 Issue: [mod-integration-framework.md](../../../issues/mod-integration-framework.md). Builds on
 [`ModAPI`](mod-api.md).

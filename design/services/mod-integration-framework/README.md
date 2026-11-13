@@ -1,7 +1,7 @@
 # Mod integration framework
 
-**Status:** in progress, for 0.8. Phases 1 to 7 implemented, not yet merged. The rest is a proposal
-(2026-11-12), updated as each phase is built. Issue:
+**Status:** implemented, for 0.8. All seven phases are built and checked in game, not yet merged.
+The design dates from 2026-11-12, and each phase records where it diverged. Issue:
 [mod-integration-framework.md](../../../issues/mod-integration-framework.md).
 
 The entry point for the shared machinery behind kRPC's mod integrations: the build, the binding to
@@ -512,7 +512,7 @@ member failed each SCANsat class in `ensure()` with the member named, after one 
 | Registration | 19 other files | A `SERVICES` and a `MODS` entry in `service/registry.bzl`, plus the hand-written files the checks name: the `.csproj`, `KRPC.sln`, `KRPC.Client.csproj`, the `CHANGELOG.md` index, `COMPONENTS` in `changelog.py` and clientgen's Python module map. Then the docs pages |
 | Binding | Write a loader and helpers, or copy one | One `ModAPI` |
 | Availability | A `CheckAPI` per RPC | `[RequiresMod]` on the service |
-| Tests | Copy the setup and `test_available` | `launch`. The test framework checks `Available` and the installed assembly in place of `test_available` |
+| Tests | Copy the setup and `test_available` | `launch`. The test framework checks `Available`, the installed assembly and the binding in place of `test_available` |
 | Service id | A literal in the C# attribute | The registry's `id`, generated into `ServiceInfo.cs` |
 | Tested version | Not recorded | The mod's versions in the registry, shown in the docs |
 
