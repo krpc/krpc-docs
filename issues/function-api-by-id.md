@@ -25,8 +25,12 @@ those ids yet.
   `NotLoadedEvent.c`, `StructureField.c` and `ThrowException.c` under
   `doc/src/scripts/user-guide/server-side-functions/` pass names today.
 
-Open: the names of the variants, such as `ClassTypeById` and `GetFieldByIndex`, since kRPC has
-no overloads.
+The variants are `Type.ClassTypeById`, `EnumerationTypeById` and `StructTypeById`,
+`Expression.ConstantEnumById`, `ThrowById`, `TryCatchById` and `GetFieldByIndex`, as kRPC has no
+overloads. Each id pair is two parameters, `serviceId` then the type's id, so one C-nano macro
+fills both. The macros are `KRPC_CLASS_`, `KRPC_ENUMERATION_` and `KRPC_STRUCT_`, beside
+`KRPC_EXCEPTION_`. Each structure field also has a `KRPC_FIELD_` macro holding its position, so
+a program never writes the number, and a new client version can reorder fields safely.
 
 `Expression.Parameter`, `Variable` and `StateVariable` take names the program chooses, which refer
 to no definition. They need no ids.
