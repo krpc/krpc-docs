@@ -2,10 +2,10 @@
 
 **Status:** in progress. Phases 1 to 6 are complete and implemented locally, with flags
 enumerations, deprecation signals and a web browser control panel tutorial. They are not yet
-submitted, and have no issue in `issues/`. The later phases (pages served by the mod, TLS,
-Node.js transports) are not started, and the [open items](#open-items) are unresolved. The
-client's current design is on the docs site, in `doc/src/client-design/js.rst`, and the
-"as built" sections below record how each phase landed.
+submitted. The later phases (pages served by the mod, TLS, Node.js transports) are not started,
+and the [open items](#open-items) are unresolved. The client's current design is on the docs
+site, in `doc/src/client-design/js.rst`, and the "as built" sections below record how each
+phase landed.
 
 ## Goal
 

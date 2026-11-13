@@ -7,21 +7,23 @@ and planning notes that do not ship with the mod.
 
 ## Layout
 
- * `design/` — one doc per feature/issue, filed by area: `autopilot/`, `protocol/`, `services/`,
-   `build-tools/`, `ksa/`. Docs spanning all areas (audits, sweeps) sit in `design/` itself.
- * `analysis/` — test plans and results for the tools and clients, with their findings.
- * `RELEASE_PLAN.md` — the authoritative list of planned work, by milestone, with each item's issue
-   and design doc.
- * `issues/` — the issues: one work item per file, the title as the heading, then the body.
-   The milestone lives in `RELEASE_PLAN.md`. They are not filed on GitHub.
+ * `issues/` — every issue: one work item per file, the title as the heading, then the body.
+   They are not filed on GitHub.
+ * `design/` — detailed designs and features, one doc each, filed by area: `autopilot/`,
+   `protocol/`, `services/`, `build-tools/`, `ksa/`. Docs spanning all areas (audits, sweeps) sit
+   in `design/` itself.
+ * `analysis/` — experiments, exploration and analysis, such as test plans and their findings.
+ * `RELEASE_PLAN.md` — the authoritative list of work. It holds every issue and design, each
+   assigned to a milestone or in the not scheduled list.
 
 ## Tracking work
 
- * Planned work is an issue in `issues/`, scheduled in `RELEASE_PLAN.md`. It reaches GitHub as the
-   pull requests on [`krpc/krpc`](https://github.com/krpc/krpc) that do it.
+ * Work is an issue in `issues/` or a design in `design/`, listed in `RELEASE_PLAN.md`. A new one
+   gets its row there when it is written. It reaches GitHub as the pull requests on
+   [`krpc/krpc`](https://github.com/krpc/krpc) that do it.
  * The GitHub issue tracker is for public bug reports, and the occasional issue the maintainer posts.
    Do not turn an issue in `issues/` into a GitHub issue, or suggest it.
- * Each design doc links its issue in `issues/`, and the PRs that do the work once they exist.
+ * A design doc links the PRs that do the work once they exist.
 
 ## Writing docs here
 

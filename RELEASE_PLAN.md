@@ -1,7 +1,8 @@
 # Release plan
 
-The authoritative list of planned work per release, with pointers to design docs. Each item is an
-issue in [issues/](issues/), done as pull requests on [`krpc/krpc`](https://github.com/krpc/krpc).
+The authoritative list of work, by release or not scheduled. Each item is an issue in
+[issues/](issues/) or a design in [design/](design/), done as pull requests on
+[`krpc/krpc`](https://github.com/krpc/krpc). Every issue and design has a row here.
 The GitHub issue tracker is for public bug reports; the few items that started there keep their
 GitHub issue.
 
@@ -13,7 +14,7 @@ The **Issue** column says what tracks the item:
 * `#N`: a GitHub issue, with the milestone given here.
 * `#N`, then a **bold action**: a GitHub issue that needs that change.
 * `PR #N`: no issue, the pull request tracks the work.
-* **To write**: no issue yet.
+* —: no issue, the design doc in the last column tracks the work.
 
 The milestone goes on the PRs, and on a GitHub issue: 0.8 is `ksp-v0.8.0`, 1.0 is `ksp-v1.0.0`.
 Finished items are collapsed under **Done** in each section.
@@ -103,7 +104,7 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 | 🚧 | Scanner errors disable only the broken members, listed in one popup with the mods the mod integration framework disabled | [#1227](https://github.com/krpc/krpc/issues/1227) | [server/partial-loading.md](design/server/partial-loading.md), [server/problem-reporting.md](design/server/problem-reporting.md) |
 | ⬜ | Mod integration framework, refactoring first: one registry in `service/` for the services and mods, a build macro, test helpers in krpctools, one binding layer, `ModAPI` loaded at startup, `RequiresMod` in place of `CheckAPI`, tested mod versions in the docs | [mod-integration-framework.md](issues/mod-integration-framework.md) | [services/mod-integration-framework/](design/services/mod-integration-framework/README.md) |
 | 🚧 | Python: build every service from the server's definitions, with generated declarations for type checking; removes `use_pregenerated_stubs` and replaces the Python part of #1195. Phases 1 to 2b merged, and three phase 3 follow-ups: typed function compiler, `definitions` and `declarations` conformance profiles, pyright on the generated modules. Open: `<Service>Client` escaped, `--bundle`, a connect per game | [python-declarations.md](issues/python-declarations.md), PRs #1298, #1302, #1303, #1304, #1305, #1306, #1307 | [python-declarations.md](design/python-declarations.md) |
-| 🚧 | JavaScript client for the browser, on WebSockets, in phases. Phases 1 to 6, the function compiler included, implemented, not yet submitted | **To write** | [javascript-client.md](design/javascript-client.md) |
+| 🚧 | JavaScript client for the browser, on WebSockets, in phases. Phases 1 to 6, the function compiler included, implemented, not yet submitted | — | [javascript-client.md](design/javascript-client.md) |
 | 🚧 | Server side functions: `Match` and `Switch` statements, before the JavaScript compiler's statements; then Python `match`. The statements in #1334; Python `match` to do | [switch-statements.md](issues/switch-statements.md) | [server-side-functions/switch.md](design/server-side-functions/switch.md) |
 | 🚧 | Trajectories service; a PR from an outside contributor | PR #1253, **add milestone** | [services/trajectories-service.md](design/services/trajectories-service.md) |
 | 🚧 | Kerbal Engineer Redux service | [#288](https://github.com/krpc/krpc/issues/288), **add milestone** | [services/kerbal-engineer-redux.md](design/services/kerbal-engineer-redux.md) |
@@ -254,11 +255,11 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | | Feature | Issue | Design doc |
 | --- | --- | --- | --- |
 | ⬜ | Function release: a client releases the functions it no longer needs | [#1107](https://github.com/krpc/krpc/issues/1107), closed as premature, **reopen**, **add milestone** | [server-side-functions/function-release.md](design/server-side-functions/function-release.md) |
-| ⬜ | Shared nodes compiled once, removing the `MaxNodes` bound | **To write** | [server-side-functions/shared-nodes.md](design/server-side-functions/shared-nodes.md) |
-| ⬜ | Batched tree construction, gated on measuring real tree sizes | **To write** | [server-side-functions/batched-tree-construction.md](design/server-side-functions/batched-tree-construction.md) |
-| ⬜ | C# functions with statements | **To write** | [server-side-functions/csharp-statement-functions.md](design/server-side-functions/csharp-statement-functions.md) |
-| ⬜ | Yielding procedures: deferred calls and resumable functions | **To write** | [server-side-functions/yielding-procedures.md](design/server-side-functions/yielding-procedures.md) |
-| ⬜ | Arbitrary expressions: opt-in calls to arbitrary CLR members | **To write** | [server-side-functions/server-side-arbitrary-expressions.md](design/server-side-functions/server-side-arbitrary-expressions.md) |
+| ⬜ | Shared nodes compiled once, removing the `MaxNodes` bound | — | [server-side-functions/shared-nodes.md](design/server-side-functions/shared-nodes.md) |
+| ⬜ | Batched tree construction, gated on measuring real tree sizes | — | [server-side-functions/batched-tree-construction.md](design/server-side-functions/batched-tree-construction.md) |
+| ⬜ | C# functions with statements | — | [server-side-functions/csharp-statement-functions.md](design/server-side-functions/csharp-statement-functions.md) |
+| ⬜ | Yielding procedures: deferred calls and resumable functions | — | [server-side-functions/yielding-procedures.md](design/server-side-functions/yielding-procedures.md) |
+| ⬜ | Arbitrary expressions: opt-in calls to arbitrary CLR members | — | [server-side-functions/server-side-arbitrary-expressions.md](design/server-side-functions/server-side-arbitrary-expressions.md) |
 
 ## Not scheduled
 
