@@ -390,6 +390,8 @@ one form, so the tests read alike at the end:
 | 2a | The helpers, and every test file with a class that requires a mod: the mod services, and SpaceCenter's tests of FAR, RealFuels, the part mods and the rest | Implemented, not yet merged |
 | 2b | The other in-game tests, and the benchmarks | Implemented, not yet merged |
 
+Both parts ran in game on 2026-11-12: one test per changed class, every test of the files whose test bodies changed, and an autopilot subset. 296 tests passed.
+
 A part takes whole files, as a mod test class often extends a stock one in the same file.
 
 The helpers, in krpctools:
