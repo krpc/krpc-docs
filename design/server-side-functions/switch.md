@@ -66,13 +66,14 @@ need no new node kinds:
   of the same block. The `MarkerRewriter` binds the bodies' `Break` markers to the end label, with
   no continue target, so `Continue` passes to the enclosing loop.
 - **Checker message.** A `Break` outside any loop or fall-through switch says "A break statement
-  must be inside a loop or switch".
+  must be inside a loop or a switch with fall-through". It names the fall-through form, as a
+  `Break` in a `Switch` with no loop around it is still unbound.
 
 ## Clients
 
 | Client | Uses |
 | --- | --- |
-| JavaScript | Phase 6b compiles `switch` to `SwitchWithFallThrough`, with JavaScript's full semantics |
+| JavaScript | Phase 6b compiles `switch` to `SwitchWithFallThrough`, with JavaScript's full semantics. A case of a type the value does not compare with is a compile error |
 | Python | A later PR compiles `match`, below |
 | C# | No change. Its compiler emits no statements, see [csharp-statement-functions.md](csharp-statement-functions.md) |
 | C++, C-nano, Java, Lua | The generated factories, with no client change |
@@ -94,7 +95,16 @@ Python 3.10 is the client's minimum, so `match` is always available. Only some p
 | `as` | An `Assign` |
 
 The first matching case wins, so a run of simple cases is one `Switch` whose default holds the
-chain of the cases after it. A class pattern naming a subclass would need a run-time type test,
+chain of the cases after it.
+
+Python compares more loosely than `Switch`, which rejects a test value of an unrelated type when
+the node is built:
+
+| Python | Compiles to |
+| --- | --- |
+| A literal of a type the subject does not compare with, such as `case "a":` on an `int` | A compile error, as in JavaScript. Python would never match it |
+| `case None` | A test value of `ConstantNull`, on a nullable subject. A compile error otherwise |
+| `case True`, `case False` | A test value on a `bool` subject. A compile error otherwise, where Python's `is` would never match | A class pattern naming a subclass would need a run-time type test,
 which waits for class inheritance ([#905](https://github.com/krpc/krpc/issues/905)).
 
 ## Testing and docs
