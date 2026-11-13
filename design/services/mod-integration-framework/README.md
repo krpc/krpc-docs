@@ -1,6 +1,6 @@
 # Mod integration framework
 
-**Status:** in progress, for 0.8. Phase 1 implemented, not yet merged. The rest is a proposal
+**Status:** in progress, for 0.8. Phases 1 and 2 implemented, not yet merged. The rest is a proposal
 (2026-11-12), updated as each phase is built. Issue:
 [mod-integration-framework.md](../../../issues/mod-integration-framework.md).
 
@@ -108,9 +108,8 @@ all, so a call without the mod throws `NullReferenceException`.
 
 The services also report their mods unevenly. MechJeb has `APIReady`, which works in flight only
 and also needs a MechJeb part on the active vessel. SpaceCenter reports FAR, RealFuels and
-RealAntennas, and none of the part mods it supports. No service reports the installed version of
-its mod. So the tests tell each mod loaded with checks of their own: a part, a part module or an
-assembly version.
+RealAntennas, and none of the part mods it supports. So the tests tell each mod loaded with checks
+of their own: a part, a part module or an assembly version.
 
 ### Duplicated API
 
@@ -123,10 +122,11 @@ release where merging them is not a breaking change.
 The tests run through `krpctools.game.ksp.TestCase`, but each test class repeats the same setup:
 
 * `setUpClass` creates a save, launches a craft, removes other vessels, connects, then reads the
-  active vessel with `assert vessel is not None`. The block is in about 28 files, mod services
-  and SpaceCenter alike.
-* Seven services write their own `test_available`, as do the RealFuels and RealAntennas tests.
-  Each repeats the presence check the test framework runs before the class starts.
+  active vessel, in some classes with `assert vessel is not None`. The block is in about 100 test
+  classes, mod services and SpaceCenter alike.
+* Eight services write their own `test_available`, as do the RealFuels and RealAntennas tests.
+  Each repeats the presence check the test framework runs before the class starts. Infernal
+  Robotics combines it with `ready`, in `test_available_and_ready`.
 * DockingCamera, SCANsat, Raster Prop Monitor and Drawing each write the PNG signature. SCANsat
   and Raster Prop Monitor each define `png_size`.
 * Nothing checks that a mod bound in full at its pinned version. A mod update that removes a member
@@ -167,15 +167,15 @@ mod-specific, and follow this work. They report the mod failures phase 4 records
 
 `service/registry.bzl` is the one source of truth for the KSP services and the mods they wrap or
 support. Every list in the repo is generated from it where it can be, and checked against it where
-it must stay hand-written. Each mod then reports whether it is installed and at which version,
-through properties a client and the tests both read. The phase is four parts:
+it must stay hand-written. Each mod then reports whether it is installed, through a property a
+client and the tests both read. The phase is four parts:
 
 | Part | Change | Risk | State |
 | --- | --- | --- | --- |
 | 1a | The `ksp_service` macro. Every service under `service/` uses it. No registry yet | Low. `//:krpc` lists the same files before and after | Implemented as designed, not yet merged. The service targets and the mod zip are unchanged |
 | 1b | `SERVICES` moves into the registry and drives the build, the docs, clientgen and the release tools. Service ids are generated | Medium: touches clientgen and every service's C# | Implemented, not yet merged. The mod zip and the generated client code are unchanged |
 | 1c | `MODS` moves into the registry. krpctools reads `registry.json` | Medium: a comparison shows the old and new mods match before the Python classes go | Implemented, not yet merged. Every mod installs and checks as before |
-| 1d | `Available` and `ModVersion` for every mod, on its service or on SpaceCenter. krpctools checks each mod through them, and the presence checks leave the registry | Medium: new RPCs on every mod service and on SpaceCenter, and a version string per mod | Implemented, not yet merged |
+| 1d | `Available` for every mod, on its service or on SpaceCenter. krpctools checks each mod through it and the installed assembly, and the presence checks leave the registry | Medium: new RPCs on SpaceCenter, and a changed check for every mod | Implemented, not yet merged |
 
 The registry is internal, so it can change shape later. KSA is not in it. A registry spanning both
 games is 1.0 work, and its shape should not assume one game where that costs nothing now.
@@ -305,7 +305,8 @@ MODS = [
   listed, the latest. `"KSPCommunityPartModules==0.4.0"` gets that one. The same form works in
   `requires`.
 * **`assembly`** names the mod's main assembly, for each mod a service wraps or supports. The
-  assembly version check reads it, and 1d generates it into the C# for `ModVersion`.
+  assembly version check reads it. In 1d, the build generates it into the C#, and each version
+  gains the SHA-256 of its `<assembly>.dll`.
 * **`version`** is the release, used in the URL and shown in the docs. **`assembly_version`** is
   what an assembly presence check compares against. These are separate fields: TweakScale
   Rescaled is release 3.3.2.1 and assembly 3.3.
@@ -330,72 +331,102 @@ MODS = [
 **Check:** before the Python mod classes went, a script built the mods both ways and compared
 every field: URL, hash, folders, files, dependencies, presence check and overlays.
 
-#### 1d: `Available` and `ModVersion`
+#### 1d: `Available` for every mod
 
-Every mod a service wraps or supports reports itself through two properties:
+Every mod a service wraps or supports reports whether it is installed:
 
 ```python
->>> conn.scan_sat.available, conn.scan_sat.mod_version
-(True, '22.1')
->>> conn.space_center.far_available, conn.space_center.far_mod_version
-(True, '0.16.1.2')
+>>> conn.scan_sat.available
+True
+>>> conn.space_center.real_chute_available
+True
 ```
 
-| Service | Properties |
+| Service | Property |
 | --- | --- |
-| Each mod service | `Available`, whether its mod is installed and works. `ModVersion`, the installed version, or null |
-| SpaceCenter | `<Mod>Available` and `<Mod>ModVersion` for each mod it supports, such as `FARAvailable` and `RealChuteModVersion` |
+| Each mod service | `Available`, whether its mod is installed and works |
+| SpaceCenter | `<Mod>Available` for each mod it supports, such as `FARAvailable` and `RealChuteAvailable` |
 
 * **`Available` is about the mod, not the vessel.** It works in every game scene, MechJeb's
   included. Infernal Robotics and MechJeb also have `Ready`: whether the active vessel's servos,
   or its MechJeb core, can be used. MechJeb's `APIReady` is renamed `Ready`, as the service is
   unreleased.
-* **`ModVersion` is a string**, as KSP mods have no standard version. It is the informational
-  version of the mod's main assembly without its build metadata, else its file version, else its
-  assembly version. SCANsat 22.1 reports `22.1.0`, and Near Future Solar 1.3.3 reports `0.4.0.0`.
-  A script can check for a version older than the one kRPC tests, and decide for itself.
+* **No version property.** A mod's version as players know it is its release, the number GitHub,
+  CKAN and SpaceDock list. Nothing in an install carries it for every mod. The assembly's
+  attributes often stay at an old number: Near Future Solar 1.3.3 has file version 0.4.0.0, and
+  Firespitter 7.17 has only an assembly version, 7.3.7660.26532. The KSP-AVC `.version` file is
+  closest, but MechJeb, DMagic and KSPCommunityPartModules ship none, and TweakScale Rescaled
+  3.3.2.1 says 3.3.2.0. CKAN records its installs outside GameData, and only for the installs it
+  manages. A version property would misreport some mods, so there is none.
 * **SpaceCenter's `<Mod>Available`** is the existing binding's state for the mods it binds to
   (FAR, Action Groups Extended, RealFuels and RealAntennas), and whether the game loaded the mod's
-  assembly for the part mods.
+  assembly for the part mods, through a server helper, `ModAssembly`.
 * **The names come from the registry.** `<Mod>` is the mod's name in `MODS`, with its first letter
   upper case, as in `KOSAvailable`. Each mod's name and `assembly` are generated into the
-  service's `ServiceInfo.cs`, as its id is, as `ServiceInfo.Mods.SCANsat.Assembly`. A helper in
-  the server, `ModAssembly`, reads the version of a loaded assembly by name.
+  service's `ServiceInfo.cs`, as its id is, as `ServiceInfo.Mods.SCANsat.Assembly`.
 * **SpaceCenter lists the mods it supports**, in a `supports` field of its `SERVICES` entry. A mod
-  in no service's `mods` or `supports` is a dependency, such as Harmony, and has no properties.
-* **krpctools checks every mod the same way.** A mod is loaded when its `Available` is true and
-  its `ModVersion` matches the requested version. The presence-check constructors leave the
-  registry. A version's `assembly_version` becomes `mod_version`: the string `ModVersion` reports,
-  where it differs from the release, as for TweakScale Rescaled (release 3.3.2.1). Each pinned
-  archive is read once to fill it in.
+  in no service's `mods` or `supports` is a dependency, such as Harmony, and has no property.
+* **krpctools checks every mod the same way.** It reads each mod's `Available` once. For a loaded
+  mod, the SHA-256 of the installed `<assembly>.dll` tells the version: the registry records it
+  per version as `assembly_sha256`, and krpctools reads GameData directly, as it installed the
+  files. The required version is tried first, and the others only when it does not match. A DLL
+  matching no version counts as "<name> (another version)", which fails the check with that name.
+  A local build given with `--mod` is hashed from its own files. The presence-check constructors
+  leave the registry.
+* **The hash is checked at install.** Installing a pinned version fails when its
+  `<assembly>.dll` does not have the registry's `assembly_sha256`, so a pin bump cannot leave a
+  stale hash.
 * **The version check covers every mod.** A game left running with a stale install, which
   `--no-launch` reuses, fails before a test runs against the wrong version.
-* **Phase 4** reads `Available` and `ModVersion` from each integration's `ModAPI`, one line each.
+* **Phase 4** reads `Available` from each integration's `ModAPI`, in one line.
 
 ### Phase 2: test helpers
 
 Every in-game test sets up the same way, through the same helpers. The phase is two parts with
 one form, so the tests read alike at the end:
 
-| Part | Covers |
-| --- | --- |
-| 2a | Every test class that requires a mod: the mod services, and SpaceCenter's tests of FAR, RealFuels, the part mods and the rest |
-| 2b | The other in-game tests |
+| Part | Covers | State |
+| --- | --- | --- |
+| 2a | The helpers, and every test file with a class that requires a mod: the mod services, and SpaceCenter's tests of FAR, RealFuels, the part mods and the rest | Implemented, not yet merged |
+| 2b | The other in-game tests, and the benchmarks | Implemented, not yet merged |
+
+A part takes whole files, as a mod test class often extends a stock one in the same file.
 
 The helpers, in krpctools:
 
 | Helper | Replaces |
 | --- | --- |
-| `TestCase.launch(craft, ...)`: new save, launch, remove other vessels, return the active vessel. Its options are what the setups vary by: the craft directory, the editor and whether the save always reloads | The setup block and its `assert vessel is not None` |
-| `krpctools.game.images`: `assert_png`, `assert_jpeg`, `png_size`, `jpeg_size` | The copies in the DockingCamera, SCANsat, Raster Prop Monitor and Drawing tests |
+| `TestCase.launch(craft, directory, editor, crew, save, always_load)`: new save, launch, remove other vessels, return the active vessel. Its options are what the setups vary by: the craft directory, the editor, the crew, the save and whether it always reloads. The orbit stays a separate call, as its arguments vary | The setup block and its `assert vessel is not None` |
+| `krpctools.game.images`: `assert_png` and `assert_jpeg`, each with an optional size, `png_size`, `jpeg_size`, and `png`, which writes an image of one color or of a function of the pixel | The copies in the DockingCamera, SCANsat, Raster Prop Monitor and Drawing tests |
 
-* **No availability tests.** Before a test class starts, `ensure()` reads the `Available` and
-  `ModVersion` of each mod it requires ([1d](#1d-available-and-modversion)), and fails the class
-  when a mod is not loaded at the requested version. So the `test_available` methods go. The
-  `ready` of Infernal Robotics and MechJeb stays, as a test of its own.
+* **No availability tests.** Before a test class starts, `ensure()` checks each mod it requires
+  through its `Available` and its installed assembly ([1d](#1d-available-for-every-mod)), and
+  fails the class when a mod is not loaded at the requested version. So the `test_available` methods go. The
+  `ready` of Infernal Robotics and MechJeb stays, as a test of its own, and Infernal Robotics'
+  `test_available_and_ready` becomes `test_ready`.
+* **Crewed by default.** The craft takes its default crew, as from the VAB, and its crew become
+  pilots for full control. `crew` names the Kerbals in place of the default, and an empty list
+  launches with none. `krpc-game run --load-craft` launched with an empty list, and 2a changes it
+  to the default crew too ([testing-tools-load-craft-crew.md](../../../issues/testing-tools-load-craft-crew.md)).
+* **The current save.** `save=None` launches without loading a save: a launch per test, after
+  leaving the editor, or after creating the Kerbals of a named crew, which a new save would drop.
+* **The existing methods stay.** `launch` calls `new_save`, `_stage_craft`, `launch_vessel` and
+  `remove_other_vessels`. Other mods' tests call them, as do the classes that create a save
+  without launching a craft, or launch a second vessel beside the first.
+* **Tests of a launch RPC call it.** The crew test and the IVA-after-launch camera test call
+  `launch_vessel` directly. `launch` runs further RPCs after the launch, which give the game time
+  to seat the crew.
+* **One launch, unconditionally.** Some setups launched only when the active vessel had another
+  name. `new_save` loads a new save unless the active vessel is the save's own pod, so the
+  condition always held, and these become one `launch` call.
+* **`launch` is the base method's name.** The camera and crew tests' helpers of that name go.
+  The autopilot's started the engines, and becomes `lift_off`.
 * **krpctools stays generic.** It is a published package for the tests of other mods, so it knows
   nothing of kRPC's repository layout. A test that launches another service's craft passes its
   directory, as the KER and MechJeb tests do.
+* **Docs and changelog.** 2a shows `launch` in `doc/src/extending/testing.rst` and its example
+  script. `krpctools.game` is unreleased, so the changelog entry that adds it covers the helpers,
+  and the parts add none.
 * **Testing.** Each part runs the in-game tests it changes, one game per mod set.
 
 ### Phase 3: one binding layer
@@ -458,10 +489,9 @@ in CI, before a player sees it.
 | Registration | 19 other files | A `SERVICES` and a `MODS` entry in `service/registry.bzl`, plus the hand-written files the checks name: the `.csproj`, `KRPC.sln`, `KRPC.Client.csproj`, the `CHANGELOG.md` index, `COMPONENTS` in `changelog.py` and clientgen's Python module map. Then the docs pages |
 | Binding | Write a loader and helpers, or copy one | One `ModAPI` |
 | Availability | A `CheckAPI` per RPC | `[RequiresMod]` on the service |
-| Tests | Copy the setup and `test_available` | `launch`. The test framework checks `Available` and `ModVersion` in place of `test_available` |
+| Tests | Copy the setup and `test_available` | `launch`. The test framework checks `Available` and the installed assembly in place of `test_available` |
 | Service id | A literal in the C# attribute | The registry's `id`, generated into `ServiceInfo.cs` |
 | Tested version | Not recorded | The mod's versions in the registry, shown in the docs |
-| Installed version | Not reported | `ModVersion`, beside `Available` |
 
 The KSA server builds against the released `KRPC.Core`
 ([ksa/README.md](../../ksa/README.md)). It gets `MemberBinder`, `ModAPI` and `RequiresMod` once it
@@ -479,5 +509,7 @@ moves to a 0.8 core, ahead of its first mod integration
 | Generate or check the lists | Generate from the registry wherever the consumer can read it: Bazel, the docs build, the Python tools run after a build. Check the files read with no build: the `.csproj` files and `KRPC.sln`, the root `CHANGELOG.md`, which GitHub renders, `COMPONENTS` in `changelog.py`, which the changelog-hints workflow imports, and clientgen's Python module map, which ships in the krpctools wheel |
 | Service ids | Generated into a `ServiceInfo.cs` per service, compiled from `$(bazel-bin)` as `AssemblyInfo.cs` is, and shipped in the generated sources archive |
 | LIDAR | Keep its `BUILD.bazel` and code as they are, with a registry entry so the generated lists include it. It was deprecated in 0.8 (#1263), so the deprecation policy removes it in 1.0. The alternative is to drop it in 0.8 as a hard break, with no release in which it is deprecated first |
-| How the tests tell a mod loaded | Through the `Available` and `ModVersion` properties clients read too. The registry holds no presence checks |
+| How the tests tell a mod loaded | Through the `Available` property clients read too, and the version by the SHA-256 of the installed assembly, which the registry records per version. The registry holds no presence checks |
+| A mod version property | None. No source in an install gives every mod's release version, and a property that misreports some mods is worse than none |
+| When a stock fallback runs | Only when the mod is not installed. A player with FAR installed gets FAR's values or an error, as a stock value in their place is wrong without notice. A missing member or a failed load makes the RPC throw |
 | A registry for both games | Not in 0.8. The registry is internal, and a 1.0 refactor can add KSA |

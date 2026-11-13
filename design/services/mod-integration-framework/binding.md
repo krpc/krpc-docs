@@ -31,8 +31,12 @@ Every integration binds through the same two classes.
 
 * `Accessor.Missing<TDelegate> (message)` builds a delegate that throws `MissingMemberException`
   with the message.
-* `Accessor.IsMissing (d)` is true for a null delegate or a stub. An integration with a fallback
-  tests it, e.g. FAR's Mach number falls back to the stock value.
+* `Accessor.IsMissing (d)` is true for a null delegate or a stub. An integration tests it on a
+  member it cannot work without, as KAC does [below](#availability-until-phase-4).
+
+A stock fallback runs only when the mod is not installed. With FAR installed, `Flight.MachNumber`
+calls FAR, and a stub there throws. A player with FAR gets FAR's value or an error, never the
+stock value in its place.
 
 ### `MemberBinder`
 

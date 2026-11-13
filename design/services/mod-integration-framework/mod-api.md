@@ -36,8 +36,8 @@ sealed class ScanSatAPI : ModAPI
 
     protected override void Bind (ModBinder mod)
     {
-        var util = mod.Require.Type ("SCANsat.SCANUtil");
-        IsCovered = util.Require.Method<Func<double, double, CelestialBody, int, bool>> ("isCovered");
+        var util = mod.Type ("SCANsat.SCANUtil");
+        IsCovered = util.Method<Func<double, double, CelestialBody, int, bool>> ("isCovered");
         SettingsInstance = mod.Type ("SCANsat.SCAN_Settings_Config").StaticGetter<object> ("Instance");
     }
 }
@@ -46,22 +46,25 @@ sealed class ScanSatAPI : ModAPI
 * **`ModAPI`** takes the display name, the assembly name and an optional minimum version. Core
   checks the assembly and the version before `Bind`. The name and the assembly come from the
   registry, generated into the service's `ServiceInfo.cs` as its id is
-  ([phase 1d](README.md#1d-available-and-modversion)). The minimum version stays in the C#.
+  ([phase 1d](README.md#1d-available-for-every-mod)). The minimum version stays in the C#.
   * `IsAvailable` is set by core. A service's `Available` RPC returns it, or SpaceCenter's
     `<Mod>Available`.
-  * `Version` is the installed version string, read by core from the assembly. A service's
-    `ModVersion` RPC returns it, or SpaceCenter's `<Mod>ModVersion`.
+  * `IsInstalled` is true when core finds the assembly, whether or not the load succeeds. A
+    stock fallback tests it, so the fallback runs only for a mod that is not installed.
   * `CheckAvailable ()` throws `InvalidOperationException`: "SCANsat is not available: <reason>".
     [`RequiresMod`](requires-mod.md) calls it.
   * One instance per integration, found by the load pass, and reached by
     `ModAPI.Get<ScanSatAPI> ()`.
-* **`ModBinder`** moves to core. `Require.Type` and `MemberBinder.Require` throw in place of
-  binding a stub, so the essential members read as such where they are bound.
+* **`ModBinder`** moves to core. A missing type or member binds a stub, as in
+  [phase 3](binding.md#stubs), so only the RPCs that use it fail. If `isCovered` is renamed, the
+  coverage RPCs throw and the settings RPCs keep working.
+* **`Require`** is for a member that every RPC of the integration goes through. `Require.Type`
+  and `MemberBinder.Require` throw in place of binding a stub, and fail the load. Most
+  integrations require nothing.
 * **`Statics (typeof (API), "RemoteTech.API.API")`** binds every delegate property of the first
   type to the static method of the same name in the second. It replaces `APILoader` for RemoteTech
   and Trajectories.
-* **No null checks.** `Bind` has no `if` on a lookup. The only test an integration writes is
-  `Accessor.IsMissing`, where it has a fallback.
+* **No null checks.** `Bind` has no `if` on a lookup.
 
 ### Load every mod API at startup
 
@@ -95,15 +98,16 @@ The path lets an integration tell its mod from a same-named assembly elsewhere, 
 
 ### A failed load disables that mod only
 
-A load fails when the mod is installed but kRPC cannot use it: a type not found, a version too
-old, or an essential member missing.
+A load fails when the mod is installed but kRPC cannot use any of it: a version too old, a
+required member missing, a conflicting mod, or an exception from `Bind`. A missing member that is
+not required fails only the RPCs that use it, and the integration stays available.
 
 * Core runs each `Bind` in its own `try`. Any exception marks that integration unavailable and
   records the reason.
 * The failing integration's RPCs throw "not available", with the reason. Other integrations, other
   services and the rest of kRPC keep running.
-* An integration inside SpaceCenter, such as FAR, RealFuels or AGExt, is disabled, and SpaceCenter
-  falls back to the stock behavior.
+* An integration inside SpaceCenter, such as FAR, RealFuels or AGExt, is disabled the same way.
+  Its RPCs throw with the reason, those with a stock fallback included, as the mod is installed.
 
 ### Exceptions
 

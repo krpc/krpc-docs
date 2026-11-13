@@ -43,11 +43,11 @@ public static class ScanSat
   `Invoke`, `ExecuteCallInto` and `CheckExpressionGameScene` call it, so server side functions are
   covered. It runs before the game scene check, as the missing mod is the more useful error.
 * **Evaluated per call.** KAC and IR become ready and unready as scenes change.
-* **`Available` and `ModVersion` are exempt.** The static properties of these names skip the
-  check, as they report whether the mod is present and at which version. The in-game tests rely on
-  these names. `Ready` keeps the check.
+* **`Available` is exempt.** A static property of that name skips the check, as it reports
+  whether the mod is present. The in-game tests rely on this name. `Ready` keeps the check.
 * **Member level.** SpaceCenter tags the members that fail without FAR or RealAntennas. Members
-  with a stock fallback, such as the FAR branches in `Flight.cs`, keep their own code.
+  with a stock fallback, such as the FAR branches in `Flight.cs`, keep their own code. They take
+  the fallback when `IsInstalled` is false, and otherwise call `CheckAvailable`.
 
 Clients and the wire protocol do not change. The exception stays `InvalidOperationException`.
 
