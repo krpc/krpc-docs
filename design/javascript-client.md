@@ -108,7 +108,7 @@ Each phase is implementable and mergeable on its own.
 | 3b | Enumerations, structures and exceptions importable with no connection | — |
 | 4 | Streams, events, callbacks | `streams`, `events`, `callbacks` |
 | 5 | Server side functions built with the `KRPC.Expression` API: streams, events and runs | `functions` |
-| 6 | A compiler from JavaScript functions to server side functions | — |
+| 6 | A compiler from JavaScript functions to server side functions, in three steps | — |
 | later | Server: pages served by the mod, an origin check | — |
 | later | Server: TLS (`wss://`), with a user's certificate or a generated one | — |
 | later | Node.js transports (TCP, local socket) at `@krpc-org/krpc/node`, browser test runs | `tcpip`, `localsocket` |
@@ -447,47 +447,278 @@ console.log(await conn.run(above));
 
 ### Phase 6: function compiler
 
-Compiles a JavaScript function into a server side function, as the Python client's compiler does
-for Python. It takes the function's source text, parses it, and builds the expression and
-statement nodes:
+Compiles a JavaScript function into a server side function, as the Python and C# compilers do for
+their languages. The client reads the function's source with `Function.prototype.toString()`,
+parses it, and builds the `KRPC.Expression` nodes:
 
 ```js
 const high = await conn.compile(
-  (vessel, limit) => vessel.flight().meanAltitude > limit,
-  [SpaceCenter.Vessel, 70000],
+  ({ vessel, limit }) => vessel.flight().meanAltitude > limit,
+  { vessel, limit: 70000 },
 );
+const event = await conn.addEvent(high);
 ```
 
-| Python | JavaScript |
+The body is written as it would run on the server: properties read and assigned as properties,
+and methods returning their values.
+
+#### API
+
+| Call | Takes |
 | --- | --- |
-| `inspect.getsourcelines(func)` | `Function.prototype.toString()`, the exact source text since ES2019 |
-| `ast` | `acorn` (MIT, about 20 KB gzipped, ES modules) |
-| Statements: `if`, loops, assignment | `if`, `for`, `let`, `const`, `?:`, `&&`, `\|\|` |
-| Free names through `__closure__`, `__globals__` | Explicit, as below |
-| Parameter types from annotations | Explicit, as below |
+| `compile(fn, captures?, parameters?)` | A function. Returns a `KRPC.Expression`, as `compile` of an `Expression` does |
+| `run(fn, captures?)` | A function with no parameters, compiled and run once. A function with parameters is compiled first |
+| `addStream(fn, captures)` | A function, streamed. `addStream(fn)` with no captures stays the call stream of phase 4 |
+| `addEvent(fn, captures?)` | A function returning a `boolean` |
 
-Differences from Python:
+- **Captures.** The function's first parameter is an object pattern, and receives the captured
+  values by key: `({ vessel, limit }) => ...` with `{ vessel, limit }`. The other parameters are
+  the function's own, passed by `run`. A function with parameters and no captures takes `{}` first.
+- **Parameter types.** `parameters` gives one type value per parameter after the first, as in
+  `[types.double]`. An event or a stream takes no parameters.
+- **Errors.** `CompilationError`, exported from the package, names the construct and its line
+  and column in the function's source. It is raised before any node is built.
+- **No cache of compiled functions.** Each `run`, `addStream` or `addEvent` of a function compiles
+  it again, as its captures can differ per call. The parse is cached per function object, in a
+  `WeakMap`. The guide says to compile once.
+- **Function types.** The compiler knows the parameter and result types, and fills the cache of
+  phase 5, so `run` reads no types from the server.
 
-- **Captured values are positional parameters.** JavaScript has no access to a function's closure
-  from outside it. The caller passes each value after the parameter types. A named object such as
-  `{ limit }` breaks under a minifier, which renames the body's `limit` and not the key.
-- **Parameter types are explicit.** TypeScript erases its types, so there are no annotations to
-  read at run time. A parameter takes a remote type, or the type of the value passed for it.
-- **One number type.** `1` and `1.0` are the same value, so literals follow the protocol's numeric
-  promotion. `1n` is a 64-bit integer.
-- **Transpilers.** A compiler to an older target rewrites `?.` and `??` into helper calls. The
-  guide asks for an ES2020 or later target for code holding compiled functions.
-- **Synchronous member access.** The body runs on the server, so `vessel.flight()` returns a
-  `Flight` there, where the client's API returns a `Promise`. This phase adds a second,
-  synchronous set of declarations to the generated stubs, for function bodies.
+#### Captured values
 
-Ruled out:
+JavaScript gives no access to a function's closure, and a minifier renames local names. Every name
+the body reads is therefore a capture, a parameter, a local, or one of the builtin globals below.
+Any other free name is a `CompilationError` that says to capture it.
 
+An object pattern survives a minifier: the keys are property names, which it keeps, and it renames
+each binding with its uses. A capture missing from the object is a `CompilationError`.
+
+| Captured value | In the function |
+| --- | --- |
+| `number`, `bigint`, `string`, `boolean`, `null`, `Uint8Array` | A constant |
+| An array, `Set`, `Map` or structure | A constant collection or structure. Its type comes from its values, or from where it is used when empty |
+| A remote object | `ConstantObject` |
+| A service, such as `conn.spaceCenter`, or the `Connection` | Member calls become embedded calls. `conn.spaceCenter` is read on the client |
+| A generated module, such as `SpaceCenter`, or an enumeration, structure or exception class | Read on the client: `SpaceCenter.SASMode.prograde` is a constant |
+| A plain object the body assigns a property of | A state variable per assigned property, as below |
+| Another plain object | Its properties are read on the client, as constants |
+| A `Stream`, `Event`, function or other object | A `CompilationError`. A stream read in a function would be read once |
+
+The builtin globals are `Math`, `console`, `Number`, `String`, `Boolean`, `BigInt`, `Array`, `Set`,
+`Map`, `Error`, `TypeError`, `RangeError`, `undefined`, `NaN` and `Infinity`, resolved by name. A
+program that shadows one of them in an enclosing scope gets the builtin in the function.
+
+**State variables.** A captured plain object whose property the body assigns keeps that property
+on the server between evaluations, which is how the object behaves in JavaScript:
+
+```js
+const highest = await conn.addStream(({ vessel, state }) => {
+  state.max = Math.max(state.max, vessel.flight().meanAltitude);
+  return state.max;
+}, { vessel, state: { max: 0 } });
+```
+
+The value starts as the property holds it at compile time, and takes its type from it. The client's
+object keeps its value. This replaces Python's `nonlocal`.
+
+#### Types
+
+**Numbers are doubles, as in JavaScript.** A server value of type `float`, `double`, `sint32` or
+`uint32` is a `number` in the client, and arithmetic on numbers converts its operands to `double`.
+`7 / 2` is `3.5`, `%` is the CLR remainder, which matches JavaScript's for both integers and
+doubles, and the bitwise operators convert to a 32-bit integer as JavaScript does. A number in a
+position of an integer type is converted toward zero, and a constant there takes the exact type.
+
+**A `bigint` is a 64-bit integer.** `sint64` and `uint64` values are `bigint` in the client, and
+`bigint` arithmetic stays integer, so `7n / 2n` is `3n`, as on the server. Mixing a `number` and a
+`bigint` is a `CompilationError`, as it is a `TypeError` in JavaScript.
+
+**Type values.** A run parameter, and an empty collection with no use that types it, need a type at
+run time:
+
+| Type | Value |
+| --- | --- |
+| Scalars | `types.double`, `types.float`, `types.int32`, `types.uint32`, `types.int64`, `types.uint64`, `types.bool`, `types.string`, `types.bytes` |
+| Collections | `types.list(T)`, `types.set(T)`, `types.map(K, V)`, `types.tuple(T, ...)` |
+| Null | `types.nullable(T)` |
+| Classes | The service's class, such as `conn.spaceCenter.Vessel` |
+| Enumerations, structures | The generated value, such as `SpaceCenter.SASMode`, or the service's |
+
+- **Null** takes its type from where it is used, as in Python. `undefined` is null.
+- **An array** is a tuple where the position is a tuple, such as an argument for a vector, and a
+  list otherwise.
+- **An empty array, `Set` or `Map`** takes its element type from its first use that types it: a
+  push, an element assignment, another assignment to the variable, or an argument. With none, it
+  is a `CompilationError` asking for a typed empty value from `types`, such as
+  `t.list(t.double).empty()` with `t` captured.
+- **Truth** follows JavaScript: `false`, `0`, `NaN`, `""`, `0n` and null are false. An empty array
+  is true.
+- **Equality.** `===` and `!==` compare numbers, strings, booleans, enumeration values and remote
+  objects, which the client caches so that one object is one JavaScript value. Collections and
+  structures compare by identity in JavaScript, which the server cannot reproduce, so comparing
+  them is a `CompilationError`. `==` and `!=` are `===` and `!==`, with operands of one type, and
+  `x == null` is also true for `undefined`.
+
+#### Constructs
+
+| Area | Supported |
+| --- | --- |
+| Members | Property reads and assignments, method and static method calls, named arguments as an options object. A `KRPC` service call is an error, as in Python |
+| Operators | Arithmetic, `**`, comparisons, `!`, `&&`, `\|\|`, `??`, `?.`, `?:`, bitwise operators on numbers and flags enumerations, template literals without tags |
+| Strings | `length`, indexing, `at`, `slice`, `substring`, `toUpperCase`, `toLowerCase`, `trim`, `trimStart`, `trimEnd`, `split`, `includes`, `startsWith`, `endsWith`, `indexOf`, `replaceAll`, `String(x)`, `+` |
+| Arrays | `length`, indexing, `at`, `map`, `filter`, `some`, `every`, `find`, `findIndex`, `includes`, `indexOf`, `reduce`, `slice`, `concat`, `join`, `toSorted`, `toReversed`, `push`, `pop`, assignment to an element, destructuring of tuples |
+| Sets, maps | `new Set`, `new Map`, `has`, `add`, `get`, `set`, `delete`, `clear`, `size`, `keys`, `values`, `entries` |
+| Structures | Field reads, and `new` of a captured structure class with an object of fields |
+| Math | `Math` functions and constants to `StdLib` procedures. `Math.round` uses `StdLib.RoundHalfUp`, as it rounds a half toward positive infinity |
+| Printing | `console.log` to `StdLib.Print`. A constant argument is formatted on the client, as `String` formats it |
+| Statements | Blocks, `const`, `let`, `if`, `while`, `do`, `for`, `for...of` over a collection, `break`, `continue`, `return`, `++`, `--`, compound assignment, destructuring assignment |
+| Functions | Arrow functions passed to the collection methods, and local functions, as below |
+| Exceptions | `throw new Error(m)`, `TypeError`, `RangeError` and captured service exception classes. `try`, `catch` and `finally` |
+
+- **Local functions take their parameter types from their calls.** A local function is one
+  `Lambda`, called with `Invoke`, as in Python. JavaScript has no annotations to type its
+  parameters, and TypeScript's are erased, so each parameter takes the one type that fits the
+  arguments of every call:
+
+  ```js
+  ({ vessel }) => {
+    const ratio = (part, total) => part / total;
+    return ratio(vessel.mass - vessel.dryMass, vessel.mass);
+  };
+  ```
+
+  - Numbers are all doubles, so most parameters have one candidate type.
+  - Null and a type `T` give a nullable `T`. An empty array takes the type of the other calls.
+  - Types that do not fit, such as a string and a number, are a `CompilationError` naming both
+    calls.
+  - A function passed by name, as in `xs.map(ratio)`, is called by the collection method with the
+    element type.
+  - The function reads the enclosing variables when called, so every path to each call assigns
+    them. A function no call reaches is not built. One defined in a nested block is called only
+    in that block. Recursion is an error, as in Python.
+  - Ruled out: a copy per set of argument types, which never fails but grows the function, and
+    could follow if the errors prove common. Default values as types, which give no collection
+    types and change the code's meaning.
+- **Exceptions map through the client's own table.** `Error` raises `KRPC.Error`, `TypeError`
+  raises `KRPC.ArgumentException` and `RangeError` `KRPC.ArgumentOutOfRangeException`. A handler
+  that starts with `if (e instanceof RangeError)` catches each exception the client raises as a
+  `RangeError`. `e.message` is the message, the only part of an exception a function exposes.
+- **A function that returns a value** returns on every path, as in Python. A variable is read only
+  after every path to the read assigns it.
+- **Not supported:** `async`, `await`, generators, `this`, classes, `for...in`, `switch`, labels,
+  spread, tagged templates, regular expressions, and recursion. Each is a `CompilationError`
+  naming it. A getter name such as `getMeanAltitude()` is an error that names
+  the property form.
+
+#### TypeScript
+
+The body is typed by a second, synchronous set of declarations in each generated module. A class
+`Vessel` gets a server form with a property per property, writable where it has a setter, and
+methods returning their values. Each module adds its classes to an interface in the package by
+declaration merging, keyed by the class name, so mods' modules join in:
+
+```ts
+declare module "@krpc-org/krpc" {
+  interface ServerTypes { "SpaceCenter.Vessel": Server.Vessel; }
+}
+```
+
+`OnServer<T>` maps a client type to its server form through that interface, and recurses into
+arrays, sets, maps and tuples. `compile` infers the captures' type from its second argument:
+
+```ts
+compile<C extends object, P extends unknown[], R>(
+  fn: (captures: OnServer<C>, ...parameters: OnServer<P>) => R,
+  captures: C,
+  parameters?: TypeValues<P>,
+): Promise<ServerFunction<P, OnClient<R>>>;
+```
+
+`ServerFunction<P, R>` is a `KRPC.Expression` with the parameter and result types as phantom
+types, so `run(fn, ...args)` checks the arguments and `addStream(fn)` gives a `Stream<R>`. A plain
+JavaScript program gets the same compiler with no types.
+
+#### Implementation
+
+```
+src/compiler/
+  index.ts       compileFunction, loaded with import()
+  parse.ts       acorn, and the function's node in its source
+  scope.ts       captures, parameters, locals, globals, definite assignment
+  ir.ts          the typed intermediate tree
+  expressions.ts, statements.ts, builtins.ts, constants.ts
+  emit.ts        the KRPC.Expression nodes from the tree
+```
+
+- **Packaging.** `compile`, `run`, `addStream` and `addEvent` load the compiler with `import()` the
+  first time they get a function. Bundlers split it into its own chunk, so a program that never
+  compiles carries none of it. acorn 8 is 33 KB minified and gzipped, more than the whole client.
+- **Parser.** `acorn` (MIT, ES modules, no dependencies), parsing at `ecmaVersion: "latest"`. The
+  source of a method shorthand, `f() {}`, parses after a prefix that makes it an object method.
+- **Two stages.** The compiler first builds a typed tree on the client, with no calls. The types
+  of nulls and empty collections resolve over the whole tree, and every `CompilationError` is
+  raised before anything reaches the server. The second stage emits the nodes.
+- **Concurrent emission.** The emitter builds the children of a node with `Promise.all`, so a
+  compile takes about one round trip per level of the tree, where Python takes one per node. The
+  batched tree construction proposal later plugs in here.
+- **Procedures** come from the connection's service definitions, read at connect for the dynamic
+  services, and named with `naming.ts`. The compiler needs no generated module.
+- **Folding.** A sub-expression of constants only, such as `limit * 2`, is computed on the client
+  by running the JavaScript operator or builtin, which gives JavaScript's exact result.
+
+#### Testing
+
+The compiler is per language, so it has no conformance profile, as Python's and C#'s have none.
+
+- **Native tests**, `//client/js:compiler-test`, with `node:test` against a `TestServer`, as
+  Python's `clienttest`. They take the cases of `test_functioncompiler.py` that have a JavaScript
+  form.
+- **Golden trees** through `TestService.DumpExpressionTree`, as `test_expressiontree.py`.
+- **Types checked against the server.** Each test compiles through a check that the compiler's
+  parameter and result types equal the server's, as Python's tests do.
+- **Run on both sides.** A function of constants and parameters only also runs as JavaScript, and
+  the test compares the two results. It covers numbers, truth and strings.
+- **TypeScript.** A `tsc` test of typed examples, with `@ts-expect-error` lines for the errors.
+
+#### Steps
+
+Each step is mergeable on its own.
+
+| Step | Adds |
+| --- | --- |
+| 6a | The API, captures, `types`, the two stages and the test harness. Expressions: constants, members, operators, numbers, truth, strings, `Math`, `console.log`. The guide's compiled examples that are single expressions gain JavaScript tabs |
+| 6b | Collections, structures, statements, state variables, exceptions. The rest of the guide's compiled examples |
+| 6c | The synchronous declarations from `clientgen`, `OnServer`, and the typed signatures |
+
+#### Rules for programs
+
+- **Target.** A transpiler targeting an older version rewrites `?.`, `??`, destructuring and arrow
+  functions into code the compiler rejects. The guide asks for ES2020 or later.
+- **Coverage.** A coverage tool that instruments the source, such as Istanbul, adds counters to the
+  function's body. V8 coverage, as `c8` and Vitest use by default, changes no source.
+
+#### Ruled out
+
+- **Positional captures**, `(vessel, limit) => ...` with `[vessel, limit]`. Shorter, but a wrong
+  order goes unnoticed.
+- **A named object read by free names**, `() => vessel...` with `{ vessel }`. A minifier renames
+  `vessel` in the body and leaves the key.
+- **The client's asynchronous API in the body**, `(await vessel.getControl()).setThrottle(1)`. It
+  needs no new declarations and runs on the client too, but is unreadable at any size.
+- **Type strings**, such as `"list<int32>"`. Compact, but checked only when compiling.
+- **Python's integer types for numbers.** JavaScript has one number type, and keeping server
+  integers would make `7 / 2` and integer overflow differ from JavaScript.
 - **Tracing**, calling the function with placeholder objects that record each operation.
   JavaScript cannot overload `>`, `+` or `?:`, which expressions need most.
-- **Tagged templates** as the main form, as in `` conn.fn`vessel.flight().meanAltitude > ${limit}` ``.
-  They capture values and survive minifiers, but an editor cannot check or complete the string. A
-  second form, if wanted.
+- **Tagged templates**, `` conn.fn`vessel.flight().meanAltitude > ${limit}` ``. They capture
+  values and survive minifiers, but an editor cannot check or complete the string.
+- **A separate entry point**, `@krpc-org/krpc/compiler`, passed to `connect`. `import()` gives the
+  same split with no step for the program.
+
+#### Open items
+
+- **`switch`.** Compiles to a chain of `if` statements, with fall-through as the hard part.
+- **Typed empty values.** Whether `t.list(t.double).empty()` reads well, or a `cast` helper does.
 
 ## Pages and TLS
 
