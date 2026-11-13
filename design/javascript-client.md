@@ -612,7 +612,7 @@ run time:
   - Ruled out: a copy per set of argument types, which never fails but grows the function, and
     could follow if the errors prove common. Default values as types, which give no collection
     types and change the code's meaning.
-- **`switch`** compiles to the server's `SwitchWithFallThrough`, with JavaScript's fall-through
+- **`switch`** compiles to the server's `Switch`, with JavaScript's fall-through
   and `break`. The server node lands first, see
   [server-side-functions/switch.md](server-side-functions/switch.md).
 - **Exceptions map through the client's own table.** `Error` raises `KRPC.Error`, `TypeError`
@@ -777,7 +777,7 @@ const ratio = await conn.compile(({ vessel }, payload) => (vessel.mass + payload
 | Variables | Numbers in variables are doubles. `var` is a `CompilationError` |
 | Arrays | A literal or captured array is a tuple where a tuple goes and a list elsewhere, built where it is used. `Map.keys()` and the like give lists, so `Array.from` takes them |
 | `for` and `do` | Lowered to `While`. With a `continue`, the update or test runs at the start of the body on every pass but the first, as the server's `Continue` jumps there |
-| `switch` | Each clause is a case of `SwitchWithFallThrough`, an empty clause a no-op that falls through. A number discriminant compares as a double |
+| `switch` | Each clause is a case of `Switch`, an empty clause a no-op that falls through. A number discriminant compares as a double |
 | Exceptions | A leading `if (e instanceof X)` chain dispatches by the class the client raises an exception as. Each branch catches its names, innermost first, and records a branch number, as Python's handlers do. An `else throw e` leaves the rest uncaught. `e.message` is the only member of `e` |
 | State | A captured plain object's property that the function assigns, or changes with `push`, `add`, `set`, `delete`, `clear` or an element assignment |
 | `toSorted` | Takes a comparator `(a, b) => K(a) - K(b)`, compiled to `OrderBy` on `K`, or `K(b) - K(a)` on its negation. With none, strings only |

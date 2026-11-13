@@ -1,7 +1,8 @@
-# Switch statements in server side functions
+# Match and switch statements in server side functions
 
-**Status:** in progress. `Switch` and `SwitchWithFallThrough` are implemented as designed, not yet
-submitted, and the JavaScript compiler compiles `switch` to `SwitchWithFallThrough`. Python `match`
+**Status:** in progress. `Match` and `Switch` are implemented as designed, in PR #1334, and the
+JavaScript compiler compiles `switch` to `Switch`. They were first named `Switch` and
+`SwitchWithFallThrough`, renamed before release as [Naming](#naming) explains. Python `match`
 is still to do. A follow-up to server side functions, which merged in #1124 to #1130. Issue:
 [switch-statements.md](../../issues/switch-statements.md). Needed by phase 6 of the
 [JavaScript client](../javascript-client.md#phase-6-function-compiler), and lands before it.
@@ -22,8 +23,8 @@ that does not leaves JavaScript no `break`.
 Two factories with one shape:
 
 ```
+Match(value, cases, bodies)
 Switch(value, cases, bodies)
-SwitchWithFallThrough(value, cases, bodies)
 ```
 
 | Parameter | Type | Meaning |
@@ -32,7 +33,7 @@ SwitchWithFallThrough(value, cases, bodies)
 | `cases` | `list<list<Expression>>` | The test values of each case. A case with none is the default, and there is at most one |
 | `bodies` | `list<Expression>` | One statement per case. An empty `Block` is an empty body |
 
-| | `Switch` | `SwitchWithFallThrough` |
+| | `Match` | `Switch` |
 | --- | --- | --- |
 | Runs | The matching case's body, or the default's | From the matching case's body on, through every later body |
 | `Break` | Belongs to the enclosing loop | Exits the switch |
@@ -58,22 +59,21 @@ Shared rules:
 Both lower to nodes the server already builds, so the checker, the node limit and the tree printer
 need no new node kinds:
 
-- **`Switch`** holds `value` in a block variable, and builds an `IfThenElse` chain of the cases in
+- **`Match`** holds `value` in a block variable, and builds an `IfThenElse` chain of the cases in
   order, with the default as the last `else`.
-- **`SwitchWithFallThrough`** builds one `Block`: a variable for `value`, then a dispatch chain of
+- **`Switch`** builds one `Block`: a variable for `value`, then a dispatch chain of
   conditions that each `Goto` a case's label, ending in a `Goto` to the default's label or the end
   label. Then each case's label and body, in order, and the end label. Each `Goto` targets a label
   of the same block. The `MarkerRewriter` binds the bodies' `Break` markers to the end label, with
   no continue target, so `Continue` passes to the enclosing loop.
-- **Checker message.** A `Break` outside any loop or fall-through switch says "A break statement
-  must be inside a loop or a switch with fall-through". It names the fall-through form, as a
-  `Break` in a `Switch` with no loop around it is still unbound.
+- **Checker message.** A `Break` outside any loop or `Switch` says "A break statement must be
+  inside a loop or a switch". A `Break` in a `Match` with no loop around it is still unbound.
 
 ## Clients
 
 | Client | Uses |
 | --- | --- |
-| JavaScript | Phase 6b compiles `switch` to `SwitchWithFallThrough`, with JavaScript's full semantics. A case of a type the value does not compare with is a compile error |
+| JavaScript | Phase 6b compiles `switch` to `Switch`, with JavaScript's full semantics. A case of a type the value does not compare with is a compile error |
 | Python | A later PR compiles `match`, below |
 | C# | No change. Its compiler emits no statements, see [csharp-statement-functions.md](csharp-statement-functions.md) |
 | C++, C-nano, Java, Lua | The generated factories, with no client change |
@@ -81,12 +81,12 @@ need no new node kinds:
 ### Python `match`
 
 Python 3.10 is the client's minimum, so `match` is always available. Only some patterns map onto
-`Switch`. The rest lower to an `if` chain over nodes the server has:
+`Match`. The rest lower to an `if` chain over nodes the server has:
 
 | Pattern | Lowers to |
 | --- | --- |
-| Literal, value (`SASMode.prograde`), or-pattern | `Switch` test values |
-| Wildcard `_` | `Switch` default |
+| Literal, value (`SASMode.prograde`), or-pattern | `Match` test values |
+| Wildcard `_` | `Match` default |
 | Capture `x` | The default, with an `Assign` |
 | Guard (`case x if x > 0`) | A condition in the `if` chain |
 | Sequence (`[a, b, *rest]`) | `Count`, `Get`, `Skip` |
@@ -94,10 +94,10 @@ Python 3.10 is the client's minimum, so `match` is always available. Only some p
 | Class (`BoundingBox(min=m)`) | Field reads. A remote class's static type decides the match when compiling |
 | `as` | An `Assign` |
 
-The first matching case wins, so a run of simple cases is one `Switch` whose default holds the
+The first matching case wins, so a run of simple cases is one `Match` whose default holds the
 chain of the cases after it.
 
-Python compares more loosely than `Switch`, which rejects a test value of an unrelated type when
+Python compares more loosely than `Match`, which rejects a test value of an unrelated type when
 the node is built:
 
 | Python | Compiles to |
@@ -113,8 +113,8 @@ which waits for class inheritance ([#905](https://github.com/krpc/krpc/issues/90
   form, `Continue` and `Return` from a body, a nested loop's `Break` inside a case, nulls, the
   default in every position, and the build errors.
 - **Golden trees** in `ExpressionTreePrinterTest` for both forms.
-- **Docs.** XML docs on both factories. A *Switch Statements* section in the expression API half
-  of the server side functions guide, after *Statements, Variables and Loops*, with an example per
+- **Docs.** XML docs on both factories. A *Match and Switch Statements* section in the expression
+  API half of the server side functions guide, after *Statements, Variables and Loops*, with an example per
   client that has the expression API.
 - **Changelog**, under `core`.
 - No conformance tests: the factories are server behavior, which every client calls through its
@@ -126,11 +126,26 @@ which waits for class inheritance ([#905](https://github.com/krpc/krpc/issues/90
 2. Python `match`, independent of JavaScript.
 3. JavaScript phase 6b, which compiles `switch`.
 
+## Naming
+
+The two differ in where `Break` goes, and the names follow the languages:
+
+| Languages | Construct | `break` in a case ends | Compiles to |
+| --- | --- | --- | --- |
+| C, C++, Java, JavaScript | `switch`, falling through | The switch | `Switch` |
+| C#, Go, Swift, Java's arrow form | `switch`, not falling through | The switch | `Switch`, with a `Break` closing each case |
+| Python, Rust, Kotlin's `when` | `match` | The enclosing loop | `Match` |
+| Haskell, OCaml, F#, Scala | `case`, `match` expressions | No `break` | Not covered: these yield a value and match patterns |
+
+Every `switch` keyword binds `break` to the switch, so the fall-through node takes the name. `Match`
+names the first-match form after Python's keyword. A value-yielding form for the functional
+languages would be a later addition, such as an overload of `Match`.
+
 ## Ruled out
 
 - **One factory with a `fallThrough` flag.** A flag that changes what `Break` means reads worse
   than two names, as `Block` and `BlockWithVariables` are two.
-- **A case node**, `Case(values, body)`, passed to `Switch` in a list. It reads like LINQ's
+- **A case node**, `Case(values, body)`, passed to `Match` in a list. It reads like LINQ's
   `SwitchCase`, but adds an `Expression` that is invalid anywhere else, which the checker must
   reject.
 - **LINQ's `SwitchExpression`.** It needs test values of the switch value's exact type and a
