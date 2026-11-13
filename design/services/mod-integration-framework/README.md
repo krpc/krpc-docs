@@ -1,6 +1,6 @@
 # Mod integration framework
 
-**Status:** in progress, for 0.8. Phases 1 and 2 implemented, not yet merged. The rest is a proposal
+**Status:** in progress, for 0.8. Phases 1 to 3 implemented, not yet merged. The rest is a proposal
 (2026-11-12), updated as each phase is built. Issue:
 [mod-integration-framework.md](../../../issues/mod-integration-framework.md).
 
@@ -442,8 +442,10 @@ The phase also merges the `ImageFormat` copies:
   their `deps` in `SERVICES`. See [Decisions](#decisions).
 * The enum is game-agnostic, and the encoder is not: it takes a Unity `Texture2D`. A KSA service
   with images uses the same enum, once KSA builds against a 0.8 core, with an encoder of its own.
-* It is StdLib's first enumeration. Each client's StdLib build generates only structs today, so
-  the phase checks the generated StdLib code and docs in every client.
+* It is StdLib's first enumeration. Every client generates and builds it as any service's enum,
+  and the docs list it with StdLib's structs.
+
+Implemented on branch `mod-binding`, not yet merged or checked in game.
 
 ### Phase 4: `ModAPI`, loaded at startup
 

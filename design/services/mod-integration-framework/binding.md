@@ -1,9 +1,10 @@
 # Mod binding
 
-**Status:** proposal (2026-11-12), phase 3 of the [mod integration framework](README.md), for 0.8.
-Issue: [mod-integration-framework.md](../../../issues/mod-integration-framework.md). `MemberBinder`
-and the stubs are built for KAC, IR, FAR and RealFuels on an unpushed branch from 2026-11-03, in
-three commits. This phase rebases them onto main and extends them to every integration.
+**Status:** implemented (2026-11-12), not yet merged, on branch `mod-binding`. Phase 3 of the
+[mod integration framework](README.md), for 0.8. Issue:
+[mod-integration-framework.md](../../../issues/mod-integration-framework.md). The branch starts
+with the three `MemberBinder` commits for KAC, IR, FAR and RealFuels from 2026-11-03, and extends
+them to every integration.
 
 ## Problem
 
@@ -50,26 +51,32 @@ var settings = mod.Type ("SCANsat.SCAN_Settings_Config");
 Settings.Instance = settings.StaticGetter<object> ("Instance");
 ```
 
-* `Getter`, `StaticGetter`, `Setter`, `Field` and `Method` match the `Accessor` helpers of the
-  same names. `For` gives a binder for another type of the same mod.
+* `Getter`, `StaticGetter`, `Setter`, `StaticSetter`, `Field`, `Method` and `Constructor` match
+  the `Accessor` helpers of the same names. `For` gives a binder for another type of the same mod.
 * A member that is not found binds a stub, and logs one warning: "SCANsat: SCANUtil.isCovered is
   not available in the installed version".
 * A binder for a missing type binds a stub for every member, so `Bind` code has no null checks.
+  The type gets one warning, and its members none.
+* `Type` is the bound type, or null. An integration that matches part modules or components by
+  type tests it, so a missing type matches nothing.
 
 ### `ModBinder`
 
 `ModBinder` in the KSP server finds a mod's assembly by name, and gives a `MemberBinder` per type:
 
-* `ModBinder.Find ("SCANsat")` returns null when the assembly is not loaded.
+* `ModBinder.Find (name, assembly)` returns null when the assembly is not loaded. Each integration
+  passes the names its `ServiceInfo` generates from the registry.
 * `Type (fullName)` returns a `MemberBinder`, and logs a warning when the type is missing.
+* The mod's assemblies are its main assembly and the others in its directory. MechJeb's
+  `MechJebLib` is one.
 
 It replaces the per-integration loops over `AssemblyLoader.loadedAssemblies`. Phase 4 moves it to
 core, behind an interface each server implements ([mod-api.md](mod-api.md#imodassemblies)).
 
 ### Availability until phase 4
 
-Each integration keeps its `IsAvailable`, now true when the assembly is found and the version
-suffices. A missing member no longer makes it false. A member without which no RPC works, such as
+Each integration keeps its `IsAvailable`, now true when the assembly is found, and for the APIs
+`APILoader` still loads, the version suffices. A missing member no longer makes it false. A member without which no RPC works, such as
 KAC's `APIInstance`, is tested with `IsMissing` and keeps the integration unavailable. Phase 4
 replaces these tests with `Require` ([mod-api.md](mod-api.md#a-failed-load-disables-that-mod-only)).
 
@@ -79,7 +86,7 @@ replaces these tests with `Require` ([mod-api.md](mod-api.md#a-failed-load-disab
 
 | Case | Log |
 | --- | --- |
-| Mod not installed | One info line. Nothing else, so Trajectories logs no errors when absent |
+| Mod not installed | One info line, "SCANsat is not installed". Nothing else, so Trajectories logs no errors when absent |
 | Mod installed | One info line with its version |
 | Missing type or member | One warning each, at load |
 
@@ -89,10 +96,11 @@ replaces these tests with `Require` ([mod-api.md](mod-api.md#a-failed-load-disab
 | --- | --- |
 | KAC, IR, FAR, RealFuels | From the branch: bind through `MemberBinder`. Dead bindings the warnings exposed are removed |
 | KER, SCANsat, Raster Prop Monitor | The `missing` list and helper sets go. `ModBinder` and `MemberBinder` bind every member |
-| MechJeb | `Reflection.cs` and `Value<T>` go. `Field` gives the same getter and setter, and stubs throw on use as before |
+| MechJeb | `Reflection.cs` and `Value<T>` go. `Field` gives the same getter and setter, and stubs throw on use as before. A small `Bindings` class keeps the binder and the `EditableDouble` and `EditableInt` helpers |
 | Trajectories | The nested type lookups go. Skips every loader when the assembly is missing |
 | DockingCamera, AGExt, RealAntennas | Their loaders bind through `MemberBinder` |
-| RemoteTech service | Uses SpaceCenter's `RemoteTech` binding, made public. Its own copy goes |
+| RemoteTech service | Uses SpaceCenter's `RemoteTech` binding, which SpaceCenter makes visible to it with `InternalsVisibleTo`. Its own copy and addon go |
+| FAR | The Mach number falls back to the stock value only when FAR is not available. `HasMachNumber`, which fell back when the member was missing, goes |
 | LIDAR | Unchanged, as it is deprecated |
 
 ## Tests
@@ -104,6 +112,9 @@ replaces these tests with `Require` ([mod-api.md](mod-api.md#a-failed-load-disab
 
 ## Changelog
 
-* Server: a mod update that removes a member fails only the RPCs that use it, with a message naming
-  the member.
-* None for Trajectories' log errors. The service is new in 0.8.
+* Server: a mod API loads when some of its methods are missing, and fails only the calls that use
+  them.
+* SpaceCenter, Infernal Robotics, Kerbal Alarm Clock and Docking Camera: a mod update that removes
+  a member fails only the RPCs that use it.
+* Core: `StdLib.ImageFormat`. The fragment of the Docking Camera image format names it.
+* None for MechJeb, KER, SCANsat, Raster Prop Monitor and Trajectories, which are new in 0.8.
