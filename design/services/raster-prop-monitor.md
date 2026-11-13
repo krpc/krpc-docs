@@ -9,7 +9,7 @@
 * A script drives the IVA displays: values that props show, the pages of the MFDs, and pages of
   its own.
 * The IVA feeds the script: values, switch positions and button presses, as streams and events.
-* A script reads what a display shows, and the camera views, as images (#424).
+* A script reads what a display shows as images, and the camera views as images or video (#424).
 
 ## Context
 
@@ -233,6 +233,11 @@ display.button_pressed(enter).add_callback(lambda: toggle(items[cursor]))
   DockingCamera service's `Camera.Image` is the model. `FlyingCamera.Render` only sets its Unity
   cameras up to render at the end of the frame, so `Image` renders them itself, farthest out
   first, and cleans them up. `FlyingCamera.Render` needs the camera on the active vessel.
+* **Video is a stream of JPEG frames**, from `Frame`. Unity 2019.4 encodes JPEG and has no video
+  codec, so the video is motion JPEG, and the stream's rate is the frame rate. A 640x480 frame
+  is about 24 KB against 166 KB as PNG, and takes about 8 ms. A stream sustains 30 frames a
+  second, or 50 with no rate limit, with the game at real time. A loop that holds each tick and
+  calls `Frame` gets every tick's frame, with the game waiting for the script.
 * **The field of view starts at the camera's largest**, as on an MFD camera page, and a value
   set is clamped to the camera's range, which `MinFieldOfView` and `MaxFieldOfView` give. The
   service keeps it per part, and does not save it.
@@ -289,7 +294,7 @@ Cameras:
 | Member | Kind |
 | --- | --- |
 | `Cameras (vessel)` | List of `ExternalCamera` |
-| `ExternalCamera` | `Part`, `Name` (`ExtCam1`, ...), `MinFieldOfView`, `MaxFieldOfView`, `FieldOfView` (get, set), `Image (width, height)` (PNG, active vessel only) |
+| `ExternalCamera` | `Part`, `Name` (`ExtCam1`, ...), `MinFieldOfView`, `MaxFieldOfView`, `FieldOfView` (get, set), `Image (width, height)` (PNG, active vessel only), `Frame (width, height, quality)` (JPEG, for video) |
 
 ## Phases
 
@@ -307,8 +312,12 @@ Phase 3 depends on phase 2 for its tests. Phase 4 depends only on phase 1. Phase
 test mod pin, which needs RPM and Module Manager, and the full RPM package so the stock pods have
 RPM IVAs.
 
-Two commits on the same branch follow the phases, from trying the service in game: monitor
-readback in any camera mode, and page button captures with `PressPageButton`.
+Commits on the same branch follow the phases, from trying the service in game: monitor
+readback in any camera mode, page button captures with `PressPageButton`, `ExternalCamera.Frame`
+for video, and a Python tutorial with a screen menu and a camera video window.
+
+Video exposed a core bug: a rate limited stream updated at as little as half its rate, as
+physics ticks run in bursts. Its fix is a separate pull request, merged before this one.
 
 ## Open Questions
 
@@ -321,4 +330,5 @@ readback in any camera mode, and page button captures with `PressPageButton`.
 | --- | --- |
 | A kRPC `IJSIModule` for `PLUGIN_` variables and `PLUGINACTION` switches | Needs RPM at compile time. Persistent variables give the same channel |
 | A `KRPCSwitch` prop module for button events | Switches on persistent variables already give events, with no kRPC config in the IVA |
-| Streaming monitor images at frame rate | A PNG per call is enough for a browser view. A video transport is a separate protocol feature |
+| A video codec or a video transport | Unity 2019.4 has no video encoder. A stream of JPEG frames carries video with no protocol change |
+| Video of monitor screens | A PNG per call is enough for a view of a screen. `Monitor.Image` streams at a rate if a script needs it |
