@@ -1,6 +1,6 @@
 # Mod integration framework
 
-**Status:** in progress, for 0.8. Phases 1 to 4 implemented, not yet merged. The rest is a proposal
+**Status:** in progress, for 0.8. Phases 1 to 5 implemented, not yet merged. The rest is a proposal
 (2026-11-12), updated as each phase is built. Issue:
 [mod-integration-framework.md](../../../issues/mod-integration-framework.md).
 
@@ -469,6 +469,8 @@ public static class ScanSat
 The server checks the mod before each call, class members and server side functions included.
 Every `CheckAPI` goes, and Trajectories gains the check it lacks. Design:
 [requires-mod.md](requires-mod.md).
+
+Implemented on branch `requires-mod`, not yet merged or run in game.
 
 ### Phase 6: tested mod versions in the docs
 
