@@ -268,7 +268,6 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 
 | | Feature | Issue | Design doc |
 | --- | --- | --- | --- |
-| ⬜ | Vessel state and staging prediction; parts may be covered by the stage API | [#311](https://github.com/krpc/krpc/issues/311) | — |
 | ⬜ | Autopilot extensions: bank-to-turn, heterogeneous actuators, output filter knobs, sign convention refactor | — | [autopilot/bank-to-turn.md](design/autopilot/bank-to-turn.md), [autopilot/heterogeneous-actuators.md](design/autopilot/heterogeneous-actuators.md), [autopilot/output-filter-manual-knobs.md](design/autopilot/output-filter-manual-knobs.md), [autopilot/sign-convention-refactor.md](design/autopilot/sign-convention-refactor.md) |
 | ⬜ | Index of mod integrations: existing work, plus SCANsat, Kerbalism, Near Future Solar and compatibility checks | [mod-integrations-index.md](issues/mod-integrations-index.md) | — |
 | 🚧 | RemoteTech API bindings and KAC alarm actions | [remotetech-kac-api.md](issues/remotetech-kac-api.md) | [services/kac-remotetech-tests-and-api.md](design/services/kac-remotetech-tests-and-api.md) |
@@ -339,6 +338,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 
 | Feature | Design doc |
 | --- | --- |
+| Vessel state and staging prediction ([#311](https://github.com/krpc/krpc/issues/311)): the stage API covers the prediction, with each stage's masses, thrust, specific impulse, burn time and delta-v, and fuel flow follows from them. A general "should stage now" check was rejected: when to stage depends on the craft's design, and a server side function runs a script's own rule in one round trip | — |
 | Service versioning | [services/service-versioning.md](design/services/service-versioning.md) |
 | CI lite and merge queue | [build-tools/ci-lite-merge-queue.md](design/build-tools/ci-lite-merge-queue.md) |
 | CI remote cache | [build-tools/ci-remote-cache.md](design/build-tools/ci-remote-cache.md) |
