@@ -22,7 +22,7 @@ Finished items are collapsed under **Done** in each section.
 | | Release | Theme | Progress |
 | --- | --- | --- | --- |
 | ✅ | [0.7](#07-server-side-functions-streams-and-events-service-improvements) | Server-side functions, streams and events, protocol additions, service improvements | Tagged 2026-10-21 |
-| 🚧 | [0.8](#08-single-connection-client-codegen-then-client-conformance-and-thread-safety) | Single connection, client codegen, then client conformance testing and thread safety | 19 of 27 features done |
+| 🚧 | [0.8](#08-single-connection-client-codegen-then-client-conformance-and-thread-safety) | Single connection, client codegen, then client conformance testing and thread safety | 24 of 31 features done |
 | ⬜ | [1.0](#10-remaining-protocol-improvements-server-side-function-follow-ups) | Remaining protocol improvements (#906), server side function follow-ups | 0 of 9 done; tick control has a 0.7 stopgap |
 
 ## 0.7: server-side functions, streams and events, service improvements
@@ -102,16 +102,14 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 | --- | --- | --- | --- |
 | 🚧 | Client name collisions: a scanner rule banning clashing member names, a contract for client naming, the clashing `ConfigNode` methods removed (done: #1261, #1273) | [#1237](https://github.com/krpc/krpc/issues/1237) | [protocol/service-definition-rules.md](design/protocol/service-definition-rules.md), [protocol/client-naming.md](design/protocol/client-naming.md) |
 | 🚧 | Scanner errors disable only the broken members, listed in one popup with the mods the mod integration framework disabled | [#1227](https://github.com/krpc/krpc/issues/1227) | [server/partial-loading.md](design/server/partial-loading.md), [server/problem-reporting.md](design/server/problem-reporting.md) |
-| 🚧 | Mod integration framework, refactoring first: one registry in `service/` for the services and mods, a build macro, test helpers in krpctools, one binding layer, `ModAPI` loaded at startup, `RequiresMod` in place of `CheckAPI`, tested mod versions in the docs. All seven phases built and checked in game, not yet submitted | [mod-integration-framework.md](issues/mod-integration-framework.md) | [services/mod-integration-framework/](design/services/mod-integration-framework/README.md) |
+| 🚧 | Mod integration framework, refactoring first: one registry in `service/` for the services and mods, a build macro, test helpers in krpctools, one binding layer, `ModAPI` loaded at startup, `RequiresMod` in place of `CheckAPI`, tested mod versions in the docs. All seven phases built and checked in game, as three stacked branches for three PRs: `service-registry` (phases 1, 2), `mod-api` (3, 4), `requires-mod` (5 to 7); not yet submitted | [mod-integration-framework.md](issues/mod-integration-framework.md) | [services/mod-integration-framework/](design/services/mod-integration-framework/README.md) |
 | 🚧 | Python: build every service from the server's definitions, with generated declarations for type checking; removes `use_pregenerated_stubs` and replaces the Python part of #1195. Phases 1 to 2b merged, and three phase 3 follow-ups: typed function compiler, `definitions` and `declarations` conformance profiles, pyright on the generated modules. Open: `<Service>Client` escaped, `--bundle`, a connect per game | [python-declarations.md](issues/python-declarations.md), PRs #1298, #1302, #1303, #1304, #1305, #1306, #1307 | [python-declarations.md](design/python-declarations.md) |
 | 🚧 | JavaScript client for the browser, on WebSockets, in phases. Phases 1 to 6, the function compiler included, implemented, not yet submitted. Phase 7: links in the server forms and npm publishing done; a first Windows CI run and the submission to do | — | [javascript-client.md](design/javascript-client.md) |
-| 🚧 | Server side functions: `Match` and `Switch` statements, before the JavaScript compiler's statements; then Python `match`. The statements in #1334; Python `match` to do | [switch-statements.md](issues/switch-statements.md) | [server-side-functions/switch.md](design/server-side-functions/switch.md) |
-| ⬜ | Name case conversion: one specified algorithm per case style, followed and tested by every client, so `UInt64` is `uint64` and Java enumeration constants match the docs. Breaking renames, so in 0.8 | — | [protocol/name-case-conversion.md](design/protocol/name-case-conversion.md) |
-| 🚧 | Trajectories service; a PR from an outside contributor | PR #1253, **add milestone** | [services/trajectories-service.md](design/services/trajectories-service.md) |
-| 🚧 | Kerbal Engineer Redux service | [#288](https://github.com/krpc/krpc/issues/288), **add milestone** | [services/kerbal-engineer-redux.md](design/services/kerbal-engineer-redux.md) |
+| 🚧 | Server side functions: `Match` and `Switch` statements, before the JavaScript compiler's statements; then Python `match`. The statements merged in #1334; Python `match` built on branch `python-match`, not yet submitted | [switch-statements.md](issues/switch-statements.md) | [server-side-functions/switch.md](design/server-side-functions/switch.md) |
+| 🚧 | Name case conversion: one specified algorithm per case style, followed and tested by every client, so `UInt64` is `uint64` and Java enumeration constants match the docs. Breaking renames, so in 0.8. Phases 1 to 4 built on branch `name-casing`, not yet submitted; phase 5 waits for the JavaScript client | — | [protocol/name-case-conversion.md](design/protocol/name-case-conversion.md) |
 
 <details>
-<summary>Done (19)</summary>
+<summary>Done (24)</summary>
 
 | | Feature | Issue | Design doc |
 | --- | --- | --- | --- |
@@ -134,13 +132,18 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 | ✅ | Flags enumerations, for `SpaceCenter.MapFilter`, with conformance tests; breaking for `MapFilterType.All` | [krpc-enum-flags.md](issues/krpc-enum-flags.md), done by PR #1311 | — |
 | ✅ | Flags enumerations in server side functions: `Expression.Not`, and the Python and C# compilers' operators | [krpc-enum-flags-functions.md](issues/krpc-enum-flags-functions.md), done by PR #1313 | — |
 | ✅ | RealAntennas: link budget and targeting on `Antenna`, data rates on `CommLink`; `Parts.Antennas` lists one entry per transmitter module | [real-antennas.md](issues/real-antennas.md), done by PR #1320 | [services/real-antennas.md](design/services/real-antennas.md) |
+| ✅ | Trajectories service; a PR from an outside contributor | PR #1253 | [services/trajectories-service.md](design/services/trajectories-service.md) |
+| ✅ | MechJeb2 service, ported from Genhis' KRPC.MechJeb 0.7.1 to MechJeb 2.15; service id 14 by #1329. The follow-ups are not scheduled | [#288](https://github.com/krpc/krpc/issues/288), fixed by #1326 | [services/mechjeb.md](design/services/mechjeb.md) |
+| ✅ | Kerbal Engineer Redux service: impact, suicide burn, staged simulation in flight and the editor, burn times, rendezvous angles; service id 15 by #1329 | [#288](https://github.com/krpc/krpc/issues/288), fixed by #1327 | [services/kerbal-engineer-redux.md](design/services/kerbal-engineer-redux.md) |
+| ✅ | SCANsat service: coverage, readouts, anomalies, scanners, maps; service id 16 by #1329. Phase 2 is not scheduled | [mod-integrations-index.md](issues/mod-integrations-index.md), done by PR #1328 | [services/scansat.md](design/services/scansat.md) |
+| ✅ | Raster Prop Monitor service: persistent variables, variable reads, monitor pages, buttons, text and images, script-drawn displays, camera views | [#424](https://github.com/krpc/krpc/issues/424), fixed by #1335; [#375](https://github.com/krpc/krpc/issues/375), **close** | [services/raster-prop-monitor.md](design/services/raster-prop-monitor.md) |
 
 </details>
 
 ### Merged
 
 <details>
-<summary>Done (37)</summary>
+<summary>Done (39)</summary>
 
 | | Item | PRs | Design doc |
 | --- | --- | --- | --- |
@@ -181,6 +184,8 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 | ✅ | B9PartSwitch, Near Future Solar and TweakScale Rescaled support, with in-game tests; `PartField` runs the right-click menu's callbacks, `Part.Cost` adds module costs | #1314 | [services/mod-compat-test-coverage.md](design/services/mod-compat-test-coverage.md) |
 | ✅ | Conformance: more flaky tests listed in Python and C++ | #1315 | — |
 | ✅ | In-game tests: install a mod zip whose folder sits at the archive root, with no `GameData` | #1316 | — |
+| ✅ | Start the remaining servers when one fails to start, and name each that failed | #1330 | — |
+| ✅ | Build and CI: the build tooling tests grouped in `//tools/build:test` | #1331 | — |
 
 </details>
 
@@ -189,10 +194,7 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 | | Item | Issue | Design doc |
 | --- | --- | --- | --- |
 | 🚧 | Scanner rules for service, type, parameter and enumeration value names, and the C++ helper names. Service and type names done by PRs #1324, #1325; parameters, enumeration values and helper keys open | [clientgen-qualified-names.md](issues/clientgen-qualified-names.md) | [protocol/service-definition-rules.md](design/protocol/service-definition-rules.md) |
-| ⬜ | Clients: escape a service or type name that meets a client's own name | [client-name-escapes.md](issues/client-name-escapes.md) | [protocol/client-reserved-names.md](design/protocol/client-reserved-names.md) |
-| 🚧 | Clients: use `Connection` for the entry point in every client, with `Transport` for the layer under it and `Remote<Kind>` for the generated bases. Built on branch `client-naming`, not yet submitted | [client-class-names.md](issues/client-class-names.md) | — |
-| 🚧 | Clients: one shape for errors, with a `RemoteError` base and a subclass per category. Type ids merged (#1324); E1 to E5 in #1333 | [client-errors.md](issues/client-errors.md) | [client-errors.md](design/client-errors.md) |
-| 🚧 | Server side functions: name types, exceptions and fields by id, and the C-nano examples with them | [function-api-by-id.md](issues/function-api-by-id.md) | [client-errors.md](design/client-errors.md#type-ids) |
+| 🚧 | Clients: escape a service or type name that meets a client's own name. Member names kept clear of the names in generated code built on branch `generated-object-name`, not yet submitted; service and type escapes open | [client-name-escapes.md](issues/client-name-escapes.md) | [protocol/client-reserved-names.md](design/protocol/client-reserved-names.md) |
 | ⬜ | Clients: calls that cannot go in a server side function | [calls-a-function-cannot-make.md](issues/calls-a-function-cannot-make.md) | — |
 | ⬜ | Clients: check whether a per-element function needs a real instance | [call-with-arguments-template.md](issues/call-with-arguments-template.md) | [server-side-functions/server-side-functions.md](design/server-side-functions/server-side-functions.md) |
 | ⬜ | In-game tests for local sockets and server restarts, for what `TestServer` and the unit tests do not reach | [ingame-protocol-tests.md](issues/ingame-protocol-tests.md) | — |
@@ -205,7 +207,7 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 | ⬜ | SpaceCenter: `Vessel.Name` returns the display name, in place of a localization key for stock craft | [vessel-name-localization.md](issues/vessel-name-localization.md) | — |
 
 <details>
-<summary>Done (23)</summary>
+<summary>Done (26)</summary>
 
 | | Item | Issue | Design doc |
 | --- | --- | --- | --- |
@@ -232,6 +234,9 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 | ✅ | SpaceCenter: setting the IVA camera mode waits for the crew after a launch, stays in IVA when already there, and throws for an uncrewed vessel | [camera-iva-mode-setter.md](issues/camera-iva-mode-setter.md), done by PR #1318 | — |
 | ✅ | In-game tests for Firespitter, KerbalActuators and Procedural Fairings, the last mod compatibility gap | [mod-compat-tests.md](issues/mod-compat-tests.md), done by PR #1319 | [services/mod-compat-test-coverage.md](design/services/mod-compat-test-coverage.md) |
 | ✅ | Lua: `platform.sleep` calls `socket.sleep` in place of a busy-wait to whole seconds, and is deprecated; the doc examples call `socket.sleep` | [lua-platform-sleep.md](issues/lua-platform-sleep.md), done by PR #1323 | — |
+| ✅ | Clients: `Connection` for the entry point in every client, with `Transport` for the layer under it and `Remote<Kind>` for the generated bases; breaking | [client-class-names.md](issues/client-class-names.md), done by PR #1332 | — |
+| ✅ | Clients: one shape for errors, with a `RemoteError` base and a subclass per category; type ids (E0) in #1324; breaking | [client-errors.md](issues/client-errors.md), done by PR #1333 | [client-errors.md](design/client-errors.md) |
+| ✅ | Server side functions: name types, exceptions and fields by id, and the C-nano examples with them | [function-api-by-id.md](issues/function-api-by-id.md), done by PR #1336 | [client-errors.md](design/client-errors.md#type-ids) |
 
 </details>
 
@@ -247,7 +252,7 @@ addition on protocol version 2, so 0.8 clients keep working: see
 | ⬜ | Protocol improvements (meta issue) | [#906](https://github.com/krpc/krpc/issues/906) | [protocol/improvements.md](design/protocol/improvements.md) |
 | 🚧 | Non-blocking calls and batching, fire-and-forget, client to server streams | [#903](https://github.com/krpc/krpc/issues/903), **add milestone** | [synchronization/non-blocking-calls.md](design/synchronization/non-blocking-calls.md), [synchronization/fire-and-forget.md](design/synchronization/fire-and-forget.md), [synchronization/reverse-streams.md](design/synchronization/reverse-streams.md); `KRPC.RunFunction` (#1124) already runs a batch in one tick |
 | 🚧 | Tick control: which tick calls run in, where in it, and one call or batch per tick, replacing the tick hold stopgap | [#251](https://github.com/krpc/krpc/issues/251), **add milestone** | [synchronization/tick-control.md](design/synchronization/tick-control.md), design open, including where in a tick calls run; [synchronization/tick-hold.md](design/synchronization/tick-hold.md) is the stopgap |
-| 🚧 | Inheritance for remote objects; additive, flattened copies kept, UI and Drawing first, then robotics and #900 modules | [#905](https://github.com/krpc/krpc/issues/905) | [protocol/inheritance.md](design/protocol/inheritance.md) |
+| 🚧 | Inheritance for remote objects; additive, flattened copies kept, UI and Drawing first, then robotics and #900 modules. Phases 1 and 2 built on branch `inheritance`, in-game tests not yet run, not yet submitted | [#905](https://github.com/krpc/krpc/issues/905) | [protocol/inheritance.md](design/protocol/inheritance.md) |
 
 ### Server side function follow-ups
 
@@ -291,12 +296,12 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | | Feature | Issue | Design doc |
 | --- | --- | --- | --- |
 | ⬜ | Autopilot extensions: bank-to-turn, heterogeneous actuators, output filter knobs, sign convention refactor | — | [autopilot/bank-to-turn.md](design/autopilot/bank-to-turn.md), [autopilot/heterogeneous-actuators.md](design/autopilot/heterogeneous-actuators.md), [autopilot/output-filter-manual-knobs.md](design/autopilot/output-filter-manual-knobs.md), [autopilot/sign-convention-refactor.md](design/autopilot/sign-convention-refactor.md) |
-| 🚧 | Index of mod integrations: existing work, plus SCANsat, Kerbalism and compatibility checks; B9PartSwitch, Near Future Solar and TweakScale Rescaled done by #1314, RealAntennas by #1320 | [mod-integrations-index.md](issues/mod-integrations-index.md) | — |
+| 🚧 | Index of mod integrations: existing work, plus SCANsat, Kerbalism and compatibility checks; B9PartSwitch, Near Future Solar and TweakScale Rescaled done by #1314, RealAntennas by #1320, Trajectories by #1253, MechJeb2 by #1326, Kerbal Engineer Redux by #1327, SCANsat by #1328, Raster Prop Monitor by #1335 | [mod-integrations-index.md](issues/mod-integrations-index.md) | — |
 | 🚧 | RemoteTech API bindings and KAC alarm actions | [remotetech-kac-api.md](issues/remotetech-kac-api.md) | [services/kac-remotetech-tests-and-api.md](design/services/kac-remotetech-tests-and-api.md) |
 | ⬜ | InfernalRobotics input linking and sun tracking | [infernal-robotics-input-linking.md](issues/infernal-robotics-input-linking.md) | [services/infernal-robotics-input-linking.md](design/services/infernal-robotics-input-linking.md) |
 | 🚧 | Principia support; phase 1 shipped as a docs page, phases 2 and 3 wait on upstream | [#767](https://github.com/krpc/krpc/issues/767) | [services/principia-service.md](design/services/principia-service.md) |
-| ⬜ | MechJeb2 service, ported from Genhis' KRPC.MechJeb, then stage stats from MechJeb's fuel-flow simulation | [#288](https://github.com/krpc/krpc/issues/288), [#311](https://github.com/krpc/krpc/issues/311) | [services/mechjeb.md](design/services/mechjeb.md) |
-| 🚧 | Raster Prop Monitor integration and camera views, all four phases plus readback outside the IVA, page button captures, video frames and a tutorial on branch `raster-prop-monitor`, unpushed; the stream rate fix it was stacked on merged as #1310 | [#375](https://github.com/krpc/krpc/issues/375), [#424](https://github.com/krpc/krpc/issues/424) | [services/raster-prop-monitor.md](design/services/raster-prop-monitor.md) |
+| ⬜ | MechJeb2 service follow-ups, after the port in #1326: phase 2 from KRPC.MechJeb #29, then stage stats from MechJeb's fuel-flow simulation | [#311](https://github.com/krpc/krpc/issues/311) | [services/mechjeb.md](design/services/mechjeb.md) |
+| ⬜ | SCANsat phase 2: science experiments, background scanning, Breaking Ground surface features, survey waypoints | [mod-integrations-index.md](issues/mod-integrations-index.md) | [services/scansat.md](design/services/scansat.md) |
 | ⛔ | Per-thruster RCS control through IndividualRCS; a PR from an outside contributor | PR #1245 | — |
 
 ### Fixes, tests and tooling
