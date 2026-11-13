@@ -1,6 +1,6 @@
 # Raster Prop Monitor service
 
-**Status:** proposal. Issues [#375](https://github.com/krpc/krpc/issues/375) (RPM integration) and
+**Status:** implemented on branch `raster-prop-monitor`, unmerged. Issues [#375](https://github.com/krpc/krpc/issues/375) (RPM integration) and
 [#424](https://github.com/krpc/krpc/issues/424) (camera views), from the
 [mod integrations index](../../issues/mod-integrations-index.md).
 
@@ -27,9 +27,14 @@ FirstPersonKSP/RasterPropMonitor) builds IVAs from props. The pieces kRPC can re
 | `RasterPropMonitor` | Internal module of an MFD prop. Pages, `globalButtons`, private `screenTexture` | Public class |
 | `RasterPropMonitor.GlobalButtonClick/Release (id)`, `PageButtonClick (page)` | Presses an MFD button, switches page. The active page is the persistent variable `activePage<propID>` | Public |
 | `MonitorPage.ProcessedText` | The text of a page, after variable substitution, with RPM's markup | Public |
-| `MonitorPage.spf` | One formatter per line of the page text, holding its `VariableOrNumber`s and their `variableName` | Private |
+| `MonitorPage.text`, `textOverlay`, `screenXMin`, `screenYMin`, `defaultColor` | The page's source text before formatting, its text overlay, its margins and its default color | Private and public fields |
+| `MonitorPage.pageHandlerModule`, `backgroundHandlerModule` | The handler modules RPM created for the page | Private |
+| `TextRenderer.fontCharacters` | The characters the monitor's fonts can draw | Private |
+| `JUtil.RasterPropMonitorShouldUpdate (part)` | Whether RPM draws the part's monitors now | Public |
+| `RasterPropMonitorComputer.UpdateVariables`, `RasterPropMonitor.FillScreenBuffer`, `RenderScreen`, `rpmComp` | The steps of RPM's update of a monitor, and the monitor's computer | Private |
 | `PAGEHANDLER`, `BACKGROUNDHANDLER` | Page config naming a module and methods by name. RPM instantiates the module with `internalProp.AddModule` and binds `string (int, int)`, `bool (RenderTexture, float)`, `void (int)` button and `void (bool, int)` activation methods | Prop config |
 | `IJSIModule` | Plugin methods for `PLUGIN_` variables and `PLUGINACTION` switches | Needs a compile-time subclass |
+| `SmarterButton.pageTriggers`, `clickHandlers`, `PageTriggerSet.selector`, `OnMouseDown`, `OnMouseUp` | A button's page triggers per monitor, its other click handlers, and the click itself | Private, except the mouse methods |
 | `JSIExternalCameraSelector`, `FlyingCamera (part, aspect)`, `PointCamera (name, fov)`, `Render (texture, yaw, pitch)` | Camera parts (`ExtCam1`, ...) and the renderer the MFD camera pages use | Public |
 
 Two constraints shape the design:
@@ -54,8 +59,9 @@ Two constraints shape the design:
   through `PERSISTENT_<name>`. A switch or numeric input sets one and the script streams it. Stock
   RPM switches do this already, so an IVA needs no kRPC config. Values are doubles, as in RPM.
 * **Switch presses are changes of a persistent variable.** `PersistentVariableChanged (name)` is a
-  polled event that fires on each change. A momentary switch fires twice, on press and release,
-  because RPM sets and clears it frames apart.
+  polled event that fires when the value differs from the last update's. A momentary switch fires
+  twice, on press and release, because RPM sets and clears it frames apart. A change that is
+  undone within one server update does not fire.
 * **Events carry no value**, as all kRPC events. A button event is one event per button id, so
   the id is the event. A script that wants each new value of a variable streams it, with a
   callback. [events-with-values](../../issues/events-with-values.md) proposes typed events.
@@ -67,10 +73,14 @@ Two constraints shape the design:
   from KSP's `InternalModule`, so RPM instantiates it from page config by name. The script acts
   as the computer behind the page: it sets the text and the background, and answers the button
   presses.
-* **Each monitor has its own display.** A page with no `display` value binds to its own monitor,
-  and the script reaches it as `Monitor.Display`. Presses on it come from that screen only. A
-  page with `display = <name>` binds to a named display instead, shared by every page that names
-  it, for an IVA author who wants several screens to show one display. A page config for either:
+* **Each monitor has its own display.** A page whose handlers have no `display` value binds to
+  its own monitor, and the script reaches it as `Monitor.Display`. Presses on it come from that
+  screen only. Handlers with `display = <name>` bind to a named display instead, shared by every
+  page that names it, for an IVA author who wants several screens to show one display. The value
+  goes in both handler nodes, as RPM passes each handler its own node only. RPM creates one
+  module per handler node, and the module finds its monitor through the pages'
+  `pageHandlerModule` and `backgroundHandlerModule`. A page config for a named display, with a
+  button to select it. Without the two `display` lines, the page shows its monitor's own display:
 
   ```
   PAGE
@@ -81,6 +91,7 @@ Two constraints shape the design:
       {
           name = KRPCDisplay
           method = Text
+          display = flightplan
           buttonClickMethod = ButtonClick
           buttonReleaseMethod = ButtonRelease
           pageActiveMethod = PageActive
@@ -89,6 +100,7 @@ Two constraints shape the design:
       {
           name = KRPCDisplay
           method = RenderBackground
+          display = flightplan
       }
   }
   ```
@@ -96,16 +108,34 @@ Two constraints shape the design:
 * **Display text is RPM page text.** RPM runs a handler's text through its formatter, so the
   script can embed variables (`{0:F0}$&$ALTITUDE`) and color tags, and RPM updates them each text
   refresh without a call from the script.
-* **Display image is a PNG**, decoded once into a texture and drawn as the page background,
-  scaled to the screen. Text draws over it.
+* **Display image is a PNG or JPEG**, decoded once into a texture and drawn as the page
+  background, scaled to the screen. Text draws over it. The service checks the file signature,
+  as Unity's `LoadImage` decodes other data as a placeholder texture.
 * **Display buttons are the monitor's global buttons**, by their index in `Monitor.Buttons`,
   after RPM's per-page redirects. A page handler receives the presses of its page only. On RPM's
   bundled MFD these are UP, DOWN, ENTER, ESC, HOME, LEFT, RIGHT, R9 and R10.
-* **Page buttons stay RPM's.** The buttons that select pages, R1 to R8, A and B on the bundled
-  MFD, switch the monitor away and never reach the display. The player can always leave the
-  script's page this way. The script watches `Shown` and can switch back with `ActivePage`.
-  RPM's `lockingPage` would keep the player on the page, but it is fixed in config and would trap
-  the player, so the service does not use it.
+* **Page buttons are RPM's until a script captures one.** The buttons that select pages, R1 to
+  R7, A to G and STBY on the bundled MFD, switch the monitor away and never reach the display.
+  The `krpc` page has no button, so a script brings the player back to it by capturing one:
+  `CaptureButton (name, page)` makes a press of that button show the script's page, such as
+  `krpc`, in place of RPM's, and fires `ButtonCaptured (name)`. A script that captures several
+  buttons draws its own screen for each, as the event names the button. The player can still
+  leave through the buttons the script leaves to RPM, and `ReleaseButton` gives one back.
+  RPM's `lockingPage` would keep the player on the page, but it is fixed in config and would
+  trap the player, so the service does not use it.
+* **A capture takes the monitor's trigger out of the button.** RPM's `SmarterButton` runs, on a
+  click, one private `PageTriggerSet` per monitor, whose `selector` is the monitor's
+  `PageButtonClick`. The service removes the triggers whose selector targets the monitor, and
+  adds a click handler of its own to the button's private `clickHandlers`. The handler calls
+  `PageButtonClick` with the captured page, so RPM's locking and redirect rules still apply.
+  Release puts the triggers back. Other monitors on the same button keep theirs.
+* **Captures outlive the IVA.** KSP builds new buttons on vessel switch and IVA entry. The
+  service keeps the captures per monitor, as it does display content, and a flight scene addon
+  applies them to the new buttons in its `Update`. They are not saved with the game.
+* **`PressPageButton (name)` clicks a page button as the player does**, through the button's
+  `OnMouseDown`, then `OnMouseUp` on the next frame. It follows captures, and a button with
+  several pages cycles through them, as RPM does. `PageButtons` names the prop's buttons that
+  select the monitor's pages, captured ones included.
 * **Button labels are drawn by the script.** The labels on the buttons are part of the model's
   texture. A script that gives a button its own meaning draws a label at the screen edge next to
   it, as RPM's own pages do.
@@ -113,10 +143,12 @@ Two constraints shape the design:
   and no button to every prop with a `RasterPropMonitor` module, `:NEEDS[RasterPropMonitor]`.
   Every MFD then has its own `Monitor.Display`. RPM's bundled MFD config is documented as
   removable, so the patch matches the module and no prop name. The patch goes in its own file so
-  a player can delete it.
+  a player can delete it: `RasterPropMonitorDisplay.cfg` in `GameData/kRPC/`.
 * **Display content lives in the service**, per monitor, or per vessel and name. KSP rebuilds
   the IVA's modules on IVA entry, and a new handler takes the stored content. A script can set it
   before the player enters the pod. It is not saved with the game.
+* **Button events count presses.** The display counts the presses and releases of each button,
+  and each event is polled, firing when its count has grown. Presses within one update fire once.
 
 A menu on one screen, with the script as its computer:
 
@@ -137,6 +169,8 @@ def move(step):
 
 draw()
 monitor.active_page = "krpc"
+# The NAV button brings the player back to the menu
+monitor.capture_button("buttonR1", "krpc")
 display.button_pressed(up).add_callback(lambda: move(-1))
 display.button_pressed(down).add_callback(lambda: move(1))
 display.button_pressed(enter).add_callback(lambda: toggle(items[cursor]))
@@ -160,24 +194,48 @@ display.button_pressed(enter).add_callback(lambda: toggle(items[cursor]))
   | `[font` anything `]` | Nothing |
   | Any other bracketed text, such as `[abc]` or `[#12]` | The text, brackets included |
   | `[` with an empty or one-character tag, such as `[]` or `[a]`, or with no `]` after it | The rest without the `[`: `]`, `a]` |
+  | `[[]` | `[]`, by the row above |
+  | `[[` and a tag of 5 or more characters that matches no row above, such as `[[abcde]` | `[`. This is RPM's escape, which only a longer tag reaches |
 
-  The `[[` escape goes through the same rules. Tests check each row against the rendered screen.
+  A `]` on a later line closes a tag, as RPM searches the whole text. Tests check `Text` against
+  each row, with the expected text traced from `TextRenderer.ParseText`.
   Text in `[hw]` or `[dw]` takes one character per column in `Text`, so such a line loses its
-  alignment. `RawText` keeps it.
+  alignment. `RawText` keeps it. `Text` also follows the renderer's layout: the page text sits
+  inside the page's margins, the page's text overlay replaces the characters under it, and a
+  character past the screen edge or missing from the font is not drawn.
 * **`Monitor.RawText` keeps the markup**, for a client that draws the screen itself. The tags are
   color `[#rrggbb]` and `[#rrggbbaa]`, pixel nudges `[@xN]` and `[@yN]`, half and double width
   `[hw]` and `[dw]`, `[sup]`, `[sub]` and `[fontN]`. The monitor gives the layout the tags need:
   the screen size in characters and pixels, the letter size in pixels, and the page's default
-  color. This recreates the text layer only. Camera views, graphs and textures are drawn under
+  color. `RawText` is the page text without the text overlay, which no bundled page uses.
+  This recreates the text layer only. Camera views, graphs and textures are drawn under
   the text, and come only with `Image`.
-* **`Monitor.Variables` names the variables the active page shows**, from the page's line
-  formatters. A script that wants exact values reads them by name through `Computer`, with no
+* **`Monitor.Variables` names the variables the active page shows**, parsed from the page's
+  source text as RPM's formatter reads it. RPM drops the formatters of lines whose variables
+  are constants, such as `RPMVERSION`, so the formatters miss them. The source text of a fixed
+  page is set when RPM builds the page, so `Variables` needs no IVA. A script that wants exact values reads them by name through `Computer`, with no
   knowledge of the IVA's page files.
-* **Monitor readback needs the IVA.** `Monitor.Text`, `RawText` and `Image` throw an exception unless
-  RPM is updating that monitor. A stale frame would read as a valid one.
+* **Monitor readback works in any camera mode.** RPM updates a monitor only while
+  `RasterPropMonitorShouldUpdate` holds for its part. Reading `Text`, `RawText`, `Variables` or
+  `Image` of any other monitor runs the steps of RPM's own update for it: the computer's private
+  `UpdateVariables`, then the monitor's private `FillScreenBuffer`, and for `Image` its
+  `RenderScreen`. Each runs at most once a frame per computer or monitor, so a read in the frame
+  of a change can give the text from before it. This serves a script that shows a pod's screens
+  in a window of its own with the flight camera on, and reaches the pods the kerbal is not in.
+  The vessel computer that the variables read updates on the active vessel in every camera mode.
+* **`Monitors` takes the active vessel only**, and throws an exception for another. A monitor
+  finds its module again on each call, by part, prop id and its place among the prop's monitor
+  modules, as KSP rebuilds the IVA. It is dormant while its part has no IVA.
+* **`PressButton` releases once the frame count moves on.** The server updates in
+  `FixedUpdate`, which can run more than once a frame.
 * **Cameras render through RPM's own `FlyingCamera`**, with a texture kRPC owns. This works in any
   camera mode, which the monitor readback does not, and matches the MFD camera pages. The
-  DockingCamera service's `Camera.Image` is the model.
+  DockingCamera service's `Camera.Image` is the model. `FlyingCamera.Render` only sets its Unity
+  cameras up to render at the end of the frame, so `Image` renders them itself, farthest out
+  first, and cleans them up. `FlyingCamera.Render` needs the camera on the active vessel.
+* **The field of view starts at the camera's largest**, as on an MFD camera page, and a value
+  set is clamped to the camera's range, which `MinFieldOfView` and `MaxFieldOfView` give. The
+  service keeps it per part, and does not save it.
 * **RPM variables are read by name**, on the part's computer. The service instantiates the
   variable, calls `Update`, and reads the value. This covers what kRPC lacks, such as `CUSTOM_`
   and `MATH_` variables from IVA packs and RPM's own mod bridges. Values that depend on the vessel
@@ -197,7 +255,9 @@ display.button_pressed(enter).add_callback(lambda: toggle(items[cursor]))
   The script knows the kind ahead of time, as with `PartField`, or asks `VariableType`. Each read
   throws an exception for a name RPM does not recognize. RPM itself shows such a name as literal
   text. `FormatVariables` gives a value with RPM's own formats, such as `SIP` and `KDT`.
-* **Persistent variables are numbers only**, as RPM stores them.
+* **Persistent variables are numbers only**, as RPM stores them. RPM has no removal, so
+  `RemovePersistentVariable` removes the entry and updates the `PERSISTENT_` variables as RPM's
+  setter does.
 
 ## API
 
@@ -210,18 +270,18 @@ Persistent variables and RPM variables:
 | `Computer.PersistentVariable (name)` | Procedure, nullable double: the part's value, else the vessel's, as `PERSISTENT_<name>` |
 | `Computer.SetPersistentVariable (name, value)`, `RemovePersistentVariable (name)` | Procedures. Set fires RPM's update of the variable |
 | `Computer.PersistentVariableChanged (name)` | Event |
-| `GlobalPersistentVariable (vessel, name)`, `SetGlobalPersistentVariable`, `GlobalPersistentVariableChanged` | The vessel-global equivalents |
+| `GlobalPersistentVariable (vessel, name)`, `SetGlobalPersistentVariable`, `RemoveGlobalPersistentVariable`, `GlobalPersistentVariableChanged` | The vessel-global equivalents. Throw an exception for a vessel with no RPM computer |
 | `Computer.VariableType (name)` | Procedure, `VariableType`: `Number`, `String` |
 | `Computer.NumberVariable (name)`, `StringVariable (name)` | Procedures, double and string |
 | `Computer.FormatVariables (text)` | Procedure, string |
 
-Monitors and displays, active vessel only:
+Monitors and displays. A monitor works on the active vessel only, and a display on any vessel:
 
 | Member | Kind |
 | --- | --- |
 | `Monitors (vessel)` | List of `Monitor` |
-| `Monitor` | `Part`, `PropName`, `Pages` (names), `ActivePage` (get, set), `Buttons` (global button names, by id), `PressButton (id)`, `ScreenWidth`, `ScreenHeight` (characters), `ScreenPixelWidth`, `ScreenPixelHeight`, `LetterWidth`, `LetterHeight` (pixels), `DefaultColor` (of the active page), `Text`, `RawText`, `Variables`, `Image` (PNG) |
-| `Monitor.Display`, `Display (vessel, name)` | `Display`: `Name` (null for a monitor's own), `Text` (get, set), `Image` (set, PNG, null clears), `Clear ()`, `Shown` (whether a monitor shows it now) |
+| `Monitor` | `Part`, `PropName`, `Pages` (names), `ActivePage` (get, set), `Buttons` (global button names, by id), `PressButton (id)`, `PageButtons`, `PressPageButton (name)`, `CaptureButton (name, page)`, `ReleaseButton (name)`, `ButtonCaptured (name)` (event), `ScreenWidth`, `ScreenHeight` (characters), `ScreenPixelWidth`, `ScreenPixelHeight`, `LetterWidth`, `LetterHeight` (pixels), `DefaultColor` (of the active page), `Text`, `RawText`, `Variables`, `Image` (PNG) |
+| `Monitor.Display`, `Display (vessel, name)` | `Display`: `Name` (null for a monitor's own), `Text` (get, set), `Image` (get, set, PNG or JPEG, null clears), `Clear ()`, `Shown` (whether a monitor shows it now) |
 | `Display.ButtonPressed (id)`, `ButtonReleased (id)` | Events |
 
 Cameras:
@@ -229,7 +289,7 @@ Cameras:
 | Member | Kind |
 | --- | --- |
 | `Cameras (vessel)` | List of `ExternalCamera` |
-| `ExternalCamera` | `Part`, `Name` (`ExtCam1`, ...), `FieldOfView` (get, set), `Image (width, height)` (PNG) |
+| `ExternalCamera` | `Part`, `Name` (`ExtCam1`, ...), `MinFieldOfView`, `MaxFieldOfView`, `FieldOfView` (get, set), `Image (width, height)` (PNG, active vessel only) |
 
 ## Phases
 
@@ -238,10 +298,10 @@ in-game tests, built in the order below.
 
 | Phase | Adds | Needs in game |
 | --- | --- | --- |
-| 1 | Service skeleton, `Available`, `Computer`, persistent variables and their events, variable reads | A pod with an RPM IVA. Tests set variables and read them back through `PERSISTENT_` on a prop |
-| 2 | `Monitor`: pages, `ActivePage`, `PressButton`, `Text`, `RawText`, `Variables`, `Image` | The IVA camera mode, through `SpaceCenter.Camera` |
-| 3 | `KRPCDisplay`, `Display`, button events, the optional Module Manager patch | Phase 2, plus a test that presses a display button with `PressButton` |
-| 4 | `ExternalCamera` (#424) | A part with `JSIExternalCameraSelector`. Works outside the IVA |
+| 1 | Service skeleton, `Available`, `Computer`, persistent variables and their events, variable reads | Two Mk1 lander cans, which RPM patches with a computer. RPM leaves the stock Mk1 pod (`mk1pod_IVA`) unpatched. Tests set variables and read them back through `PERSISTENT_` |
+| 2 | `Monitor`: pages, `ActivePage`, `PressButton`, `Text`, `RawText`, `Variables`, `Image` | The IVA camera mode, through `SpaceCenter.Camera`, set once the launched vessel settles. KSP ignores it straight after a launch |
+| 3 | `KRPCDisplay`, `Display`, button events, the optional Module Manager patch | Phase 2, plus a test that presses a display button with `PressButton`. A test overlay, `mods/JSI/KRPCTestDisplay.cfg`, adds a page for a named display |
+| 4 | `ExternalCamera` (#424) | Two JSI External Radial-mount Cameras on the test craft, as `ExtCam1` and `ExtCam2`. Works outside the IVA |
 
 Phase 3 depends on phase 2 for its tests. Phase 4 depends only on phase 1. Phase 1 adds the
 test mod pin, which needs RPM and Module Manager, and the full RPM package so the stock pods have
@@ -249,11 +309,8 @@ RPM IVAs.
 
 ## Open Questions
 
-* `Monitor.Text` outside the IVA. `MonitorPage.UpdateText` is public, and the service can update
-  the page's variables itself, as the variable reads do. That could give fresh text in any camera
-  mode. A page handler may depend on its page being shown, so this needs checking in game.
-* Player presses on pages kRPC does not own. RPM binds global buttons to the page's handler, so
-  kRPC sees them only by wrapping the `SmarterButton` callbacks. Not planned.
+* Player presses of global buttons on pages kRPC does not own. RPM binds them to the page's
+  handler, and the click handler hook that captures use could report them too. Not planned.
 
 ## Considered and Not Planned
 
