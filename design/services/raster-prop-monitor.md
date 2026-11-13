@@ -55,7 +55,9 @@ Two constraints shape the design:
 * **Switch presses are changes of a persistent variable.** `PersistentVariableChanged (name)` is a
   polled event that fires on each change. A momentary switch fires twice, on press and release,
   because RPM sets and clears it frames apart.
-* **Events carry no value**, as all kRPC events. A script reads the new value, or streams it.
+* **Events carry no value**, as all kRPC events. A button event is one event per button id, so
+  the id is the event. A script that wants each new value of a variable streams it, with a
+  callback. [events-with-values](../../issues/events-with-values.md) proposes typed events.
 * **The script's own page is a page handler module in the service DLL.** `KRPCDisplay` derives
   from KSP's `InternalModule`, so RPM instantiates it from page config by name. A page names a
   display with `display = <name>`. Each monitor page showing that name shows the same content:

@@ -270,6 +270,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | | Feature | Issue | Design doc |
 | --- | --- | --- | --- |
 | ⬜ | MicroPython client, for boards such as the Raspberry Pi Pico; first check that generated stubs fit | [micropython-client.md](issues/micropython-client.md) | — |
+| ⬜ | Events that carry a value: a core stream of the unsent firings as a list, no protocol change; waits for a service that needs it | [events-with-values.md](issues/events-with-values.md) | — |
 | ⬜ | Custom transports in every client, as C-nano has | [client-custom-transports.md](issues/client-custom-transports.md) | — |
 | ⬜ | Per-client receive patience | [recv-patience.md](issues/recv-patience.md) | [server/recv-timeout-cliff.md](design/server/recv-timeout-cliff.md) |
 | 🚧 | RemoteTech API bindings and KAC alarm actions | [remotetech-kac-api.md](issues/remotetech-kac-api.md) | [services/kac-remotetech-tests-and-api.md](design/services/kac-remotetech-tests-and-api.md) |
