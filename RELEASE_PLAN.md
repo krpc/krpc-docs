@@ -100,7 +100,6 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 | | Feature | Issue | Design doc |
 | --- | --- | --- | --- |
 | 🚧 | Client name collisions: a scanner rule banning clashing member names, a contract for client naming, the clashing `ConfigNode` methods removed (done: #1261, #1273) | [#1237](https://github.com/krpc/krpc/issues/1237) | [protocol/service-definition-rules.md](design/protocol/service-definition-rules.md), [protocol/client-naming.md](design/protocol/client-naming.md) |
-| ⬜ | Inheritance for remote objects; additive, UI and Drawing first, then robotics and #900 modules | [#905](https://github.com/krpc/krpc/issues/905) | [protocol/inheritance.md](design/protocol/inheritance.md) |
 | 🚧 | Scanner errors disable only the broken members, a broken mod disables only its integration, listed in one popup | [#1227](https://github.com/krpc/krpc/issues/1227) | [server/partial-loading.md](design/server/partial-loading.md), [server/problem-reporting.md](design/server/problem-reporting.md) |
 | ⬜ | `RequiresMod` attribute: the server checks that a service's mod is available before each RPC | [requires-mod-attribute.md](issues/requires-mod-attribute.md) | [server/partial-loading.md](design/server/partial-loading.md) |
 | 🚧 | Python: build every service from the server's definitions, with generated declarations for type checking; removes `use_pregenerated_stubs` and replaces the Python part of #1195. Phases 1 to 2b merged, and three phase 3 follow-ups: typed function compiler, `definitions` and `declarations` conformance profiles, pyright on the generated modules. Open: `<Service>Client` escaped, `--bundle`, a connect per game | [python-declarations.md](issues/python-declarations.md), PRs #1298, #1302, #1303, #1304, #1305, #1306, #1307 | [python-declarations.md](design/python-declarations.md) |
@@ -241,6 +240,7 @@ addition on protocol version 2, so 0.8 clients keep working: see
 | ⬜ | Protocol improvements (meta issue) | [#906](https://github.com/krpc/krpc/issues/906) | [protocol/improvements.md](design/protocol/improvements.md) |
 | 🚧 | Non-blocking calls and batching, fire-and-forget, client to server streams | [#903](https://github.com/krpc/krpc/issues/903), **add milestone** | [protocol/non-blocking-calls.md](design/protocol/non-blocking-calls.md), [protocol/fire-and-forget.md](design/protocol/fire-and-forget.md), [protocol/reverse-streams.md](design/protocol/reverse-streams.md); `KRPC.RunFunction` (#1124) already runs a batch in one tick |
 | 🚧 | Tick control: one RPC or batch per physics update, replacing the tick hold stopgap | [#251](https://github.com/krpc/krpc/issues/251), **add milestone** | [server/tick-hold.md](design/server/tick-hold.md) is the stopgap; protocol design open |
+| 🚧 | Inheritance for remote objects; additive, flattened copies kept, UI and Drawing first, then robotics and #900 modules | [#905](https://github.com/krpc/krpc/issues/905) | [protocol/inheritance.md](design/protocol/inheritance.md) |
 
 ### Server side function follow-ups
 

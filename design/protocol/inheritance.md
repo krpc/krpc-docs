@@ -3,7 +3,7 @@
 **Status:** in progress. Phase 1 is split into a stack: server and schema, then the Python client.
 Phase 2 sits on top of it, with in-game tests not yet run.
 Neither branch has a pull request yet. The other clients and docgen follow. Written against `krpc` at
-version 0.8.0.
+version 0.8.0. Targets 1.0, as no part of it breaks a client (ruled 2026-11-11).
 
 [Issue #905](https://github.com/krpc/krpc/issues/905) asks for service class hierarchies to reach
 the clients. Today the scanner flattens them, so each class carries a copy of every inherited
@@ -64,15 +64,23 @@ message Class {
 The service definition JSON from `servicedefs` gains the same key. Under proto3, an older client
 ignores the unknown field.
 
-**The flattened procedures stay.** The scanner emits `Object_get_Visible` for the declaring class
-and keeps `Button_get_Visible`. Each rule below matches a rule in
-[protocol-compatibility.md](../protocol-compatibility.md):
+**The flattened procedures stay, permanently.** The scanner emits `Object_get_Visible` for the
+declaring class and keeps `Button_get_Visible`. Each client picks the form it uses. Ruled
+2026-11-11.
 
-* A 0.8 client sees what it sees today, plus the new base classes, which are harmless.
-* A new client reads `base` and skips each member already declared on an ancestor. The match is
-  by member name, which is unambiguous because an override keeps its name.
-* Dropping the flattened copies is a breaking change for a later major release. It is not part of
-  this design.
+* A client without class inheritance calls the flattened copies and ignores `base`. This covers
+  cnano and third-party clients in languages such as Rust or Go.
+* A client with inheritance reads `base` and filters out each member already declared on an
+  exposed ancestor, in its stubs and its docs. The match is by member name. It is unambiguous
+  because overriding and hiding are scanner errors, so a matching name is always a copy.
+* A client that does not read `base` yet keeps working, so the clients move over one at a time.
+* Adding a base later stays additive. A stub generated before `RoboticServo` existed still calls
+  `RoboticHinge_get_Locked`. The same holds for a mod that exposes a base in a later version.
+
+The cost is the size of `GetServices` for UI and Drawing, sent once per connection, and two
+procedures for one value. Each client uses one form, so its streams stay consistent. Dropping the
+copies was rejected: it would need every client ported first, and would make each new base a
+breaking change for generated stubs.
 
 **Upcasts need no wire change.** Object ids carry no type. The server checks an argument with
 `Type.IsInstanceOfType` (`core/src/Service/Services.cs`), so a `Button` passed to
@@ -98,7 +106,7 @@ rare, and the RPC is additive. Revisit B if a polymorphic collection turns out t
 | C++ | Restructure `krpc::Object<T>` | CRTP blocks a base. Split the equality and hashing helpers from the base, or template the leaf only |
 | Java | `class Button extends Control` | |
 | Lua | Metatable chain | Dynamic, so no clientgen |
-| cnano | No change | Objects are `typedef krpc_object_t`, so base functions already accept a derived handle. Keep the flattened functions until phase 5, as dropping them breaks source compatibility. Ruled 2026-11-05 |
+| cnano | No change | Objects are `typedef krpc_object_t`, so base functions already accept a derived handle. Keeps the flattened functions, as C has no classes to hang the base functions on |
 | docgen | Base class line plus "inherited from" links | Members are listed on the declaring class. Each language shows the base once its client derives its classes, as the docs then promise that a derived object goes where its base is expected. Python has the `Bases:` line |
 
 Option A adds a cast helper per client: `conn.cast(obj, FailureModule)`, `obj.as<FailureModule>()`,
@@ -144,13 +152,13 @@ Each phase is mergeable on its own.
      `MapMarker` and `NavballMarker` implement `IDrawable` and do not derive from `Drawable<T>`,
      so they stay outside the hierarchy unless they are rebased.
    * Built as a fourth branch on the stack, on top of the Python client, so the Python in-game
-     tests run end to end. Each base gets an API reference page. The derived pages still list the
-     inherited members, as the other clients still call the flattened copies.
-3. **SpaceCenter robotics.** Add a `RoboticServo` base. The change is additive.
+     tests run end to end. Each base gets an API reference page. The derived pages of a language
+     list the inherited members until its client filters the flattened copies.
+3. **SpaceCenter robotics.** Add a `RoboticServo` base. The change is additive, as the flattened
+   copies stay.
 4. **Runtime type and casts.** `KRPC.GetObjectClass` plus the client cast helpers. Then the #900
    follow-ups: a mod `[KRPCClass]` deriving from `SpaceCenter.Module`, and `Part.modules`
    returning it.
-5. **Later major release.** Drop the flattened procedures.
 
 ## Constructors
 
@@ -178,3 +186,6 @@ Inheritance needs no constructor support. A C# constructor is not inherited.
   from a mod, the client builds a per-connection subclass of it (`_client_class`). A derived stub
   class still derives from the shared stub base, so it misses those members. This first matters
   for the phase 4 module work, where a mod class derives from `SpaceCenter.Module`.
+* Flattened copies of extension members. A member a mod adds to `SpaceCenter.Module` would be
+  copied onto subclasses in other services, so the copies depend on which mods are installed.
+  Settle this with the phase 4 design.
