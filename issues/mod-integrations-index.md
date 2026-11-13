@@ -8,13 +8,13 @@ This issue indexes the mod support that is planned or worth considering. Each op
 | --- | --- | --- | --- |
 | MechJeb2 | 36k | #288, #311 | Port the third-party [kRPC.MechJeb](https://genhis.github.io/KRPC.MechJeb) service into kRPC: [design/services/mechjeb.md](../design/services/mechjeb.md). |
 | Kerbal Engineer Redux | 1.92M | #288 | `Vessel.DeltaV` and `Stage` already cover delta-v. Find which stats are missing: [design/services/kerbal-engineer-redux.md](../design/services/kerbal-engineer-redux.md). |
-| Trajectories | 1.11M | PR #1253 | Merged. |
+| Trajectories | 1.11M | PR #1253 | Open, from an outside contributor. |
 | Principia | not on CKAN | #767 | Phase 1 shipped as a docs page. Phases 2 and 3 wait on upstream. |
 | Raster Prop Monitor | 2.05M | #375, #424, [design](../design/services/raster-prop-monitor.md) | The count likely includes installs as a dependency of IVA packs. Four phases: persistent variables, monitors, script pages, cameras. Built on branch `raster-prop-monitor`, with readback outside the IVA and page button captures. |
-| IndividualRCS | - | PR #1245 | Merged. |
-| [Near Future Solar](https://github.com/post-kerbin-mining-corporation/NearFutureSolar) | 1.50M | - | `SolarPanel` wraps the curved panels' `ModuleCurvedSolarPanel`, with in-game tests. Implemented and passing in game, awaiting a PR. |
-| [B9PartSwitch](https://github.com/blowfishpro/B9PartSwitch) | 2.02M | - | Setting a `PartField` did not switch the subtype: B9PartSwitch acts only on the UI control's `onFieldChanged`, which `PartField` now calls as the right-click menu does. In-game tests switch the subtype in the editor and check resources and mass there and in flight. Implemented and passing in game, awaiting a PR. |
-| [TweakScale](https://github.com/TweakScale/TweakScale), [TweakScale Rescaled](https://github.com/JonnyOThan/TweakScale) | 1.52M, 1.07M | - | Mass, thrust, torque and resources read correctly on scaled parts. `Part.Cost` ignored module costs, and now adds them as the game's ship cost does. TweakScale's own cost does not follow the scale, and adds nothing in flight. In-game tests for both. Implemented and passing in game, awaiting a PR. |
+| IndividualRCS | - | PR #1245 | Open, from an outside contributor. |
+| [Near Future Solar](https://github.com/post-kerbin-mining-corporation/NearFutureSolar) | 1.50M | PR #1314 | `SolarPanel` wraps the curved panels' `ModuleCurvedSolarPanel`, with in-game tests. Merged. |
+| [B9PartSwitch](https://github.com/blowfishpro/B9PartSwitch) | 2.02M | PR #1314 | Setting a `PartField` did not switch the subtype: B9PartSwitch acts only on the UI control's `onFieldChanged`, which `PartField` now calls as the right-click menu does. In-game tests switch the subtype in the editor and check resources and mass there and in flight. Merged. |
+| [TweakScale](https://github.com/TweakScale/TweakScale), [TweakScale Rescaled](https://github.com/JonnyOThan/TweakScale) | 1.52M, 1.07M | PR #1314 | Mass, thrust, torque and resources read correctly on scaled parts. `Part.Cost` ignored module costs, and now adds them as the game's ship cost does. TweakScale's own cost does not follow the scale, and adds nothing in flight. In-game tests for both. Merged. |
 | RemoteTech, Kerbal Alarm Clock | 689k, 1.33M | [remotetech-kac-api](remotetech-kac-api.md) | Complete the existing services. |
 | Infernal Robotics | - | [infernal-robotics-input-linking](infernal-robotics-input-linking.md) | Input linking and sun tracking. |
 | Procedural Fairings | 1.19M | [mod-compat-tests](mod-compat-tests.md) | The one existing integration with no in-game tests. |
@@ -48,7 +48,7 @@ Kerbalism also needs a compatibility fix. It replaces `ModuleScienceExperiment` 
 
 ## Suggested Order
 
-1. Near Future Solar, as a small fix for a known gap. Implemented, awaiting a PR.
-2. Smoke tests on Real Solar System and Kopernicus, then B9PartSwitch and TweakScale. A bug here returns wrong values with no error. B9PartSwitch and TweakScale are implemented, awaiting a PR.
+1. Near Future Solar, as a small fix for a known gap. Merged in #1314.
+2. Smoke tests on Real Solar System and Kopernicus, then B9PartSwitch and TweakScale. A bug here returns wrong values with no error. B9PartSwitch and TweakScale merged in #1314.
 3. A SCANsat service, as the first new integration.
 4. Kerbalism, scoped separately because it spans a service and compatibility work.
