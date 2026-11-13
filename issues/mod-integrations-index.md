@@ -17,7 +17,7 @@ This issue indexes the mod support that is planned or worth considering. Each op
 | [TweakScale](https://github.com/TweakScale/TweakScale), [TweakScale Rescaled](https://github.com/JonnyOThan/TweakScale) | 1.52M, 1.07M | - | Mass, thrust, torque and resources read correctly on scaled parts. `Part.Cost` ignored module costs, and now adds them as the game's ship cost does. TweakScale's own cost does not follow the scale, and adds nothing in flight. In-game tests for both. Implemented and passing in game, awaiting a PR. |
 | RemoteTech, Kerbal Alarm Clock | 689k, 1.33M | [remotetech-kac-api](remotetech-kac-api.md) | Complete the existing services. |
 | Infernal Robotics | - | [infernal-robotics-input-linking](infernal-robotics-input-linking.md) | Input linking and sun tracking. |
-| Procedural Fairings, DockingCamera, LIDAR | 1.19M (Procedural Fairings) | [mod-compat-tests](mod-compat-tests.md) | Existing integrations with no in-game tests. |
+| Procedural Fairings | 1.19M | [mod-compat-tests](mod-compat-tests.md) | The one existing integration with no in-game tests. |
 
 [requires-mod-attribute](requires-mod-attribute.md) makes the server check that a service's mod is available before each RPC, which applies to any new service.
 

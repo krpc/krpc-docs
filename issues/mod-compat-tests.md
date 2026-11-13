@@ -1,8 +1,13 @@
-# In-game tests for untested mod integrations
+# In-game tests for Procedural Fairings
 
-Several mod integrations have no in-game tests:
+`Fairing` wraps the Procedural Fairings `ProceduralFairingDecoupler` module as well as the stock
+`ModuleProceduralFairing`. `test_parts_fairing.py` covers only stock fairings.
 
-* Procedural Fairings.
-* DockingCamera and LIDAR, which have no `test/` directory and are absent from `//:test` and `//:lint`. Tests without the mods installed (`Available` is false, the factories throw) need no mod sourcing.
+* Register the mod in `krpctools.game` (`ksp/mods/__init__.py`), detected by one of its parts.
+* Add a craft with a Procedural Fairings fairing, and a test class with `mods = ["ProceduralFairings"]`
+  covering the fairing's state and jettison.
 
-Designs: [mod-compat-test-coverage.md](https://github.com/krpc/krpc-docs/blob/main/design/services/mod-compat-test-coverage.md), [dockingcam-lidar-tests.md](https://github.com/krpc/krpc-docs/blob/main/design/services/dockingcam-lidar-tests.md)
+Every other mod integration in scope has in-game tests. The thrust reversers matched by animation
+name are left untested on purpose.
+
+Design: [mod-compat-test-coverage.md](https://github.com/krpc/krpc-docs/blob/main/design/services/mod-compat-test-coverage.md)

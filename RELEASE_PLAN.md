@@ -326,7 +326,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | | Item | Issue | Design doc |
 | --- | --- | --- | --- |
 | 🚧 | Autopilot test-plan gaps | [autopilot-test-gaps.md](issues/autopilot-test-gaps.md) | [autopilot/test-plan.md](design/autopilot/test-plan.md) |
-| 🚧 | Mod compatibility tests | [mod-compat-tests.md](issues/mod-compat-tests.md) | [services/mod-compat-test-coverage.md](design/services/mod-compat-test-coverage.md), [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
+| 🚧 | Procedural Fairings tests, the last mod compatibility gap | [mod-compat-tests.md](issues/mod-compat-tests.md) | [services/mod-compat-test-coverage.md](design/services/mod-compat-test-coverage.md) |
 | ⬜ | NUnit 5 | [nunit-5-migration.md](issues/nunit-5-migration.md) | [build-tools/nunit-5-migration.md](design/build-tools/nunit-5-migration.md) |
 | ⬜ | Windows CI: C-nano serial transport tests, over a named pipe | [#1200](https://github.com/krpc/krpc/issues/1200) | — |
 | ⬜ | Build `KRPC.IO.Ports` from source in the net472 `KRPC.Core`, in place of the prebuilt DLL | [core-serial-ports.md](issues/core-serial-ports.md) | — |

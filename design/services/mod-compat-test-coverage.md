@@ -1,21 +1,31 @@
 # Mod-compatibility integration-test coverage
 
-**Status:** in progress (2026-07-17) — Action Groups Extended done and merged as
-[PR #968 "AGExt tests"](https://github.com/krpc/krpc/pull/968) (2026-07-18, section 2);
-the Firespitter and KerbalActuators thrust reversers implemented, PR not yet opened (sections 5
-and 6); the rest not yet implemented. The kOS name tag (was phase 2) is covered: #829 was fixed by
-[PR #1155](https://github.com/krpc/krpc/pull/1155), whose `test_parts_tag.py` runs over five mod
-sets. The remaining tests are drafted as an issue in
-[issues/mod-compat-tests.md](../../issues/mod-compat-tests.md).
+**Status:** in progress (2026-11-10). Every integration in scope is covered except Procedural
+Fairings (section 3), which is the one open item in
+[issues/mod-compat-tests.md](../../issues/mod-compat-tests.md). Done:
+
+| Mod | Section | PR |
+|---|---|---|
+| FAR | 1 | [#1032](https://github.com/krpc/krpc/pull/1032) |
+| Action Groups Extended | 2 | [#968](https://github.com/krpc/krpc/pull/968) |
+| kOS name tag | 4 | [#1155](https://github.com/krpc/krpc/pull/1155) |
+| Firespitter, KerbalActuators | 5, 6 | implemented, PR not yet opened |
+| RealFuels | added after the audit | [#1039](https://github.com/krpc/krpc/pull/1039) |
+| B9PartSwitch, Near Future Solar, TweakScale Rescaled | added after the audit | [#1314](https://github.com/krpc/krpc/pull/1314) |
+
+The test plumbing moved into `krpctools.game` in [PR #1299](https://github.com/krpc/krpc/pull/1299).
+"Test plumbing to reuse" below describes the current layout; the `_MOD_*` registries named in the
+older sections are gone.
 
 kRPC integrates with a number of third-party KSP mods, and several of those integrations have **no
 integration-test coverage**. This doc catalogs every mod integration in the repo, cross-references
 it against the integration-test suite, and lays out how to close the gaps using the mod-gating
 plumbing that the RealChute (#382) and DMagic (#550) test work already established.
 
-Out of scope: the `LiDAR` and `DockingCamera` bridge services. They are also untested, but they bind
-to bespoke, non-public bridge builds and need mod-side work before kRPC support can be improved —
-tracked separately in [`design/services/dockingcam-lidar-tests.md`](dockingcam-lidar-tests.md).
+Out of scope: the `LiDAR` and `DockingCamera` bridge services, tracked separately in
+[`design/services/dockingcam-lidar-tests.md`](dockingcam-lidar-tests.md). That work is done:
+DockingCamera has in-game tests since [PR #1264](https://github.com/krpc/krpc/pull/1264), and LIDAR
+was deprecated in [PR #1263](https://github.com/krpc/krpc/pull/1263), so it gets no tests.
 
 ## Two integration styles
 
@@ -34,17 +44,32 @@ kRPC touches mods two ways, and the gaps are almost entirely in the second:
 
 ## Current coverage
 
+As of 2026-11-10. Test files are under `service/SpaceCenter/test/` unless a path is given.
+
 | Mod | Integration | Test coverage |
 |---|---|---|
-| InfernalRobotics | Bridge service | `service/InfernalRobotics/test/` — 4 classes |
-| RemoteTech | Bridge service + SpaceCenter autopilot/throttle gating | `service/RemoteTech/test/` — 4 classes; gating in `service/SpaceCenter/test/test_control.py` |
-| KerbalAlarmClock | Bridge service | `service/KerbalAlarmClock/test/` — 1 class |
-| RealChute | Part-module compat (`Parachute`) | `service/SpaceCenter/test/test_parts_realchute.py` (#382) |
-| DMagic | Part-module compat (`Experiment`) | `service/SpaceCenter/test/test_parts_experiment_dmagic.py` (#550) |
+| InfernalRobotics | Bridge service | `service/InfernalRobotics/test/` |
+| RemoteTech | Bridge service + SpaceCenter autopilot/throttle gating | `service/RemoteTech/test/` |
+| KerbalAlarmClock | Bridge service | `service/KerbalAlarmClock/test/` |
+| DockingCamera | Bridge service | `service/DockingCamera/test/` (#1264) |
+| RealChute | Part-module compat (`Parachute`) | `test_parts_realchute.py` (#382) |
+| DMagic | Part-module compat (`Experiment`) | `test_parts_experiment_dmagic.py` (#550) |
+| AGExt | `ExternalAPI/AGExt.cs` (`Control`) | `test_action_groups_extended.py` (#968) |
+| FAR | `ExternalAPI/FAR.cs` (`Flight`, `Part`) | `test_flight.py`, two classes (#1032) |
+| RealFuels | `ExternalAPI/RealFuels.cs`, `RealFuelsTank` | `test_parts_realfuels.py` (#1039) |
+| kOS, KSPCommunityPartModules | Name tag module (`Part.Tag`) | `test_parts_tag.py`, four mod sets (#1155) |
+| B9PartSwitch | `PartField` subtype switching | `test_parts_b9partswitch.py` (#1314) |
+| Near Future Solar | `SolarPanel` curved panels | `test_parts_solar_panel_nearfuturesolar.py` (#1314) |
+| TweakScale Rescaled | Scaled part stats, `Part.Cost` | `test_parts_tweakscale.py` (#1314) |
+| Firespitter, KerbalActuators | `ThrustReverser` | `test_parts_engine.py` (PR not yet opened) |
+| Procedural Fairings | `Fairing` | **none** (section 3) |
 
 ## The gaps — mod integrations with no test coverage
 
-### 1. Ferram Aerospace Research (FAR) — highest value, hardest to test
+### 1. Ferram Aerospace Research (FAR) — done in PR #1032
+
+The analysis below predates the tests. [PR #1032](https://github.com/krpc/krpc/pull/1032) added two
+FAR test classes to `test_flight.py`.
 
 `service/SpaceCenter/src/ExternalAPI/FAR.cs` binds
 `APILoader.Load(typeof(FAR), "FerramAerospaceResearch", "FerramAerospaceResearch.FARAPI",
@@ -112,7 +137,7 @@ ProceduralFairings mod explicitly). Only stock fairings are currently tested.
 
 **Testability:** Procedural Fairings has public KSP 1.12 releases and self-contained parts. A single
 mod-part craft plus a `Fairing` jettison/state test class, following the RealChute pattern. Detected
-via `_MOD_PARTS` (a ProceduralFairings part in the catalog).
+by a ProceduralFairings part in the catalog (`_PartMod`).
 
 ### 4. kOS — name-tag part field — done in PR #1155
 
@@ -160,10 +185,11 @@ design is.
 `ThrustReverser.cs` detects the `"FSswitchEngineThrustTransform"` module and drives reverse thrust
 via its `isReversed` field and `reverseTTAction` / `normalTTAction` / `switchTTAction` actions.
 
-**As built:** Firespitter v7.17 (`snjo/Firespitter`, no dependencies, no `GameData/` root in the
-archive, so `add_prefix`). Craft `PartsEngineReverserFirespitter`: pod, tank and `FSnoseEngine` on
+**As built:** Firespitter v7.17 (`snjo/Firespitter`, no dependencies). The archive has no
+`GameData/` root, so the installer's `copy_folder` also takes a folder at the top of an archive.
+Craft `PartsEngineReverserFirespitter`: pod, tank and `FSnoseEngine` on
 launch clamps. `TestPartsEngineReverserFirespitter` round-trips `thrust_reversed` and checks the
-thrust direction turns 180 degrees and back. Detected via `_MOD_PARTS` (`FSnoseEngine`).
+thrust direction turns 180 degrees and back. Detected by its part, `FSnoseEngine`.
 
 ### 6. KerbalActuators - prop-spinner thrust reverser - implemented, PR not yet opened
 
@@ -173,7 +199,7 @@ thrust direction turns 180 degrees and back. Detected via `_MOD_PARTS` (`FSnoseE
 **As built:** the module ships in KerbalActuators (`Angel-125/KerbalActuators` v1.9.0, installs
 as `GameData/WildBlueIndustries/001KerbalActuators`), not Wild Blue Tools. It has no
 dependencies, and its bundled ModuleManager is not installed. The mod ships no part that uses the
-module, so an overlay (`tools/mods/config/WildBlueIndustries/TestPart.cfg`) clones the Juno into
+module, so an overlay (`ksp/mods/WildBlueIndustries/TestPart.cfg` in the mods registry) clones the Juno into
 `kerbalActuatorsReverserTest` and `kerbalActuatorsFixedTest`. The Juno's one thrust transform
 serves as both forward and reverse, so the test checks state only, not direction. Craft
 `PartsEngineReverserKerbalActuators`. `TestPartsEngineReverserKerbalActuators` round-trips the
@@ -193,40 +219,42 @@ pinning several mods for one `bool` toggle apiece.
 **Recommendation:** do **not** add per-mod tests for these. If the stock-turbofan branch
 (`TF1/TF2ThrustReverser`) is reachable with a stock part, cover that one with a no-mod test; leave the
 rest documented-as-untested. Note the omission explicitly rather than letting it read as covered.
+This stays the decision: these shims are untested on purpose, and are not open work.
 
 The stock turbofans are covered: `TestPartsEngineReverser` drives the J-90 "Goliath" and J-33
 "Wheesley" reversers with no mod installed.
 
 ## Non-integrations (nothing to test)
 
-For the record, these were searched for and are **not** integrated in-repo, so there is no compat code
-to test: MechJeb (external project, `doc/src/third-party.rst` link only), Procedural Parts (#594
-confirmed kRPC reads the stock `SolidFuel` resource with no special-casing), RealFuels / Modular Fuel
-Tanks, Realism Overhaul (its science parts ride on the DMagic module, already covered by #550),
-Kerbal Engineer, and TweakScale.
+For the record, these were searched for and were **not** integrated in-repo at the time of the audit:
+MechJeb (external project, `doc/src/third-party.rst` link only), Procedural Parts (#594 confirmed
+kRPC reads the stock `SolidFuel` resource with no special-casing), Modular Fuel Tanks, Realism
+Overhaul (its science parts ride on the DMagic module, already covered by #550), Kerbal Engineer, and
+TweakScale.
+
+RealFuels and TweakScale Rescaled have since gained support and tests (see the status table). Planned
+integrations, MechJeb and Kerbal Engineer among them, are indexed in
+[issues/mod-integrations-index.md](../../issues/mod-integrations-index.md).
 
 ## Test plumbing to reuse
 
-The RealChute and DMagic work already built everything needed; adding a mod is mostly registry
-entries plus a craft and a test class.
+Since [PR #1299](https://github.com/krpc/krpc/pull/1299) the plumbing lives in `krpctools.game`,
+under `tools/krpctools/krpctools/game/`. Adding a mod is a registry entry, a craft and a test class.
 
-* **Declare the requirement** — set `mods = ["<Name>"]` on the `krpctest.TestCase` subclass
-  (`tools/krpctest/krpctest/testcase.py`). The harness restarts KSP at most once per distinct mod set
-  (`pytest_plugin.py` groups by mod set) and fails fast on sets that install but never become
-  available (`game.py` `_unsatisfiable`).
-* **Fetch the archive** — add an `http_archive` (URL + sha256) in `MODULE.bazel` (the mod block,
-  ~lines 451–520) and a `filegroup` in `tools/mods/BUILD.bazel`.
-* **Register install + GameData layout** — add the mod to the `MODS` registry in
-  `tools/krpctest/krpctest/install.py` (name → Bazel target(s) + GameData subdir). `_reconcile_mods`
-  makes GameData contain *exactly* the requested managed set.
-* **Register detection** — either `_MOD_SERVICES` (mod exposes a kRPC service or an `Available` flag,
-  e.g. FAR's `FARAvailable`) or `_MOD_PARTS` (probe a mod part in the loaded catalog, e.g. RealChute's
-  `RC.stack`) in `game.py`.
-* **Suppress first-run popups / add test parts** — config overlays under `tools/mods/config/<subdir>/`
-  (RealChute needs the Harmony / ClickThroughBlocker / ToolbarControl dependency stack + popup
-  suppression; DMagic ships no parts so a test-only part is defined in
-  `tools/mods/config/DMagicScienceAnimate/TestPart.cfg`).
-* **Craft** — a `.craft` under `service/<Service>/test/craft/` built from the mod's parts, loaded via
+* **Declare the requirement**: set `mods = ["<Name>"]` on the `TestCase` subclass from
+  `krpctools.game.ksp`. The runner restarts KSP at most once per distinct mod set.
+* **Register the mod**: a class in `ksp/mods/__init__.py`, added to `MODS`. It pins the archive
+  (`source` URL and `sha256`), names the GameData `folders` (and top-level `files`) it installs, and
+  lists the mods it `requires`. Archives download to `~/.cache/krpctools`; nothing goes in
+  `MODULE.bazel`.
+* **Detection**: the class's base gives the presence check. `_PartMod` probes a part in the catalog,
+  `_ServiceMod` a service's `available` property, `_AssemblyMod` a loaded assembly's version. A mod
+  that patches a module onto every part overrides `present` (AGExt).
+* **Overlays**: `ksp/mods/<folder>/` is copied over the installed folder, to suppress a first-run
+  popup or to add a test-only part (DMagic, B9PartSwitch, KerbalActuators). `ksp/mods/README.md`
+  lists them.
+* **Install**: GameData is reconciled to exactly the requested set and its dependencies.
+* **Craft**: a `.craft` under `service/<Service>/test/craft/`, loaded with
   `launch_vessel_from_vab(...)`. Craft must be VAB-built (RealChute lesson).
 
 Each mod that pulls in a plugin framework may need its own dependency stack and popup suppression;
@@ -234,30 +262,20 @@ budget for that per mod, not just the headline archive.
 
 ## Suggested phasing
 
-Roughly increasing difficulty; each phase is independently shippable and additive (test-only, so **no
-changelog** unless a compat bug is fixed along the way, in which case that fix gets the entry).
+Test-only, so **no changelog** unless a compat bug is fixed along the way, in which case that fix
+gets the entry.
 
-1. **Action Groups Extended** — *done* (merged as PR #968); see section 2. The `_MOD_MODULES` /
-   `TestingTools.PartModuleAvailable` detection shim added here is reusable by any future
-   module-patch-only mod.
-2. **Procedural Fairings** — self-contained parts, clean jettison/state assertions. Now the best next
-   target: no module-identity complications, and it exercises the untested `_MOD_PARTS` path on a fresh
-   mod.
-3. **Firespitter** and **KerbalActuators** thrust reversers - implemented, PR not yet opened;
-   see sections 5 and 6.
-4. **FAR** — most valuable, most involved: pin the mod, establish a controlled flight condition, and
-   assert FAR-sourced aero values (start with invariants/directional response, tighten to magnitudes
-   only if a stable condition can be reproduced headless).
-5. **kOS name-tag** — done in PR #1155 (see section 4). Originally blocked on #829: the AGExt `_MOD_MODULES` shim does not apply
-   because kRPC ships its own `KOSNameTag` module. Revisit once #829's shared-module fix lands. The
-   no-mod `Part.Tag` round-trip is a separable quick win that need not wait.
-
-Each phase should also add the new test file(s) to `//:test` and `//:lint` and their `BUILD.bazel`
-wiring (LiDAR/DockingCamera showed how easy it is to leave a service out of the root suites).
+| Phase | Mod | State |
+|---|---|---|
+| 1 | Action Groups Extended | done, PR #968 (section 2) |
+| 2 | Procedural Fairings | **open**, the one remaining item (section 3) |
+| 3 | Firespitter, KerbalActuators | implemented, PR not yet opened (sections 5, 6) |
+| 4 | FAR | done, PR #1032 (section 1) |
+| 5 | kOS name tag | done, PR #1155 (section 4) |
 
 ## Verification
 
-None of these reproduce headless or with stock parts — verification is in-game via krpctest with the
+None of these reproduce headless or with stock parts — verification is in-game via `krpctools.game` with the
 mod installed, exactly as RealChute and DMagic were validated. Each phase's test must be run against a
 real install of its mod and confirmed to go red without the compat code / green with it (or at least
 to exercise the mod-present branch that stock parts never reach).
