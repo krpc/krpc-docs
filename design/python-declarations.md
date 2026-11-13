@@ -1,6 +1,6 @@
 # Python: generated declarations and dynamic services
 
-**Status:** proposal, for 0.8. Issue: [python-declarations.md](../issues/python-declarations.md), not yet filed.
+**Status:** in progress, for 0.8. Phase 2 and 2b are implemented, not yet in a pull request. Issue: [python-declarations.md](../issues/python-declarations.md), not yet filed.
 
 The Python client has two implementations of every service: generated stubs and services built from `GetServices`. A stub that lacks a member has a third path, `merge_service`, which adds the member to a per-client subclass. This doc replaces them with one implementation, always built from the server's definitions, plus generated modules that carry the type information.
 
@@ -31,7 +31,7 @@ Each use case then works with no choice to make:
 | Type hints | The generated modules, which assume the server matches |
 | A mod with its own service | Built at connect. Type checkers know it through the mod's client type, as in [Client types](#client-types) |
 | A mod adding members to a shipped class | The members exist at run time. Type checkers do not know them |
-| A server of another version | The services match the server. Type checkers see the client's version |
+| A server of another version | Not supported. The services match the server, and type checkers see the client's version |
 
 ### Generated modules
 
@@ -75,12 +75,13 @@ A built enumeration is a different class from the imported one, so `dyn.prograde
 | Definitions | Class used | Effect |
 |---|---|---|
 | Match | The generated class, shared by every client | `==`, `is` and `isinstance` work |
-| Differ | One built for this client | The server's values all work. `==` and `coerce_to` compare service, enumeration name and value name, as a server can number the values differently. `is` is false |
+| Differ | One built for this client | The server's values all work. A generated value converts to the client's by its number. `==` and `is` are false |
 | Not registered | One built for this client | As for a mod with no module |
 
  * **The client type picks the modules.** `connect[T]` looks first in the modules of the `<Service>Client` types in `T`'s MRO. The client type and the run time then use the same declarations, and a module generated for a newer server applies only to the connections typed with it.
- * **Imported modules are the fallback.** A generated module registers its classes on import, by service and name, and a later registration replaces an earlier one. A service outside the client type, and every service of an untyped `connect()`, uses the registered classes. `import krpc` imports no generated module.
- * **Values match by name, so import order rarely matters.** An enumeration value equals and converts to the client's value of the same name, and a structure converts from any tuple of the right length. The exception is `except`: Python compares exception classes by identity, ignoring `__subclasscheck__`, so `except` with an imported exception class needs that module's class to be the client's.
+ * **Imported modules are the fallback.** A generated module registers its classes on import, by service and name, and a later registration replaces an earlier one. A service outside the client type uses the registered classes. `import krpc` imports no generated module.
+ * **Values go by number.** A generated enumeration value converts to the client's built value by its number, as the other clients send their compiled numbers. A client and a server of different releases are not supported, so a renumbered value may stand for another one. A structure converts from any tuple of the right length.
+ * **`except` needs the shared class.** Python compares exception classes by identity, ignoring `__subclasscheck__`, so `except` with an imported exception class needs that module's class to be the client's.
  * An enumeration matches on its names and values, and a structure on its field names in order. Field types always come from the server's definition, as they do today.
  * An exception matches on its name and the builtin its mapped type derives from. A server error then raises the generated class, so `except` works with an imported exception.
  * These classes hold no client, so sharing them brings back none of the stub defects.
@@ -99,22 +100,22 @@ Python has no declaration merging, so a module cannot add its service to `krpc.C
 
 | Name | Declares |
 |---|---|
-| `krpc.Client` | The client's methods, and `krpc`, the service every server has. Any other attribute is `Any` to type checkers |
+| `krpc.Client` | The client's methods. Any service is `Any` to type checkers |
 | `<Service>Client`, one in each generated module | `krpc.Client` plus the one service |
-| `krpc.ksp.KSPClient`, and later `krpc.ksa.KSAClient` | Every service shipped for one game, combined as a user would combine them |
+| `krpc.ksp.KSPClient`, and later `krpc.ksa.KSAClient` | The core services and every service shipped for one game, combined as a user would combine them |
 | `krpc.connect[T](...)`, `krpc.connect_local[T](...)` | A client created as `T` |
-| `krpc.connect(...)` | A `krpc.Client` |
+| `krpc.connect(...)` | A `krpc.ksp.KSPClient`. `krpc.connect[krpc.Client]()` gives the plain client |
 
-Untyped code, which most users write, is unchanged. Every service works, and `conn.space_center` is `Any` to type checkers, so a first script shows no errors:
+Code with no client type, which most users write, is typed for KSP, as `krpc.connect()` connects with `KSPClient`:
 
 ```python
 import krpc
 
 conn = krpc.connect(name="Launch")
-vessel = conn.space_center.active_vessel
+vessel = conn.space_center.active_vessel    # Vessel | None
 ```
 
-Typed code names the services it uses:
+Code for a mod names the services it uses:
 
 ```python
 import krpc
@@ -146,7 +147,10 @@ stage(conn)    # any client type including SpaceCenter
 ```
 
  * **`krpc.Client.__getattr__` returns `Any`, for type checkers only.** A typed client inherits it, so a misspelled service on a typed client is not reported. Typing is secondary, and the alternative forces `connect[...]` on every user who runs a type checker.
- * **`krpc.Client` declares no shipped service.** After the [split](#packages) the base package cannot know them. `connect()` is no longer typed with the shipped services, which the split would break anyway.
+ * **`krpc.Client` declares no service, not even `KRPC`.** After the [split](#packages) the base package cannot know the game's services. The core services, `KRPC` and `StdLib`, take client types like the others, so a module generated for a newer server replaces them the same way. A `krpc` declared on `Client` would make a newer `KRPCClient` an incompatible override.
+ * **The client's own calls to `KRPC` go through `Client._krpc`**, a property typed with the shipped declaration.
+ * **`connect()` with no client type connects with `KSPClient`.** It imports `krpc.ksp` on the first connect, so `import krpc` imports no generated module. A script, and every doc example, then type checks with no client type. With `Any` services, the doc examples' pyright check found no misspelled member.
+ * **Follow-up: the default is KSP's.** A KSA program calling `krpc.connect()` gets the KSP types, and after the split the base package's `connect()` needs `krpc-ksp` installed. One option is a connect per game, such as `krpc.ksp.connect()` and `krpc.ksa.connect()`, with `krpc.connect()` returning a `krpc.Client`. See [Phase 3](#phase-3-follow-ups).
  * **Several modules take one class**, as Python has no intersection type, so `connect[MyModClient, OtherClient]` cannot be typed.
  * **A client type holds only annotations.** The attributes come from `GetServices` at connect.
  * Lua and TypeScript can extend `Client` from the mod's file, by a repeated `---@class` and by module augmentation. There, `conn.myMod` type checks with no user code.
@@ -199,7 +203,7 @@ The client is planned to split into a base package and a stub package per game. 
 
  * **The game's services move to `krpc.ksp`**, matching the planned package name. `krpc.services` keeps the services of the core, which every server has.
  * **`krpc.services` no longer declares a `Client`.** A file cannot come from two distributions, and the base package cannot know a game's services.
- * **`import krpc` imports no game module**, as the base package will not have one. Values matching by name, and the client type picking the modules, make that safe.
+ * **`import krpc` imports no game module**, as the base package will not have one. The client type picks the modules, and `connect()` imports `krpc.ksp` on its first call.
  * `krpc.services.testservice` stays in the base package, for the client's tests.
 
 ### Corner cases
@@ -207,10 +211,10 @@ The client is planned to split into a base package and a stub package per game. 
 | Case | Behavior |
 |---|---|
 | The client type declares a service the server lacks | `AttributeError` on access, naming the service |
-| The server's definition differs from the module | Members follow the server, types the module. The enumeration or structure is built, and values convert by name |
+| The server's definition differs from the module | Members follow the server, types the module. The enumeration or structure is built, and a generated enumeration value converts by its number |
 | Two bases of a client type declare one service | A type error. At run time the first in the MRO picks the module |
 | Two connections typed differently | Each uses its own type's modules |
-| A module imported after connecting | Values still compare and convert by name. `is`, and `except` with its exception classes, do not hold |
+| A module imported after connecting | Its enumeration values convert by number. `==`, `is`, and `except` with its exception classes, do not hold |
 | A service named as a `Client` member, such as `Close` or `Stream` | The [reserved names](protocol/service-definition-rules.md#reserved-names) keep services off them |
 | A class named `<Service>Client` in its own service | Clashes with the client type. To reserve in the service definition rules, as a follow-up |
 
@@ -297,15 +301,17 @@ Docs:
 
 On the same pull request as phase 2, from its review, as phase 2 made `krpc.Client` declare every shipped service. A module generated for a newer shipped service then could not redeclare its attribute.
 
- * `krpc.Client` with `krpc` and a `TYPE_CHECKING` `__getattr__` returning `Any`. Remove `krpc/services/__init__.py`'s `Client`, and the eager import of the modules.
+ * `krpc.Client` with only a `TYPE_CHECKING` `__getattr__` returning `Any`, and `KRPCClient` and `StdLibClient` among the bases of `KSPClient`. Remove `krpc/services/__init__.py`'s `Client`, and the eager import of the modules.
  * The KSP services' modules move to `krpc.ksp`, with `KSPClient` in `krpc/ksp/__init__.py`.
  * `connect[T]` picks the modules from `T`, then the registry.
  * `--include SERVICE=MODULE` for Python, with defaults for the shipped services. This also fixes a module's import of another mod's service.
  * `krpctest`'s connection type and the in-game tests import from `krpc.ksp`.
- * Docs: `getting-started.rst` and every example stay untyped. `python.rst` gets one section on typing. `extending/clientgen.rst` covers `--include` for Python.
+ * Docs: `getting-started.rst` and every example keep `krpc.connect()`, typed through `KSPClient`. `python.rst` gets one section on typing. `extending/clientgen.rst` covers `--include` for Python.
  * Changelog `client/python`:
    * "**Breaking:** Move the KSP services' modules from `krpc.services` to `krpc.ksp` (#NNN)"
-   * "**Breaking:** `krpc.connect()` returns a `krpc.Client` that type checkers know only the `krpc` service of. Connect with `krpc.connect[KSPClient]()` for the KSP services' types (#NNN)"
+   * No entry for `krpc.connect()`, which stays typed with the KSP services through `KSPClient`
+ * From the branch's review: enumeration values convert by number in place of by name, and `krpc.connect()` connects with `KSPClient` in place of a `krpc.Client` with `Any` services.
+ * From the third review: `krpc.Client` declares no `krpc`, so the core services are treated as the others.
 
 ### Phase 3: Follow-ups
 
@@ -315,6 +321,7 @@ Each a pull request stacked on phase 2, merged in turn.
  * Run pyright on the generated modules, which no check covers, so that a module a user generates type checks.
  * Reserve `<Service>Client` as a type name in the service definition rules.
  * `krpc-clientgen python --bundle`, to generate a combined client type with a set of modules, as for a whole newer server.
+ * A connect per game, or another fix for `krpc.connect()` defaulting to `KSPClient`, before the KSA client types and the package split. See [Client types](#client-types).
  * Conformance: split a `definitions` profile out of `dynamic`, for building the services at connect, and add a `declarations` profile for the generated types. Python has both, and Lua takes `declarations` with [lua-type-hints.md](../issues/lua-type-hints.md).
 
 ## Alternatives Considered
@@ -334,4 +341,6 @@ Each a pull request stacked on phase 2, merged in turn.
 | `.pyi` overrides in a stub path, to replace a shipped module | Type checkers see the newer types, while the run time imports the older classes |
 | Global import order to pick the modules | A replacement module applies to every connection, and the result depends on what was imported first |
 | Entry points, `krpc.services`, for a mod's module | A mod must ship a package in place of one file. The client type picking the modules makes order matter little |
+| Enumeration values that compare, hash and convert by name | Serves a client and a server of different releases, which are not supported. A value inside a collection still went by number, so a full version converts every element |
+| `krpc.connect()` returning a `krpc.Client` with `Any` services | Scripts and the doc examples lose type checking, which then catches no misspelled member |
 | A warning at connect when the server's definitions differ from the modules, by a hash per service from `clientgen` | The program runs correctly, and only static checking is out of date |
