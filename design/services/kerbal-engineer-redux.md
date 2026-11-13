@@ -83,11 +83,18 @@ as TWR and time to atmosphere.
 
 | Struct | Fields |
 | --- | --- |
-| `Impact` | `TimeTo`, `Latitude`, `Longitude`, `Altitude`, `Biome` |
-| `SuicideBurn` | `TimeTo`, `Altitude`, `DeltaV`, `Distance`, `Duration` |
-| `Stage` | `Number`, `DeltaV`, `TotalDeltaV`, `SpecificImpulse`, `Thrust`, `ActualThrust`, `TWR`, `MaxTWR`, `ActualTWR`, `Mass`, `TotalMass`, `ResourceMass`, `BurnTime`, `TotalBurnTime`, `MaxThrustTorque`, `ThrustOffsetAngle`, `RCSSpecificImpulse`, `RCSThrust`, `RCSDeltaVStart`, `RCSDeltaVEnd`, `RCSTWRStart`, `RCSTWREnd`, `RCSBurnTime`, `Cost`, `TotalCost`, `PartCount`, `TotalPartCount` |
+| `Impact` | `UT`, `TimeTo`, `Latitude`, `Longitude`, `Altitude`, `Biome` |
+| `SuicideBurn` | `UT`, `TimeTo`, `Altitude`, `DeltaV`, `Distance`, `Duration` |
+| `Stage` | `Number`, `DeltaV`, `TotalDeltaV`, `SpecificImpulse`, `Thrust`, `AvailableThrust`, `TWR`, `AvailableTWR`, `MaxTWR`, `StartMass`, `MassLost`, `ResourceMass`, `BurnTime`, `TotalBurnTime`, `MaxThrustTorque`, `ThrustOffsetAngle`, `RCSSpecificImpulse`, `RCSThrust`, `RCSStartDeltaV`, `RCSEndDeltaV`, `RCSStartTWR`, `RCSEndTWR`, `RCSBurnTime`, `StartCost`, `CostLost`, `StartPartCount`, `DroppedPartCount` |
 | `BurnTime` | `Duration`, `HalfDuration` |
-| `Rendezvous` | `PhaseAngle`, `InterceptAngle`, `TimeToTransferAngle`, `AngleToAscendingNode`, `AngleToDescendingNode`, `TimeToAscendingNode`, `TimeToDescendingNode` |
+| `Rendezvous` | `PhaseAngle`, `InterceptAngle`, `TimeToInterceptAngle`, `AngleToAscendingNode`, `AngleToDescendingNode`, `TimeToAscendingNode`, `TimeToDescendingNode` |
+
+Field names follow `SpaceCenter`, where KER's own names would read differently there. `Thrust`
+and `TWR` are at the current throttle, as `Engine.Thrust` is, and `AvailableThrust`/`AvailableTWR`
+at full throttle. A vessel figure at the start of a stage is `Start...`, as in `Stage.StartMass`,
+and the amount the stage removes is `MassLost`, `CostLost` and `DroppedPartCount`. `Total...` is
+kept for the sum over this stage and the later ones. `Impact` and `SuicideBurn` carry `UT` beside
+`TimeTo`, as `ClosestApproach` does.
 
 ## Editor
 
@@ -103,5 +110,5 @@ at the altitude.
   `Part.FixedUpdate` and loses it in `ShipConstruct.GetShipMass`, so KER's result flipped
   between calls. The service calls `UpdateMass ()` on each part first, as `GetShipMass` does,
   which leaves the crew out every time. KER's own editor window normally shows the same.
-* **Cost and part counts** join `Stage`: `Cost`, `TotalCost`, `PartCount`, `TotalPartCount`. They
-  are for designing a craft, and stock editor delta-v has none of them.
+* **Cost and part counts** join `Stage`: `StartCost`, `CostLost`, `StartPartCount`,
+  `DroppedPartCount`. They are for designing a craft, and stock editor delta-v has none of them.
