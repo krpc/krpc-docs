@@ -26,6 +26,7 @@ carry, and keeps a KSA change from paying for KSP work it does not touch.
 | [releases.md](../releases.md) | Release trains per game and client, stub packages, labels, tags, release workflows |
 | [docs-website.md](docs-website.md) | One source, one site build per game |
 | [borea.md](borea.md) | Listing the KSA mod on the Borea mod manager, from `ksa-v0.2.0` |
+| [kitten-engineer-redux.md](kitten-engineer-redux.md) | A `KittenEngineerRedux` service for the Kitten Engineer Redux mod, bound with `MemberBinder` |
 
 Related, outside this folder:
 
