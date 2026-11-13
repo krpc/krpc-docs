@@ -1,6 +1,6 @@
 # Mod integration framework
 
-**Status:** in progress, for 0.8. Phases 1 to 5 implemented, not yet merged. The rest is a proposal
+**Status:** in progress, for 0.8. Phases 1 to 7 implemented, not yet merged. The rest is a proposal
 (2026-11-12), updated as each phase is built. Issue:
 [mod-integration-framework.md](../../../issues/mod-integration-framework.md).
 
@@ -470,7 +470,7 @@ The server checks the mod before each call, class members and server side functi
 Every `CheckAPI` goes, and Trajectories gains the check it lacks. Design:
 [requires-mod.md](requires-mod.md).
 
-Implemented on branch `requires-mod`, not yet merged or run in game.
+Implemented on branch `requires-mod`, not yet merged. Checked in game on 2026-11-13: 367 passed.
 
 ### Phase 6: tested mod versions in the docs
 
@@ -482,12 +482,27 @@ Implemented on branch `requires-mod`, not yet merged or run in game.
 
 Bumping a pin in the registry updates the tests and the docs in the same commit.
 
+Implemented on branch `tested-mod-versions`, not yet merged. Where it diverged:
+
+* docgen is unchanged. `doc/mods.bzl` writes rst include files from the registry in Starlark: a
+  link target and a `|<title> tested|` substitution per mod, and two tables for SpaceCenter.
+* Each mod has a `title`, its name in the docs, such as "Ferram Aerospace Research" for FAR.
+* The Supported Mods list keeps its prose bullets. A generated table after it gives each supported
+  mod's tested versions, and a second one each mod service's. A mod with no pinned version (LiDAR)
+  gets a link and no table row.
+
 ### Phase 7: no stubs at the pinned version
 
 After the presence checks, `ensure()` checks that each required mod's `ModAPI` bound with no stub
 and no failure, through a `TestingTools` procedure that reads `ServiceProblems.Mods`. Every test
 class that requires a mod gets the check with no code. A pin bump that removes a member then fails
 in CI, before a player sees it.
+
+Implemented on branch `no-stubs-check`, not yet merged. The procedure is
+`TestingTools.ModProblems`, a map from mod name to the problem. A required mod is matched to its
+integration by name. A failed check leaves the game running, and each later class with the same
+mods checks again. Checked in game on 2026-11-13: SCANsat and KAC, 36 passed. A misspelled SCANsat
+member failed each SCANsat class in `ensure()` with the member named, after one launch.
 
 ## Adding a mod service, after the phases
 
