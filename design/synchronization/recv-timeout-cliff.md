@@ -1,9 +1,10 @@
 # The receive timeout throughput cliff
 
-**Status:** investigation. Two adaptive schemes were tried and measured as negative results; a
-recommendation is below. Options 2 and 3 are drafted as issues in
-[issues/recv-timeout-default.md](../../issues/recv-timeout-default.md) and
-[issues/recv-patience.md](../../issues/recv-patience.md).
+**Status:** investigation, done. Two adaptive schemes were measured as negative results. Of the
+recommendations below, 1 is done (the `krpc` server performance page), 2 and 3 are open issues
+([recv-timeout-default.md](../../issues/recv-timeout-default.md),
+[recv-patience.md](../../issues/recv-patience.md)), and 4 is
+[non-blocking calls and batching](non-blocking-calls.md).
 
 ## Summary
 
@@ -18,7 +19,7 @@ cliff rather than a slope, it is silent, and it lands where a python or lua prog
 
 ## Mechanism
 
-`RPCServerUpdate` in `core/src/Core.cs` alternates between polling for requests and executing
+`UpdateRPCs` in `core/src/Core.cs` alternates between polling for requests and executing
 them, for up to `MaxTimePerUpdate` (10000 us by default):
 
  * The poll is a **spin** on `stream.DataAvailable`, not a blocking socket read. It gives up
@@ -115,35 +116,22 @@ difference has to pay for it, either continuously or by probing.
 
 ## Recommendation
 
-A control loop, which is the shape that suffers most, has since been given a way out:
-[holding a physics tick](tick-hold.md) lets a client keep the game on one tick while it computes,
-so its reads and writes land in the same tick instead of one call per tick. That does not change
-anything below, which is about what the server does for a client that has not asked for a hold.
+A control loop, the shape that suffers most, now has [the tick hold](tick-hold.md). That leaves
+the server's treatment of a client that has not asked for a hold, in order of cost:
 
-In order of cost:
-
-1. **Document the cliff.** `doc/src/internals.rst` already explains blocking receives and the
-   receive timeout accurately, but not the consequence: if your client takes longer than the
-   receive timeout between calls, you get one call per frame, and the fix is to raise the
-   timeout or to stop making sequential calls. This is the whole fix for a user who hits it and
-   has no idea why their program became twenty times slower.
+1. **Document the cliff.** Done: the server performance and control loops pages of the `krpc`
+   docs say that a client slower than the receive timeout is served one call per update.
 2. **Consider a larger default.** 1000 us is below the turnaround of a python or lua client
    doing any real work per call. 2000 or 3000 us would cover most of them, at 1 to 2 ms of
-   frame time per update while idle. This is a real cost paid by every user, including those
-   with no client connected, so it is a judgment call rather than an obvious win.
-3. **Let the client say it is coming back.** The information the server is missing is held by
-   the client, which knows whether it is mid-sequence. A per-client patience value, set through
-   a new procedure on the `KRPC` service (`CallContext` already identifies the caller, so this
-   needs no protocol change), would let a program that does 2 ms of work per call ask to be
-   waited for, and cost nothing to every program that does not. Better still as a per-request
-   hint, since the promise then expires on its own and a client that stops calling costs one
-   window rather than every frame, but that is a protocol change.
-4. **Batch.** The protocol already carries several calls in one request, but no client exposes
-   it. A program reading twenty values one at a time pays twenty round trips and hits this cliff
-   with any of them; the same twenty in one request pay one. This is the real answer for the
-   workload that suffers most, and it is a client-side change with no frame time cost at all.
-   See also [server-side functions](../server-side-functions/server-side-functions.md), which
-   attacks the same problem from the other end.
+   frame time per update while idle, paid by every user. A judgment call.
+3. **Let the client say it is coming back.** The client knows whether it is mid-sequence. A
+   per-client patience value set through a `KRPC` procedure needs no protocol change, and costs
+   nothing to a program that does not set it. A per-request hint expires on its own, so a
+   client that stops calling costs one window, but it is a protocol change.
+4. **Batch.** Twenty reads in one request pay one round trip, with no frame time cost. See
+   [non-blocking-calls.md](non-blocking-calls.md), and
+   [server-side functions](../server-side-functions/server-side-functions.md) for the same
+   problem attacked from the server.
 
 Not recommended: polling to the update budget unconditionally. It trades a cliff that costs a
 slow client for a permanent tax on every frame, and it does not help the once-a-frame client at
@@ -153,9 +141,8 @@ all.
 
 Patch the poll loop in `core/src/Core.cs` behind an environment variable, build
 `//tools/benchmarks:python`, run `TestServer` from its runfiles tree on a fixed port, and drive
-it with a client that busy-waits a controlled gap between calls. `RPC_PORT` and `STREAM_PORT`
-make the benchmark runners target a server that is already running
-(`tools/benchmarks/testserver.py`).
+it with a client that busy-waits a controlled gap between calls. `KRPC_TEST_TCPIP_PORT` makes the
+benchmark runners target a server that is already running (`tools/benchmarks/testserver.py`).
 
 The client benchmarks in `client/*/benchmark.*` deliberately sit on the fast side of the cliff
 so that they measure the client rather than the frame rate. Raising the list size in

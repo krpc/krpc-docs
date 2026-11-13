@@ -157,8 +157,8 @@ the client.
 
 ### 5. Client-to-server streams / batched calls — [#903](https://github.com/krpc/krpc/issues/903)
 
-**Status: design agreed** — see [non-blocking-calls.md](non-blocking-calls.md),
-[fire-and-forget.md](fire-and-forget.md) and [reverse-streams.md](reverse-streams.md). Three phased
+**Status: design agreed** — see [non-blocking-calls.md](../synchronization/non-blocking-calls.md),
+[fire-and-forget.md](../synchronization/fire-and-forget.md) and [reverse-streams.md](../synchronization/reverse-streams.md). Three phased
 rungs: a non-blocking `submit` returning a future and explicit batches (protocol/server
 already support multi-call requests — no server work); a `no_response` flag on `Request` for fire-and-forget (a feature negotiated
 in the handshake); and reverse streams — register a call, push latest-wins argument
@@ -263,7 +263,7 @@ but pure reads.
 **Notes.** Part of the 0.8 hard break. Phase 3 can follow in 1.0 as an addition. Does *not*
 supersede the `repeated ProcedureCall` batching field, which uniquely guarantees same-frame
 execution — keep it. Complementary to the `no_response` flag in
-[fire-and-forget.md](fire-and-forget.md). Enables a demultiplexing reader in
+[fire-and-forget.md](../synchronization/fire-and-forget.md). Enables a demultiplexing reader in
 the clients, and hence an asyncio-based Python client, though that is a separate (and larger)
 clientgen question.
 

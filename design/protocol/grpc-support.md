@@ -5,8 +5,8 @@ which replaced the gRPC discussion on [#899](https://github.com/krpc/krpc/issues
 
 Related: [local-transports.md](local-transports.md) (why the game's runtime cannot host gRPC),
 [single-connection.md](single-connection.md), [request-ids.md](request-ids.md),
-[non-blocking-calls.md](non-blocking-calls.md), [fire-and-forget.md](fire-and-forget.md),
-[reverse-streams.md](reverse-streams.md), [client-disconnect-cleanup.md](client-disconnect-cleanup.md).
+[non-blocking-calls.md](../synchronization/non-blocking-calls.md), [fire-and-forget.md](../synchronization/fire-and-forget.md),
+[reverse-streams.md](../synchronization/reverse-streams.md), [client-disconnect-cleanup.md](client-disconnect-cleanup.md).
 
 ## Why gRPC
 
@@ -105,9 +105,9 @@ connection. gRPC has no connection the application can see. The bridge models on
 | Request ids, async calls, pipelining (0.8) | Concurrent calls over HTTP/2 | Built in |
 | Single connection (0.8) | The channel multiplexes everything | Not needed |
 | Per-client FIFO execution | None across calls; ordered only within one streaming call | Gap; the `Session` call recovers it |
-| Batching: several calls in one tick ([non-blocking-calls.md](non-blocking-calls.md)) | None. A batch RPC with a `oneof` per procedure would be enormous. The bridge can coalesce concurrent calls into one tick, with no guarantee they land together | Gap |
-| Fire-and-forget ([fire-and-forget.md](fire-and-forget.md)) | None. A unary call always responds, though an empty response is cheap. A client-streaming call carries one-way messages | Workaround |
-| Reverse streams, latest-wins pushes ([reverse-streams.md](reverse-streams.md)) | Client-streaming RPC, which delivers every message. The bridge implements latest-wins | Partial |
+| Batching: several calls in one tick ([non-blocking-calls.md](../synchronization/non-blocking-calls.md)) | None. A batch RPC with a `oneof` per procedure would be enormous. The bridge can coalesce concurrent calls into one tick, with no guarantee they land together | Gap |
+| Fire-and-forget ([fire-and-forget.md](../synchronization/fire-and-forget.md)) | None. A unary call always responds, though an empty response is cheap. A client-streaming call carries one-way messages | Workaround |
+| Reverse streams, latest-wins pushes ([reverse-streams.md](../synchronization/reverse-streams.md)) | Client-streaming RPC, which delivers every message. The bridge implements latest-wins | Partial |
 | Remote objects | None; ids are message fields | Gap, by design |
 | Objects and state tied to a client session | None | Gap; the `Session` call models it |
 | Client name, handshake | Metadata | Direct |

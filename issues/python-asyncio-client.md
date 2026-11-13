@@ -10,4 +10,4 @@ To decide:
 - The stream API: `await stream.wait()`, async iteration over updates, or both.
 - Whether callbacks may be coroutines, run on a given event loop.
 
-Design: [non-blocking-calls.md](https://github.com/krpc/krpc-docs/blob/main/design/protocol/non-blocking-calls.md), "asyncio"; [request-ids.md](https://github.com/krpc/krpc-docs/blob/main/design/protocol/request-ids.md), "Client APIs"
+Design: [non-blocking-calls.md](https://github.com/krpc/krpc-docs/blob/main/design/synchronization/non-blocking-calls.md), "asyncio"; [request-ids.md](https://github.com/krpc/krpc-docs/blob/main/design/protocol/request-ids.md), "Client APIs"

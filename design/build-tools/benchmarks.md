@@ -183,7 +183,7 @@ within `RecvTimeout`, and the loop reaches the number two ways:
 
  * **A plateau at 16.7 ms** as soon as a client's own turnaround crosses `RecvTimeout`, because
    the server then serves it once per frame. This is the
-   [receive timeout cliff](../server/recv-timeout-cliff.md), and it is the one that survives
+   [receive timeout cliff](../synchronization/recv-timeout-cliff.md), and it is the one that survives
    everything else. It is what the case sizes are chosen to stay clear of, and it is the failure
    mode of the suite: it arrives exactly when the thing being measured gets expensive, which is
    when the measurement matters.

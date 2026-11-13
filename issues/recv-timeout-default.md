@@ -4,4 +4,4 @@ A client that takes longer than `RecvTimeout` between calls drops from hundreds 
 
 Measure the idle frame cost at 1000, 2000 and 3000 us, and the Python and Lua per-call turnaround in the benchmark suite. Pick the smallest value that clears the Python turnaround, and update `doc/src/internals.rst`. An existing `settings.cfg` keeps its value, which the changelog entry should say.
 
-Design: [recv-timeout-cliff.md](https://github.com/krpc/krpc-docs/blob/main/design/server/recv-timeout-cliff.md)
+Design: [recv-timeout-cliff.md](https://github.com/krpc/krpc-docs/blob/main/design/synchronization/recv-timeout-cliff.md)

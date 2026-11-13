@@ -10,7 +10,8 @@ and planning notes that do not ship with the mod.
  * `issues/` — every issue: one work item per file, the title as the heading, then the body.
    They are not filed on GitHub.
  * `design/` — detailed designs and features, one doc each, filed by area: `autopilot/`,
-   `protocol/`, `services/`, `build-tools/`, `ksa/`. Docs spanning all areas (audits, sweeps) sit
+   `protocol/`, `services/`, `build-tools/`, `ksa/`, `synchronization/` (how calls line up with
+   physics ticks). Docs spanning all areas (audits, sweeps) sit
    in `design/` itself.
  * `analysis/` — experiments, exploration and analysis, such as test plans and their findings.
  * `RELEASE_PLAN.md` — the authoritative list of work. It holds every issue and design, each

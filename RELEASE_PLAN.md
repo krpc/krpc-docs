@@ -44,7 +44,7 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 | ✅ | Structure types | #1066, #1067 | [protocol/struct-types.md](design/protocol/struct-types.md) |
 | ✅ | Nullable values, incl. inside structures and collections | #1017, #1091 | [protocol/nullable-values.md](design/protocol/nullable-values.md), [protocol/nested-nullable-values.md](design/protocol/nested-nullable-values.md) |
 | ✅ | Object lifetime and removal | #1051, #1072, #1120 | [object-lifetime.md](design/object-lifetime.md) |
-| ✅ | Physics tick synchronization (tick hold, stopgap for #251), auto-pilot update timing | #1070 | [server/tick-hold.md](design/server/tick-hold.md), [autopilot/update-timing.md](design/autopilot/update-timing.md) |
+| ✅ | Physics tick synchronization (tick hold, stopgap for #251), auto-pilot update timing | #1070 | [synchronization/tick-hold.md](design/synchronization/tick-hold.md), [synchronization/update-timing.md](design/synchronization/update-timing.md) |
 | ✅ | Local socket transport | #1065 | [protocol/local-transports.md](design/protocol/local-transports.md) |
 | ✅ | More communication protocols; local sockets landed in 0.7, gRPC moved to #1187 | [#899](https://github.com/krpc/krpc/issues/899) | [protocol/local-transports.md](design/protocol/local-transports.md) |
 | ✅ | Definition ordering | #1044 | [protocol/definition-ordering.md](design/protocol/definition-ordering.md) |
@@ -245,8 +245,8 @@ addition on protocol version 2, so 0.8 clients keep working: see
 | | Feature | Issue | Design doc |
 | --- | --- | --- | --- |
 | ⬜ | Protocol improvements (meta issue) | [#906](https://github.com/krpc/krpc/issues/906) | [protocol/improvements.md](design/protocol/improvements.md) |
-| 🚧 | Non-blocking calls and batching, fire-and-forget, client to server streams | [#903](https://github.com/krpc/krpc/issues/903), **add milestone** | [protocol/non-blocking-calls.md](design/protocol/non-blocking-calls.md), [protocol/fire-and-forget.md](design/protocol/fire-and-forget.md), [protocol/reverse-streams.md](design/protocol/reverse-streams.md); `KRPC.RunFunction` (#1124) already runs a batch in one tick |
-| 🚧 | Tick control: one RPC or batch per physics update, replacing the tick hold stopgap | [#251](https://github.com/krpc/krpc/issues/251), **add milestone** | [server/tick-hold.md](design/server/tick-hold.md) is the stopgap; protocol design open |
+| 🚧 | Non-blocking calls and batching, fire-and-forget, client to server streams | [#903](https://github.com/krpc/krpc/issues/903), **add milestone** | [synchronization/non-blocking-calls.md](design/synchronization/non-blocking-calls.md), [synchronization/fire-and-forget.md](design/synchronization/fire-and-forget.md), [synchronization/reverse-streams.md](design/synchronization/reverse-streams.md); `KRPC.RunFunction` (#1124) already runs a batch in one tick |
+| 🚧 | Tick control: which tick calls run in, where in it, and one call or batch per tick, replacing the tick hold stopgap | [#251](https://github.com/krpc/krpc/issues/251), **add milestone** | [synchronization/tick-control.md](design/synchronization/tick-control.md), design open, including where in a tick calls run; [synchronization/tick-hold.md](design/synchronization/tick-hold.md) is the stopgap |
 | 🚧 | Inheritance for remote objects; additive, flattened copies kept, UI and Drawing first, then robotics and #900 modules | [#905](https://github.com/krpc/krpc/issues/905) | [protocol/inheritance.md](design/protocol/inheritance.md) |
 
 ### Server side function follow-ups
@@ -272,7 +272,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | --- | --- | --- | --- |
 | ⬜ | Events that carry a value: a core stream of the unsent firings as a list, no protocol change; waits for a service that needs it | [events-with-values.md](issues/events-with-values.md) | — |
 | ⬜ | Streams and events over serial IO, after the single connection; needs flow control | [#1204](https://github.com/krpc/krpc/issues/1204) | [protocol/single-connection.md](design/protocol/single-connection.md) |
-| ⬜ | Per-client receive patience | [recv-patience.md](issues/recv-patience.md) | [server/recv-timeout-cliff.md](design/server/recv-timeout-cliff.md) |
+| ⬜ | Per-client receive patience | [recv-patience.md](issues/recv-patience.md) | [synchronization/recv-timeout-cliff.md](design/synchronization/recv-timeout-cliff.md) |
 | ⬜ | gRPC support, possibly through an external bridge; the game's runtime cannot host it | [#1187](https://github.com/krpc/krpc/issues/1187) | [protocol/grpc-support.md](design/protocol/grpc-support.md) |
 
 #### Clients
@@ -305,7 +305,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 
 | | Item | Issue | Design doc |
 | --- | --- | --- | --- |
-| ⬜ | Raise the default receive timeout | [recv-timeout-default.md](issues/recv-timeout-default.md) | [server/recv-timeout-cliff.md](design/server/recv-timeout-cliff.md) |
+| ⬜ | Raise the default receive timeout | [recv-timeout-default.md](issues/recv-timeout-default.md) | [synchronization/recv-timeout-cliff.md](design/synchronization/recv-timeout-cliff.md) |
 | ⬜ | Reject a string argument holding invalid UTF-8 in the KSP mod; measure the cost first | [invalid-utf8-arguments.md](issues/invalid-utf8-arguments.md) | — |
 | ⬜ | Find out what users see with a mismatched client, server or service, per client; document the symptoms in the docs | [client-server-mismatch.md](issues/client-server-mismatch.md) | [protocol-compatibility.md](design/protocol-compatibility.md) |
 | ⬜ | Release what a yielded call holds when its client disconnects; `ScanSat.Map` leaks a map | [yielded-call-cleanup.md](issues/yielded-call-cleanup.md) | — |
@@ -375,7 +375,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | Python: warning at connect when the server's definitions differ from the generated declarations, by a hash per service from `clientgen`. The calls are built from the server's definitions and run correctly, so only static type checking is out of date | [python-declarations.md](design/python-declarations.md) |
 | SSL encryption and authentication ([#11](https://github.com/krpc/krpc/issues/11)), closed as not planned: use a proxy or tunnel | — |
 | Streams and events of a function with parameters, the arguments fixed when added: wrap it in a function with no parameters that calls it with constants. Doing that in the clients was also rejected: no constant node for collections, tuples or structs, and the server keeps every constant for the life of the connection | [server-side-functions/server-side-functions.md](design/server-side-functions/server-side-functions.md#function-arguments) |
-| A stream rate in force from the stream's first update, by a rate argument to `AddStream` or a stream added stopped. The first value is never rate limited, and the rate timer starts when the stream is added. Extra updates need `SetStreamRate` to land two or more ticks after `AddStream`. To rule them out, add the stream and set its rate inside a tick hold, or inside its successor from [#251](https://github.com/krpc/krpc/issues/251) | [server/tick-hold.md](design/server/tick-hold.md) |
+| A stream rate in force from the stream's first update, by a rate argument to `AddStream` or a stream added stopped. The first value is never rate limited, and the rate timer starts when the stream is added. Extra updates need `SetStreamRate` to land two or more ticks after `AddStream`. To rule them out, add the stream and set its rate inside a tick hold, or inside its successor from [#251](https://github.com/krpc/krpc/issues/251) | [synchronization/tick-hold.md](design/synchronization/tick-hold.md) |
 | Generating client stubs in `order.txt` order: `clientgen` sorts members by name, and the docs website already takes its order from `order.txt` through `docgen`. The new order would reach only stub readers and IDE outline views, and would reorder every stub and most `clientgen` goldens. Worth revisiting if a client's documentation system reads its order from the stubs | — |
 
 ## Issues

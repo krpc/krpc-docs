@@ -1,12 +1,9 @@
 # Reverse streams (issue #903)
 
-**Status:** proposal — design agreed, not yet implemented (2026-07-03). Planned for 1.0. Revised
-2026-10-21 for the 0.8 single connection, request ids and protocol version. The code references
-are from before 0.8. On 2026-10-25 non-blocking calls and fire-and-forget moved to their own docs.
-
-One of three designs under [issue #903](https://github.com/krpc/krpc/issues/903), which is tracked
-as one issue: [non-blocking calls and batching](non-blocking-calls.md),
-[fire-and-forget](fire-and-forget.md), **reverse streams**. Each ships on its own, in that order.
+**Status:** proposal, design agreed (2026-07-03), not started. Planned for 1.0. Revised
+2026-10-21 for the 0.8 single connection, request ids and protocol version, and 2026-11-13 for the
+code as it now stands. The third of the three #903 designs, see the
+[index](README.md#how-calls-reach-a-tick).
 
 Register a call once, then push latest-wins argument updates that the server applies **at most
 once per tick**. Errors invalidate the reverse stream and arrive as a `StreamUpdate` using the
@@ -17,14 +14,14 @@ once per tick**. Errors invalidate the reverse stream and arrive as a `StreamUpd
 ## Context
 
 * **Execution is FIFO per client**, round-robin across clients. Phase 2 of
-  [request ids](request-ids.md) replaces the server's one-in-flight guard with a per-client FIFO
-  queue.
+  [request ids](../protocol/request-ids.md) replaces the server's one-in-flight guard with a
+  per-client FIFO queue.
 * **One connection carries both directions.** From 0.8 each client has a single connection
-  ([single-connection.md](single-connection.md)), framed as `Message` in both directions on every
+  ([single-connection.md](../protocol/single-connection.md)), framed as `Message` in both directions on every
   transport, SerialIO included. Pushes travel client to server on it, and invalidation errors come
   back on it as a `StreamUpdate`.
 * **Prior art.** Latest-wins-per-tick evaluation is the forward stream loop
-  (`Core.StreamServerUpdate`). Server-side call storage is `Expression.Call`.
+  (`Core.UpdateStreams`). Server-side call storage is `Expression.Call`.
 * **Why not [fire-and-forget](fire-and-forget.md) alone.** A burst of writes each executes.
   Latest-wins makes a high-rate control loop backpressure-proof.
 
@@ -35,8 +32,9 @@ once per tick**. Errors invalidate the reverse stream and arrive as a `StreamUpd
 ```proto
 message Request {
   repeated ProcedureCall calls = 1;
-  bool no_response = 2;
-  repeated ReverseStreamUpdate reverse_updates = 3;
+  uint64 id = 2;
+  bool no_response = 3;                               // fire-and-forget
+  repeated ReverseStreamUpdate reverse_updates = 4;
 }
 
 message ReverseStreamUpdate {
@@ -64,7 +62,8 @@ message ReverseStreamUpdate {
   removal, matching `RemoveStream` idempotence). A request with only pushes creates no
   continuation; clients always send pushes with `no_response = true` (a push with
   `no_response = false` gets an empty `Response` as a synchronous flush).
-- Each `RPCServerUpdate`, after the poll block and before regular continuations:
+- Once per update, in `UpdateRPCs` before regular continuations (where exactly is open
+  question 4):
   execute every dirty reverse stream once with its latest arguments, clear dirty,
   counted against the same time budget. **Latest-wins**: superseded pushes cost only
   parsing, never execution — this is what makes high-rate control loops
@@ -73,7 +72,7 @@ message ReverseStreamUpdate {
   `Services.HandleException`), or a `YieldException` (reverse-stream calls must not
   yield — control setters never do), removes the reverse stream and sends a
   `StreamResult { id, result.error }` in a **`StreamUpdate` exactly once** —
-  reusing the [#877 invalidation convention](stream-invalidation.md) verbatim; client
+  reusing the [#877 invalidation convention](../protocol/stream-invalidation.md) verbatim; client
   stream managers route errors for reverse ids to the reverse-stream wrapper. A client
   that never registers a reverse stream never receives one of these errors.
 - Client disconnect tears down its reverse streams, beside the forward-stream cleanup.
@@ -122,21 +121,20 @@ the #877 section), and the handshake feature. Client docs: the reverse-stream AP
 
 ## Implementation order
 
-1. Server: schema additions, RPCs, registry, executor, error channel. Depends on #877's
-   invalidation work.
+1. Server: schema additions, RPCs, registry, executor, error channel.
 2. Client APIs, Python first, then the remaining clients.
 3. `CHANGELOG.md` entries per component as the final pre-merge commit.
 
 ## Interactions
 
-- **#877 invalidation**: the reverse-stream error channel *is* the #877 convention;
-  implement #877 first.
+- **#877 invalidation**: the reverse-stream error channel *is* the #877 convention, which
+  shipped in #1122.
 - **#902 refcounting**: deliberately not applied to reverse streams (each add is a
   fresh id); the shared id counter is unaffected.
 - **#843 nullable**: pushes carry `Argument` messages and inherit `is_null` semantics
   for nullable parameters unchanged.
-- **#901 freezing**: orthogonal — freezing gates the client's *inbound* value
-  application; pushes are outbound.
+- **Tick hold**: a held update runs its poll loop many times, so "once per update" has to be
+  enforced, not assumed. Pushes from the holding client apply in the held tick.
 
 ## Open questions
 
@@ -150,3 +148,6 @@ the #877 section), and the handshake feature. Client docs: the reverse-stream AP
    with `no_response`. As a new `Message` case holding `ReverseStreamUpdate`s, a push
    needs no `Request` and no response to suppress. `stream_update` is server to client
    only, and cannot carry arguments. Either is additive on protocol version 2.
+4. Where in the update pushes apply: once at the start of the call phase, or at a phase the
+   client picks. This is the sub-tick question of [tick-control.md](tick-control.md), and a
+   reverse stream should take whatever placement a held tick takes.

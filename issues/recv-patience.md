@@ -4,4 +4,4 @@ With blocking receives, the server waits up to `RecvTimeout` for a client's next
 
 Batching (#903) is the other answer for the same workload.
 
-Design: [recv-timeout-cliff.md](https://github.com/krpc/krpc-docs/blob/main/design/server/recv-timeout-cliff.md), option 3 under "Recommendation".
+Design: [recv-timeout-cliff.md](https://github.com/krpc/krpc-docs/blob/main/design/synchronization/recv-timeout-cliff.md), option 3 under "Recommendation".

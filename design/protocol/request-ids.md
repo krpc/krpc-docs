@@ -7,8 +7,8 @@ Phases 2 and 3 are later additions, each negotiated in the handshake.
 
 Related: [single-connection.md](single-connection.md) (its "Client reader" section specifies the
 client side of phase 1), [improvements.md](improvements.md) (meta-issue
-[#906](https://github.com/krpc/krpc/issues/906)), [non-blocking-calls.md](non-blocking-calls.md) and
-[fire-and-forget.md](fire-and-forget.md) (#903), [protocol-compatibility.md](../protocol-compatibility.md),
+[#906](https://github.com/krpc/krpc/issues/906)), [non-blocking-calls.md](../synchronization/non-blocking-calls.md) and
+[fire-and-forget.md](../synchronization/fire-and-forget.md) (#903), [protocol-compatibility.md](../protocol-compatibility.md),
 [client-conformance/defects.md](../client-conformance/defects.md) (Python bug 25 of the parity audit).
 
 ## Problem
@@ -101,7 +101,7 @@ What phase 1 gives on its own:
   [protocol-version.md](protocol-version.md).
 - The granted depth is also the server's flood defense: the server stops reading from a client at
   the cap, and TCP backpressure does the rest.
-- No client API change. `submit` ([non-blocking-calls.md](non-blocking-calls.md)) works from
+- No client API change. `submit` ([non-blocking-calls.md](../synchronization/non-blocking-calls.md)) works from
   phase 1, and phase 2 lets its requests overlap on the server.
 
 ### Phase 3
@@ -120,7 +120,7 @@ Keep `repeated ProcedureCall calls`. All calls in one `Request` run in one `Requ
 and so in the same update, which separate pipelined requests do not guarantee. That same-update
 grouping is a real semantic, and composes with ids: one id per `Request`.
 
-The `no_response` flag from [fire-and-forget.md](fire-and-forget.md) is complementary:
+The `no_response` flag from [fire-and-forget.md](../synchronization/fire-and-forget.md) is complementary:
 fire-and-forget for writes, ids for reads collected later. A `no_response` request produces no
 response to correlate.
 
@@ -129,7 +129,7 @@ response to correlate.
 The reader in [single-connection.md](single-connection.md) is the base for every higher-level API:
 
 - non-blocking call: `conn.submit(func, *args)` returns a future on the slot. Designed in
-  [non-blocking-calls.md](non-blocking-calls.md), with the reader rules it adds;
+  [non-blocking-calls.md](../synchronization/non-blocking-calls.md), with the reader rules it adds;
 - synchronous call: a submit, then `result()` at once. One core, which the sync API wraps;
 - asyncio: `asyncio.wrap_future` on a submitted future. No parallel `krpc.aio` package with
   generated async stubs.

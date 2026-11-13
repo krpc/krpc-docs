@@ -105,7 +105,7 @@ byte: 67 bytes for the round trip by name, and 37 by id.
 | 921600 | 0.73 ms | 0.40 ms | 0.33 ms | Possibly real: at most 1370 calls/s against 2490, if the client stays inside the receive timeout |
 
 A client slower than the receive timeout gets one call per update, as
-[server/recv-timeout-cliff.md](../design/server/recv-timeout-cliff.md) describes. At 115200 baud the
+[synchronization/recv-timeout-cliff.md](../design/synchronization/recv-timeout-cliff.md) describes. At 115200 baud the
 response alone takes about 1.5 ms, over the 1 ms timeout, so ids shorten each call by 2.6 ms and the
 rate stays the same.
 

@@ -1,18 +1,15 @@
 # Holding a physics tick for a control loop
 
 **Status:** done, merged in [#1070](https://github.com/krpc/krpc/pull/1070), together with
-[the auto-pilot's update timing](../autopilot/update-timing.md). A deliberate stopgap for
-[#251](https://github.com/krpc/krpc/issues/251), to be retired once real tick synchronization
-lands in the protocol rewrite.
+[the auto-pilot's update timing](update-timing.md). A stopgap for
+[#251](https://github.com/krpc/krpc/issues/251), to be deprecated once
+[tick control](tick-control.md) replaces it.
 
 ## Problem
 
 A control loop reads the game state, computes with it and writes the result back, and the
-computing happens between the calls. The server executes RPCs inside `FixedUpdate` and polls for
-the next one for at most `RecvTimeout`, so a client that takes longer than that to send its next
-call is not waiting when the server looks, and the server leaves the update. That client is served
-**one RPC per tick**, however many it makes: see
-[the receive timeout cliff](recv-timeout-cliff.md) for the measurements.
+computing happens between the calls. A client that computes for longer than `RecvTimeout` between
+calls is served **one RPC per tick**: see [the receive timeout cliff](recv-timeout-cliff.md).
 
 So an iteration of N calls costs N ticks, and the values written were computed from a state N ticks
 old. Measured against a 60 Hz `TestServer`, five calls with 2 ms of work between them:
@@ -24,7 +21,7 @@ old. Measured against a 60 Hz `TestServer`, five calls with 2 ms of work between
 
 Nothing already available fixes this:
 
- * **Batching** ([non-blocking-calls.md](../protocol/non-blocking-calls.md), #903) puts several
+ * **Batching** ([non-blocking-calls.md](non-blocking-calls.md), #903) puts several
    calls in one request so they run in one tick. It cannot help: the computing sits between the
    reads and the writes, so the writes are a separate request in a later tick.
  * **Raising `RecvTimeout`** moves the cliff and costs that much frame time on every idle update.
@@ -91,7 +88,7 @@ as before.
 
 ### How the update loop honors it
 
-`RPCServerUpdate` in `core/src/Core.cs` has six exits, and a held tick suppresses five of them: the
+`UpdateRPCs` in `core/src/Core.cs` has six exits, and a held tick suppresses five of them: the
 `RecvTimeout` poll break, both `MaxTimePerUpdate` breaks, the per-continuation "delay to the next
 update", and `OneRPCPerUpdate`. The poll loop then has no exit left but the hold ending, which is
 what `TickHeld` decides on every pass. `rpcContinuations.Count == 0` stays as it was, since while
@@ -157,20 +154,10 @@ Also worth knowing:
 
 ## Relationship to the planned work
 
-[#251](https://github.com/krpc/krpc/issues/251) ("Execute one RPC per frame") is the planned
-feature, listed as tick control in [single-connection.md](../protocol/single-connection.md) with no
-dedicated design. It suggests batching RPCs into transactions that execute in one frame, which is
-#903's batching, and which as noted above does not serve a loop that computes between its calls.
-This holds the tick instead, which is the part no other design covers.
-
-Server side functions (#1124 to #1130) give the transaction half: `KRPC.RunFunction` runs a
-function, computation included, within one tick. A loop whose computation can move to the server
-can use that in place of a hold.
-
-It composes with, rather than competes with, batching (#903) and request ids
-([request-ids.md](../protocol/request-ids.md)): a batch inside a hold is fine, and pipelining does
-not need the tick held. When #251 lands properly, these two procedures can be marked `[Obsolete]`
-under the mechanism from PR #926.
+See the [index](README.md). In short: [tick control](tick-control.md) is the planned
+replacement, and `HoldTick`, `ReleaseTick` and `NextTick` are deprecated, not removed, when it
+lands. A hold composes with batching and with request ids: a batch inside a hold is fine, and
+pipelining does not need the tick held.
 
 ## Tests
 

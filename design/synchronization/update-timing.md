@@ -1,7 +1,7 @@
 # When the auto-pilot's control loop runs in a tick
 
 **Status:** done — merged as [PR #1070](https://github.com/krpc/krpc/pull/1070), together with
-[holding a tick](../server/tick-hold.md), which gives a program a whole tick but no say in
+[holding a tick](tick-hold.md), which gives a program a whole tick but no say in
 where in it the auto-pilot runs.
 
 ## Problem
@@ -116,7 +116,7 @@ position in the tick could be chosen without touching the control law.
   this tick looks equivalent and is not: with control input ahead of the server update, that
   test is true every tick, the fallback wins every tick, and no mode ever has any effect.
 * **The events must be raised outside the poll loop.** A held update runs its poll loop many
-  times over. Raising them in `Core.Update` around `RPCServerUpdate` makes once-per-update
+  times over. Raising them in `Core.Update` around `UpdateRPCs` makes once-per-update
   true by construction rather than by care, and keeps handler cost out of the RPC timings.
   Raising `OnAfterCalls` before the stream update also means streams see what the handlers
   did.
@@ -156,13 +156,3 @@ position in the tick could be chosen without touching the control law.
   refusing.
 * `core/test/UpdateEventsTest.cs` covers the events firing exactly once per update, including
   an update that held a tick, and bracketing the calls.
-
-## Relationship to the planned work
-
-Composes with the tick hold: the hold decides which tick the calls happen in, the update mode
-decides where among them the loop runs, and manual mode plus a hold gives both. Neither is
-needed to use the other.
-
-Independent of batching (#903) and request ids
-([request-ids.md](../protocol/request-ids.md)): those decide how calls reach a tick, not what
-the auto-pilot does within it.

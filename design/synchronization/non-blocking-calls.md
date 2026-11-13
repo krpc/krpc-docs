@@ -1,20 +1,17 @@
 # Non-blocking calls and batching (issue #903)
 
-**Status:** proposal (2026-10-25). Planned for 1.0. Client APIs only, with no protocol or server
-change. Needs the request-ids reader from 0.8. Split out of [reverse-streams.md](reverse-streams.md),
-where it was rung 1. It replaces that doc's earlier `with conn.batch():` context manager.
-
-One of three designs under [issue #903](https://github.com/krpc/krpc/issues/903), which is tracked
-as one issue: **non-blocking calls and batching**, [fire-and-forget](fire-and-forget.md), [reverse
-streams](reverse-streams.md). Each ships on its own, in that order.
+**Status:** proposal (2026-10-25), not started. Planned for 1.0. Client APIs only, with no
+protocol or server change. Builds on the request-ids reader that shipped in 0.8
+([#1219](https://github.com/krpc/krpc/pull/1219)). The first of the three #903 designs, see the
+[index](README.md#how-calls-reach-a-tick).
+It replaces an earlier `with conn.batch():` context manager.
 
 ## Context
 
 Control writes are blocking round trips. `control.pitch = x; control.yaw = y` measured about 40 ms.
 
-* **Why writes are slow.** The server processes RPCs only inside `RPCServerUpdate`, once per
-  `FixedUpdate`, within an adaptive time budget (`MaxTimePerUpdate`, 1 to 25 ms). A blocking client
-  waits up to a tick per call, and sequential setters each pay that wait.
+* **Why writes are slow.** Each blocking call is a round trip, and a client slower than the
+  receive timeout waits a tick per call. See [recv-timeout-cliff.md](recv-timeout-cliff.md).
 * **Batching exists everywhere except the client APIs.** `Request` carries
   `repeated ProcedureCall calls`. `RequestContinuation` runs them in order in one tick, with
   per-call error isolation and ordered results. Every client hard-codes one call per request.
@@ -57,11 +54,12 @@ alt = f.result()
 * **Errors** are set on the future as the same exception the blocking call raises. A failed future
   never retrieved is logged when discarded, as asyncio does.
 * **Blocking calls wrap `submit`.** `_invoke` becomes a submit followed by `result()`. This is the
-  "one core, the sync API wraps it" answer to the open question in [request-ids.md](request-ids.md).
+  "one core, the sync API wraps it" answer to the open question in
+  [request-ids.md](../protocol/request-ids.md).
 
 ## Reader rules
 
-These extend "Client reader" in [single-connection.md](single-connection.md).
+These extend "Client reader" in [single-connection.md](../protocol/single-connection.md).
 
 | Rule | Reason |
 | --- | --- |
@@ -71,9 +69,9 @@ These extend "Client reader" in [single-connection.md](single-connection.md).
 | An unread response is decoded and dropped | Fire-and-forget works without `no_response`, at the cost of the response bytes |
 
 Requests already in the socket buffer should run back to back in one update, as
-`Core.RPCServerUpdate` keeps polling until its time budget is spent. Measure this before relying on
-it. Overlapping execution with reading is phase 2 of [request-ids.md](request-ids.md), and needs no
-client API change.
+`Core.UpdateRPCs` keeps polling until its time budget is spent. Measure this before relying on
+it. Overlapping execution with reading is phase 2 of [request-ids.md](../protocol/request-ids.md),
+and needs no client API change.
 
 ## Batches
 
@@ -131,7 +129,7 @@ the client guides, which is the issue's use case, covering `submit`, batches and
   calls; an error lands on its future only; a done callback runs off the reader; the setter and
   lambda forms; `asyncio.wrap_future` round trip.
 - **Batching**: multi-call round trip with mixed success/error results (error isolated
-  to its handle); ordering; extend `test_performance.py:11-21` with a batched variant
+  to its handle); ordering; extend `service/SpaceCenter/test/test_performance.py` with a batched variant
   demonstrating the latency win (assert batched < N× single, loosely — headless-KSP
   timing is noisy).
 

@@ -1,29 +1,24 @@
 # Fire-and-forget requests (issue #903)
 
-**Status:** proposal — design agreed, not yet implemented (2026-07-03). Planned for 1.0. Revised
-2026-10-21 for the 0.8 single connection and features negotiated in the handshake. Split out of
-[reverse-streams.md](reverse-streams.md) on 2026-10-25, where it was rung 2.
-
-One of three designs under [issue #903](https://github.com/krpc/krpc/issues/903), which is tracked
-as one issue: [non-blocking calls and batching](non-blocking-calls.md), **fire-and-forget**,
-[reverse streams](reverse-streams.md). Each ships on its own, in that order.
+**Status:** proposal, design agreed (2026-07-03), not started. Planned for 1.0. Revised
+2026-10-21 for the 0.8 single connection and features negotiated in the handshake. The second of
+the three #903 designs, see the [index](README.md#how-calls-reach-a-tick).
 
 ## Context
 
 * **Responses are written at one place**, `client.Stream.Write(response)` in
   `Core.ExecuteContinuation`, which is the seam for a no-response flag.
-* **Execution is FIFO per client**, round-robin across clients.
 * **The gain is smaller since [non-blocking calls](non-blocking-calls.md).** A submitted call whose
   future is never read already costs the caller nothing. The flag saves the response bytes and the
   reader's work, which matters most on SerialIO.
 
 ## Design
 
-**Schema**: `Request { repeated ProcedureCall calls = 1; bool no_response = 2; }`.
-Request-level, not per-call — mixed batches would need partial responses.
+**Schema**: `bool no_response = 3` on `Request`, beside `calls = 1` and `id = 2`. Request-level,
+not per-call, since mixed batches would need partial responses.
 
 **Server**: thread the flag through `Messages.Request` → `RequestContinuation`;
-`ExecuteContinuation` skips `client.Stream.Write(response)` (`Core.cs:762`) when set.
+`ExecuteContinuation` skips `client.Stream.Write (response)` when set.
 Errors from no-response requests are logged at info level and otherwise dropped.
 Execution is unchanged — same FIFO ordering, same tick budget, same per-client queue
 (a burst of pipelined fire-and-forget requests drains within ticks).
@@ -31,13 +26,13 @@ Execution is unchanged — same FIFO ordering, same tick budget, same per-client
 **The fence idiom** (document): because execution is FIFO per client, a subsequent
 *normal* RPC's response confirms that all prior fire-and-forget requests have executed —
 a free flush/barrier. A call marked for out-of-order completion
-([request-ids.md](request-ids.md) phase 3) is not covered by the fence.
+([request-ids.md](../protocol/request-ids.md) phase 3) is not covered by the fence.
 
 **Version skew — the one hazard**: an older server ignores the unknown field and writes a
 `Response` the client does not expect. Client libraries therefore ask for the
 `no_response` feature in the handshake, and raise a clear "server too old" error on first
 use if it was not granted. The rule is in
-[protocol-version.md](protocol-version.md) under "Additive changes". Old client + new
+[protocol-version.md](../protocol/protocol-version.md) under "Additive changes". Old client + new
 server is trivially fine.
 
 **Client APIs**: an option on a batch send (`batch.send(no_response=True)`,
