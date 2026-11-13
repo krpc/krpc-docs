@@ -1,7 +1,7 @@
 # Listing on Borea
 
-**Status:** in progress. Part of [kRPC for KSA](README.md). Target: the
-`ksa-v0.2.0` release. `ksa-v0.1.0` is not listed.
+**Status:** done. Part of [kRPC for KSA](README.md). Listed from `ksa-v0.2.0` by content-index
+PR #254, merged 2026-10-31. `ksa-v0.1.0` is not listed. The archive layout merged in krpc PR #1205.
 
 [Borea](https://github.com/KSAModding/Borea) is the community mod manager for KSA. It installs
 from the KSAModding content index: one authored TOML listing per mod in
@@ -53,7 +53,9 @@ settings. Before 1.0 this is deliberate: a change to the settings format needs n
 
 ## The listing
 
-`listings/kRPC.toml` in content-index:
+`listings/kRPC.toml` in content-index, as proposed. The merged listing differs: its name is `kRPC`,
+it has a description and an icon (content-index PR #255), homepage and SpaceDock links, and
+`game_min` follows each release's KSA build.
 
 ```toml
 spec_version = 1
@@ -93,7 +95,7 @@ min = "0.4.8"
 | `install.manages` | The server window rewrites `settings.toml`. The claim gives each instance its own copy of the mod folder |
 | `tag_prefix` | Required: krpc/krpc also publishes the KSP `v*` releases. The watcher reads `ksa-v0.2.0` as `0.2.0`, and skips other `ksa-` tags such as a future `ksa-experimental-v0.3.0` |
 | `links.forums` | Required for a mod. The KSA forum thread has to exist first |
-| `game_min`, `loader.min` | The versions the release was tested against. Update when 0.2.0 is tested on newer ones |
+| `game_min`, `loader.min` | The versions the release was built against. The release scripts update them through a content-index PR before each release |
 | `description`, `[images]` | Optional. Images stay on our host, with sha256 and size records from `tools/image_record.py` |
 | `spacedock`, `authority` | Only if the release is also on SpaceDock. `authority = "github"` keeps GitHub as the source |
 
@@ -105,17 +107,20 @@ krpc/krpc (RFC 0038). It covers every listing that points at the repo. A marker 
 
 ## Steps
 
-1. Change `release.sh` and the install docs, as above. Done, not yet in a PR. The archive installs
+All done.
+
+1. Change `release.sh` and the install docs, as above. Merged in PR #1205. The archive installs
    and runs in a Borea 0.5.2 instance on Linux, from a local index entry. TCP and gRPC clients
    connect.
 2. Tag and release `ksa-v0.2.0`.
 3. Post the KSA forum thread.
 4. Add the topic to krpc/krpc.
-5. Open the content-index PR with the listing. Run its local checks first (`check_layout.py`,
+5. Open the content-index PR with the listing (PR #254). Run its local checks first (`check_layout.py`,
    `check_schema.py`, `check_index.py`, `check_license.py`, then `check_release.py` with
    content-index-releases checked out beside it). A green PR with verified ownership merges itself.
-6. Later releases need nothing: the watcher stamps each new `ksa-v*` release.
+6. Later releases need no listing PR of their own: the watcher stamps each new `ksa-v*` release.
+   The bounds update above is the exception.
 
-## Open questions
+## SpaceDock
 
-* **SpaceDock.** Whether to upload there too, and which host is the authority.
+The mod is also on SpaceDock, as mod 4747,, and the listing links it.

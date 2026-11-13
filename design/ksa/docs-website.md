@@ -16,8 +16,8 @@ The game-agnostic pages are agnostic in prose only. Their examples call the KSP 
 | Extending | 9 of 35 |
 | Communication protocols | 0 of 7 |
 
-The KSA client guides are short as a result. The Python one is 47 lines against KSP's 781, and has
-no streams, events or server-side functions. Game-neutral examples are not an option, as the `KRPC`
+The KSA client guides are short as a result. The Python one is 47 lines against KSP's 781. Since
+PR #1223 the KSA tree has short user guides of its own, written apart from the KSP ones. Game-neutral examples are not an option, as the `KRPC`
 service has nothing worth streaming.
 
 ## Design

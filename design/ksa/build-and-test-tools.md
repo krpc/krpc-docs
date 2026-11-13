@@ -1,17 +1,18 @@
 # Build and test tools
 
-**Status:** proposal, 2026-10-26. Part of [kRPC for KSA](README.md). The `--reference-dir` option
-of `krpc-servicedefs` is in review for #1228, PR to open.
+**Status:** in progress. Part of [kRPC for KSA](README.md). The `--reference-dir` option of
+`krpc-servicedefs` merged in PR #1271, and the shared harness core in PR #1299. The KSA harness
+extension and Bazel targets are not started.
 
 Most tools are already game-agnostic. The in-game test harness and the service lists are the two
 that assume KSP.
 
 | Tool | Game coupling now | Change |
 | --- | --- | --- |
-| `tools/krpctest` | Installs mods into GameData, launches KSP, loads a save | Split into a shared core and a backend per game |
-| `//:test-ingame` | KSP | `//ksp:test-ingame` and `//ksa:test-ingame` |
-| `//:run-ksp` | KSP | Stays, plus `//ksa:run-ksa` |
-| `krpc-servicedefs` | Copies the KSP assemblies | Takes the game's reference directory |
+| `tools/krpctest` | Installs mods into GameData, launches KSP, loads a save | Split into a shared core and a backend per game. Done for KSP as `krpctools.game` (PR #1299) |
+| `//tools/game:test-ksp` (was `//:test-ingame`) | KSP | Plus a KSA target |
+| `//tools/game:run-ksp` (was `//:run-ksp`) | KSP | Stays, plus a KSA target |
+| `krpc-servicedefs` | Copies the KSP assemblies | Takes the game's reference directory. Done in PR #1271 |
 | `tools/krpctools/services.bzl` | One list, KSP services included | A shared list plus one list per game |
 | clientgen, docgen | none | none |
 | `experimental/ksa/grpc/protogen.py` | KSA | A Bazel target writing the `.proto` from the service definitions |
@@ -55,7 +56,7 @@ See [releases.md](../releases.md) for where each list's stubs ship.
 ## Service definitions
 
 `krpc-servicedefs` loads a service assembly by reflection and needs the game assemblies to resolve
-its types. Stub assemblies are enough, since nothing runs. It gains a repeatable `--reference-dir`
-option in place of the KSP directory argument (#1228). The prototype already calls the
+its types. Stub assemblies are enough, since nothing runs. A repeatable `--reference-dir` option
+replaced the KSP directory argument in PR #1271 (#1228). The KSA build still calls the 0.7.0
 `ServiceDefinitions` binary with `--reference-dir`, and moves to `krpc-servicedefs` when it builds
 against krpctools 0.8.

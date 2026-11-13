@@ -1,8 +1,9 @@
 # KSA API coverage
 
-**Status:** in progress. Part of [kRPC for KSA](README.md). The service merged in PR #1190. The
-manual control inputs and phases 1 to 7 are built and tested in game, not yet in a PR. Audited against KSA
-build 2026.10.19.5638.
+**Status:** done for phases 1 to 7, released in `ksa-v0.2.0`. Part of [kRPC for KSA](README.md).
+The service merged in PR #1190, the manual control inputs and phase 1 in PR #1207, and phases 2 to 7
+in PRs #1209 to #1215. Audited against KSA build 2026.10.19.5638. The additions of build
+2026.11.10.5801 are planned in [api-v2026.11.10.md](api-v2026.11.10.md).
 
 The `KSA` service covers flight basics. KSP's `SpaceCenter`, `Drawing` and `UI` services go much
 further. This doc lists the gaps that KSA can fill today, and orders them into phases.
@@ -42,42 +43,43 @@ would run unchanged. It was dropped on the prototype's findings:
 | KSP area | In KSA | Key game types | `KSA` service today | Phase |
 | --- | --- | --- | --- | --- |
 | Vessels, active vessel | Yes | `Vehicle`, `Universe` | `Vehicle`, `ActiveVehicle`, `Vehicles` | Done |
-| Bodies | Yes | `Celestial`, `PhysicalAtmosphereReference`, `BiomesReference` | Mass, gravity, rotation, SOI, terrain, atmosphere, ocean, position queries | Done, not yet in a PR |
-| Atmosphere queries | Yes, no temperature | `PhysicalAtmosphereReference`, `PhysicsEnvironment` | Pressure and density at the vehicle and at any altitude | Done, not yet in a PR |
-| Biomes | Yes | `Celestial.SampleBiomeIdMap`, `BiomesReference` | `Body.Biomes`, `BiomeAt`, `Flight.Biome` | Done, not yet in a PR |
-| Orbits, patches | Yes | `Orbit`, `PatchedConic`, `TargetData` | Elements, anomalies, nodes, `PositionAt`, `NextOrbit` | Done, not yet in a PR |
-| Targets, closest approach | Yes | `Vehicle.SetTarget(orbiter, part)`, `PatchedConic.TryFindClosestApproach` | Target vehicle, body and part, closest approach | Done, not yet in a PR |
-| Reference frames | Yes | Ecl frame chain | Vehicle, body, burn, relative and hybrid frames, `Transform*` | Done, not yet in a PR |
-| Maneuver nodes | Yes | Flight computer burns | `Burn`, `AddBurn`, `AutoBurn` | Done, not yet in a PR |
-| Structural load, debris | Yes | `StructuralLoad`, `Vehicle.IsDebris` | Peak and max g-load and dynamic pressure, `IsDebris`, `OnRails` | Done, not yet in a PR |
-| Saves | Yes | `GameSaves` | `Save`, `Load`, `SaveExists` | Done, not yet in a PR |
+| Bodies | Yes | `Celestial`, `PhysicalAtmosphereReference`, `BiomesReference` | Mass, gravity, rotation, SOI, terrain, atmosphere, ocean, position queries | Done |
+| Atmosphere queries | Yes | `PhysicalAtmosphereReference`, `PhysicsEnvironment` | Pressure and density at the vehicle and at any altitude. Temperature from 5801 is planned in [api-v2026.11.10.md](api-v2026.11.10.md) | Done |
+| Biomes | Yes | `Celestial.SampleBiomeIdMap`, `BiomesReference` | `Body.Biomes`, `BiomeAt`, `Flight.Biome` | Done |
+| Orbits, patches | Yes | `Orbit`, `PatchedConic`, `TargetData` | Elements, anomalies, nodes, `PositionAt`, `NextOrbit` | Done |
+| Targets, closest approach | Yes | `Vehicle.SetTarget(orbiter, part)`, `PatchedConic.TryFindClosestApproach` | Target vehicle, body and part, closest approach | Done |
+| Reference frames | Yes | Ecl frame chain | Vehicle, body, burn, relative and hybrid frames, `Transform*` | Done |
+| Maneuver nodes | Yes | Flight computer burns | `Burn`, `AddBurn`, `AutoBurn` | Done |
+| Structural load, debris | Yes | `StructuralLoad`, `Vehicle.IsDebris` | Peak and max g-load and dynamic pressure, `IsDebris`, `OnRails` | Done |
+| Saves | Yes | `GameSaves` | `Save`, `Load`, `SaveExists` | Done |
 | Stages, delta-v | Yes | `Sequence`, `SequencePerformance` | `Sequence` | Done |
-| Parts tree | Yes | `PartTree`, `Part` | `Part`, part lists by name and module | Done, not yet in a PR |
-| Engines, gimbal | Yes | `RocketCore`, `Gimbal`, `GimbalState` | `Engine`, `Gimbal` | Done, not yet in a PR |
-| Tanks, crossfeed, transfer | Yes | `Tank`, `FuelLink`, `TankTransferMode` | `Resource`, `Tank` (with the rated pressure for gas), `FuelLink` | Done, not yet in a PR |
+| Parts tree | Yes | `PartTree`, `Part` | `Part`, part lists by name and module | Done |
+| Engines, gimbal | Yes | `RocketCore`, `Gimbal`, `GimbalState` | `Engine`, `Gimbal` | Done |
+| Tanks, crossfeed, transfer | Yes | `Tank`, `FuelLink`, `TankTransferMode` | `Resource`, `Tank` (with the rated pressure for gas), `FuelLink` | Done |
 | RCS | Yes | `ThrusterController` | `RCS.Active` | Done |
-| Decouplers, docking ports | Yes | `Decoupler`, `DockingPort` | Both, separation returns the new vehicles | Done, not yet in a PR |
+| Decouplers, docking ports | Yes | `Decoupler`, `DockingPort` | Both, separation returns the new vehicles | Done |
 | Parachutes | Yes | `Parachute` | `Parachute` | Done |
-| Power | Yes | `Battery`, `SolarPanel`, `Generator`, `PowerConsumer` | All four, vehicle totals | Done, not yet in a PR |
-| Lights | Yes | `PowerConsumer.LightSwitch`, `Vehicle.LightsOn` | `Control.Lights`, `Light.Active` | Done, not yet in a PR |
-| Legs, bays, deployables | Partial | `KeyframeAnimationModule` (`DeploymentState`) | `Deployable` | Done, not yet in a PR |
-| Radiation | Yes, KSA only | `Radiation.ComputeDoseRates`, `TryComputeOrbitDoseRates`, `ParticleEvents` | `Flight` and `Burn` dose rates, with particle events as the HUD gauges | Done, not yet in a PR |
+| Power | Yes | `Battery`, `SolarPanel`, `Generator`, `PowerConsumer` | All four, vehicle totals | Done |
+| Lights | Yes | `PowerConsumer.LightSwitch`, `Vehicle.LightsOn` | `Control.Lights`, `Light.Active` | Done |
+| Legs, bays, deployables | Partial | `KeyframeAnimationModule` (`DeploymentState`) | `Deployable` | Done |
+| Radiation | Yes, KSA only | `Radiation.ComputeDoseRates`, `ComputeOrbitDoseRates`, `ParticleEvents` | `Flight` and `Burn` dose rates, with particle events as the HUD gauges | Done |
 | Radiation shielding | Yes, KSA only | `RadiationShield`, tank cover | None. `Kitten.DoseRate` gives the dose behind the shield | Not started |
-| Space weather | Yes, KSA only | `ActivityCycle`, `ParticleEvents`, `StormState`, `SpaceWeather` | None. Deferred: the model changed across many revisions in v2026.10.25.5707, and parts are unused in game | Not started |
-| Crew | Yes | `KittenRosterData`, `KittenRosterEntryData`, `IVASeat` | `Kitten` (with radiation doses, sickness and retirement), `Seat`, vehicle and part crew | Done, not yet in a PR |
-| EVA | Yes | `EVADoor`, `KittenEva` | `GoOnEva`, `Board`, `ActiveKitten`. Kittens on EVA are not vehicles | Done, not yet in a PR |
-| Camera | Yes | `Camera`, `CameraMode`, `OrbitController`, `MapController` | Mode, view angles and distance, field of view, focus | Done, not yet in a PR |
-| Screenshots, messages | Yes | `ScreenshotCapture`, `TimedAlert` | `Screenshot`, `Message` | Done, not yet in a PR |
-| Debug cheats | Partial | `TeleportInputData`, `TeleportToLocation`, the vehicle input events, console commands | `Debug`, `Vehicle.Destroy`, `Recover` | Done, not yet in a PR |
-| Editor | Yes | `VehicleSave`, `PartTree.PerformanceSequences` | `VehicleDesigns`, with mass and delta-v | Done, not yet in a PR |
-| Drawing | Yes | `GizmosRenderer`, ImGui draw lists | Lines, polylines, circles, arcs, boxes, spheres and text | Done, not yet in a PR |
-| UI | Yes | ImGui windows (as in the server window) | Windows of labels, buttons, input fields, sliders, toggles and dropdowns | Done, not yet in a PR |
-| Manual controls | Yes | `ManualControlInputs`, `FlightComputer.ManualThrustMode` | `Pitch`, `Yaw`, `Roll`, `Forward`, `Right`, `Up` as -1, 0 or 1, and `Pulse` | Done, not yet in a PR |
+| Space weather | Yes, KSA only | `ActivityCycle`, `ParticleEvents`, `StormState`, `SpaceWeather` | None. Deferred: the model changed across many revisions in v2026.10.25.5707, and parts are unused in game. Still deferred at 5801 ([api-v2026.11.10.md](api-v2026.11.10.md)) | Not started |
+| Crew | Yes | `KittenRosterData`, `KittenRosterEntryData`, `IVASeat` | `Kitten` (with radiation doses, sickness and retirement), `Seat`, vehicle and part crew | Done |
+| EVA | Yes | `EVADoor`, `KittenEva` | `GoOnEva`, `Board`, `ActiveKitten`. Kittens on EVA are not vehicles | Done |
+| Camera | Yes | `Camera`, `CameraMode`, `OrbitController`, `MapController` | Mode, view angles and distance, field of view, focus | Done |
+| Screenshots, messages | Yes | `ScreenshotCapture`, `TimedAlert` | `Screenshot`, `Message` | Done |
+| Debug cheats | Partial | `TeleportInputData`, `TeleportToLocation`, the vehicle input events, console commands | `Debug`, `Vehicle.Destroy`, `Recover` | Done |
+| Editor | Yes | `VehicleSave`, `PartTree.PerformanceSequences` | `VehicleDesigns`, with mass and delta-v | Done |
+| Drawing | Yes | `GizmosRenderer`, ImGui draw lists | Lines, polylines, circles, arcs, boxes, spheres and text | Done |
+| UI | Yes | ImGui windows (as in the server window) | Windows of labels, buttons, input fields, sliders, toggles and dropdowns | Done |
+| Manual controls | Yes | `ManualControlInputs`, `FlightComputer.ManualThrustMode` | `Pitch`, `Yaw`, `Roll`, `Forward`, `Right`, `Up` as -1, 0 or 1, and `Pulse` | Done |
 | Auto-pilot | Yes | `FlightComputer` | `AutoPilot` | Done |
 
 ### Absent in KSA
 
-These have no game type, so no API is possible today. Revisit at each KSA release.
+These have no game type, so no API is possible today. Revisit at each KSA release. Air temperature
+and Mach left this list at build 5801.
 
 | Area | Note |
 | --- | --- |
@@ -91,7 +93,6 @@ These have no game type, so no API is possible today. Revisit at each KSA releas
 | Action groups | Toggles live on the modules and `InputAction` |
 | Alarms | Only on-screen `TimedAlert` toasts |
 | Thermal simulation | `FxTemperature` is visual only |
-| Air temperature, Mach | `PhysicalAtmosphereReference` has pressure and density only |
 
 ## Phases
 
@@ -99,7 +100,7 @@ Each phase merges on its own, with in-game tests for every new member.
 
 ### 1. Existing Classes
 
-Built and tested in game, in PR #1207. The table is the plan. The built API and where it
+Built and tested in game, merged in PR #1207. The table is the plan. The built API and where it
 differs follow it.
 
 | Class | Add | Game source |
@@ -151,7 +152,7 @@ breaking-change pass.
 
 ### 2. Propulsion and Fuel
 
-Built and tested in game, not yet in a PR. The table is the plan.
+Built and tested in game, merged in PR #1210. The table is the plan.
 
 | Class | Members | Game source |
 | --- | --- | --- |
@@ -177,7 +178,7 @@ again varies between runs, so the tests do not check it.
 
 ### 3. Power, Lights, Deployables
 
-Built and tested in game, not yet in a PR. The table is the plan.
+Built and tested in game, merged in PR #1211. The table is the plan.
 
 | Class | Members | Game source |
 | --- | --- | --- |
@@ -210,7 +211,7 @@ Hunter and Polaris are kittens with a backpack, which `LaunchVehicle` rejects.
 
 ### 4. Crew and EVA
 
-Built and tested in game, not yet in a PR. The table is the plan.
+Built and tested in game, merged in PR #1212. The table is the plan.
 
 | Class | Members | Game source |
 | --- | --- | --- |
@@ -248,12 +249,12 @@ over 1 m from it, and comes in range once it grabs the hatch rail, after a fract
 simulation.
 
 The start save has Hunter, Banjo and Polaris on EVA near Gemini7, and one kitten in each of Gemini7
-and Rocket. The roster names the others at random on each new game, so the tests find crew through
+and Rocket. From build 5801 it has no kittens on EVA, and two in each of Gemini7 and Rocket. The roster names the others at random on each new game, so the tests find crew through
 the vehicles.
 
 ### 5. Game Level
 
-Built and tested in game, not yet in a PR. The tables are the plan.
+Built and tested in game, merged in PR #1213. The tables are the plan.
 
 | Class | Members | Game source |
 | --- | --- | --- |
@@ -316,7 +317,7 @@ to `KSA` in phase 1, matching `SpaceCenter.Save` and `Load`.
 
 ### 6. Drawing
 
-Built and tested in game, not yet in a PR. The two paragraphs are the plan.
+Built and tested in game, merged in PR #1215. The two paragraphs are the plan.
 
 `Drawing`, `UI` and `Debug` are classes in the `KSA` service, holding static methods, for example
 `Drawing.AddLine`. Their stubs then cannot collide with KSP's `Drawing`, `UI` and `Debug`
@@ -377,7 +378,7 @@ Mechanics:
 
 ### 7. UI
 
-Built and tested in game, not yet in a PR. The first paragraph is the plan.
+Built and tested in game, merged in PR #1215. The first paragraph is the plan.
 
 Windows, text, buttons, input fields, sliders, toggles and dropdowns over ImGui, plus messages. The
 kRPC server window in KSA already draws ImGui windows from a mod. The service keeps
@@ -421,7 +422,7 @@ Mechanics:
 
 * **Object lifetime.** Every service class reports the state of its game object, and the server
   sweeps the object store when the vehicles or their parts change. A call through a gone object
-  raises `KRPC.ObjectDestroyedException`, as in KSP. Built, not yet in a PR.
+  raises `KRPC.ObjectDestroyedException`, as in KSP. Merged in PR #1209.
 * **Vehicle identity.** A KSA vehicle's id is its name, the only stable identifier. A `Vehicle`
   object throws after docking or undocking, and this stays. Calls that split a vehicle return the
   new vehicles instead (phase 1).

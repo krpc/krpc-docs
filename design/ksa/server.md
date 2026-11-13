@@ -1,8 +1,8 @@
 # The KSA Server
 
-**Status:** in progress. Part of [kRPC for KSA](README.md). The mod merged in
-[PR #1190](https://github.com/krpc/krpc/pull/1190). The server window is built and checked in game,
-not yet in a PR.
+**Status:** done, released in `ksa-v0.2.0`. Part of [kRPC for KSA](README.md). The mod merged in
+[PR #1190](https://github.com/krpc/krpc/pull/1190), and the server window in PR #1206. The `core`
+workarounds stay until the mod builds against a `core` with the fixes.
 
 The mod is a StarMap code mod, `experimental/ksa/server/`, built against the KRPC.Core 0.7.0
 release. It does the jobs kRPC's KSP addon does:
@@ -18,9 +18,9 @@ release. It does the jobs kRPC's KSP addon does:
 
 ## Tick Hook
 
-StarMap 0.4.8 offers lifecycle attributes only, with no per-tick hook, so the hook is a Harmony
-patch. The prefix runs after the frame's vehicle solver results are applied and before the next
-solver step is queued:
+StarMap 0.4.8 offered lifecycle attributes only, with no per-tick hook, so the hook is a Harmony
+patch. StarMap 0.5 adds an `IPatchService`, which the mod does not use. The prefix runs after the
+frame's vehicle solver results are applied and before the next solver step is queued:
 
 * **Reads are settled.** Vehicle state is the result of the last step.
 * **Writes take effect next step.** Control inputs and flight computer settings feed the queued
@@ -74,7 +74,7 @@ Each workaround goes once the KSA mod builds against a `core` with the fix
 
 | Problem | Workaround | Fix in `core` |
 | --- | --- | --- |
-| On .NET, `TcpClient.Close` nulls the socket, so `TCPClient.Connected` throws for a client that disconnects during a yielding call, and the server stops | Harmony finalizer returning not connected | [#1189](https://github.com/krpc/krpc/issues/1189) |
-| Adaptive rate control overwrites `Configuration.MaxTimePerUpdate`, so the window shows the live value | None | Issue to file |
+| On .NET, `TcpClient.Close` nulls the socket, so `TCPClient.Connected` throws for a client that disconnects during a yielding call, and the server stops | Harmony finalizer returning not connected | [#1189](https://github.com/krpc/krpc/issues/1189), fixed by PR #1249 |
+| Adaptive rate control overwrites `Configuration.MaxTimePerUpdate`, so the window shows the live value | None | #1236, fixed by PR #1250 |
 | Server keys collide between protocols | The `port` drop above | The 0.8 key prefixes |
 | No public seam for a gRPC server | Publicized internals ([grpc.md](grpc.md)) | A public seam |

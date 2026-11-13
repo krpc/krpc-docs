@@ -1,8 +1,9 @@
 # kRPC for KSA
 
-**Status:** in progress. The prototype, under `experimental/ksa/`, merged as
-[PR #1190](https://github.com/krpc/krpc/pull/1190) and released as `ksa-v0.1.0` against the kRPC
-0.7.0 release. The server window, manual controls, gRPC server and Borea archive layout are built, not yet in a PR.
+**Status:** in progress. The mod, under `experimental/ksa/`, merged as
+[PR #1190](https://github.com/krpc/krpc/pull/1190) and is released as `ksa-v0.2.0` against the kRPC
+0.7.0 release, on Borea and SpaceDock. Phases 1 to 5 below, the move out of `experimental/`, are not
+started.
 
 kRPC for Kitten Space Agency (KSA) shares the protocol, `core`, the clients and the tools with kRPC
 for KSP. The repo, its build, CI, releases and docs all assume KSP is the only game. These docs plan
@@ -67,18 +68,22 @@ Related, outside this folder:
 | Work | State |
 | --- | --- |
 | Prototype: server, `KSA` service, tests, docs, release scripts | Merged in PR #1190, released as `ksa-v0.1.0` |
-| Server window ([server.md](server.md)) | Built and checked in game, not yet in a PR |
-| Manual rotation and translation inputs ([api-coverage.md](api-coverage.md)) | Built and tested in game, not yet in a PR |
-| API phase 1, existing classes ([api-coverage.md](api-coverage.md)) | Built and tested in game, not yet in a PR |
-| Object store sweep ([api-coverage.md](api-coverage.md)) | Built and tested in game, not yet in a PR |
-| API phase 2, propulsion and fuel ([api-coverage.md](api-coverage.md)) | Built and tested in game, not yet in a PR |
-| API phase 3, power, lights and deployables ([api-coverage.md](api-coverage.md)) | Built and tested in game, not yet in a PR |
-| API phase 4, crew and EVA ([api-coverage.md](api-coverage.md)) | Built and tested in game, not yet in a PR |
-| API phase 5, camera, screenshots, debug and vehicle designs ([api-coverage.md](api-coverage.md)) | Built and tested in game, not yet in a PR |
-| API phase 6, drawing ([api-coverage.md](api-coverage.md)) | Built and tested in game, not yet in a PR |
-| API phase 7, UI ([api-coverage.md](api-coverage.md)) | Built and tested in game, not yet in a PR |
-| Unary gRPC server ([grpc.md](grpc.md)) | Built and tested in game on Linux, not yet in a PR |
-| Archive layout for Borea ([borea.md](borea.md)) | Built, not yet in a PR. Untested in a Borea instance |
+| Tooling fixes, the v2026.10.25.5707 build, archive layout for Borea ([borea.md](borea.md)) | Merged in PR #1205 |
+| Server window ([server.md](server.md)) | Merged in PR #1206 |
+| Manual inputs and API phase 1, existing classes ([api-coverage.md](api-coverage.md)) | Merged in PR #1207 |
+| Object store sweep ([api-coverage.md](api-coverage.md)) | Merged in PR #1209 |
+| API phases 2 to 5 ([api-coverage.md](api-coverage.md)) | Merged in PRs #1210 to #1213 |
+| Floats for values that need no double ([api-coverage.md](api-coverage.md)) | Merged in PR #1214 |
+| API phases 6 and 7, drawing and UI ([api-coverage.md](api-coverage.md)) | Merged in PR #1215 |
+| Windows scripts | Merged in PR #1216 |
+| Changelog | Merged in PR #1217 |
+| Unary gRPC server ([grpc.md](grpc.md)) | Merged in PR #1222 |
+| Docs rework | Merged in PR #1223 |
+| Release `ksa-v0.2.0` | Released 2026-10-30 |
+| Borea listing ([borea.md](borea.md)) | Listed from `ksa-v0.2.0` |
+| KSA build v2026.11.10.5801 and StarMap 0.5.4 | Built and tested in game, not yet in a PR |
+| Release scripts for the KSA train | Built, not yet in a PR |
+| API additions for v2026.11.10.5801 ([api-v2026.11.10.md](api-v2026.11.10.md)) | Proposal |
 
 ## Phases
 
@@ -86,7 +91,7 @@ Each phase merges on its own. All of them follow kRPC 1.0, except procedure ids,
 
 | | Phase | Done when |
 | --- | --- | --- |
-| 0 | Prototype in `experimental/ksa/`, released as `ksa-v0.1.0` against kRPC 0.7.0 | Done, PR #1190 |
+| 0 | Prototype in `experimental/ksa/`, released as `ksa-v0.1.0` against kRPC 0.7.0 | Done, PR #1190, then `ksa-v0.2.0` |
 | 1 | Layout: `ksp/` and `ksa/`, the KSA mod built by Bazel against `//core` at HEAD, `@ksa` stub assemblies | `bazel build //...` builds both mods |
 | 2 | CI: KSA targets in the existing jobs | A KSA change is checked with no new jobs |
 | 3 | Tools: shared in-game harness, `//ksa:test-ingame` | KSA in-game tests run through Bazel |

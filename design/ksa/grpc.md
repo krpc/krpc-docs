@@ -1,7 +1,8 @@
 # gRPC on KSA
 
-**Status:** in progress. Part of [kRPC for KSA](README.md). The unary server is built and tested in
-game on Linux, not yet in a PR. [Streams](#streams) wait for KSA to build against KRPC.Core 0.8.
+**Status:** in progress. Part of [kRPC for KSA](README.md). The unary server merged in PR #1222 and
+released in `ksa-v0.2.0`, tested in game on Linux. [Streams](#streams) wait for KSA to build against
+KRPC.Core 0.8.
 
 KSA runs on .NET 10, so kRPC for KSA hosts a gRPC server in the game process, beside the kRPC
 protocol server. The server is built from the service definitions:
