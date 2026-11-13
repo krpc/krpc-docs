@@ -255,6 +255,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 
 | | Item | GitHub | Labels | Design doc |
 | --- | --- | --- | --- | --- |
+| ⬜ | Find out what users see with a mismatched client, server or service, per client; document the symptoms in the docs | **To file**: [client-server-mismatch.md](issues/client-server-mismatch.md) | enhancement, client, protocol, docs | [protocol-compatibility.md](design/protocol-compatibility.md) |
 | ⬜ | Windows CI: C-nano serial transport tests, over a named pipe | [#1200](https://github.com/krpc/krpc/issues/1200) | enhancement, client, build, cnano | — |
 | ⬜ | Reject a string argument holding invalid UTF-8 in the KSP mod; measure the cost first | **To file**: [invalid-utf8-arguments.md](issues/invalid-utf8-arguments.md) | bug, server, ksp | — |
 | 🚧 | Autopilot test-plan gaps | **To file**: [autopilot-test-gaps.md](issues/autopilot-test-gaps.md) | enhancement, service, tools, ksp | [autopilot/test-plan.md](design/autopilot/test-plan.md) |
