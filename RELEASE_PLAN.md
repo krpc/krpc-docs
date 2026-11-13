@@ -334,6 +334,12 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | C-nano: follow-ups to server side functions: generated functions, heap use, header opt-out, examples, testee cleanups | [cnano-functions-follow-ups.md](issues/cnano-functions-follow-ups.md) | — |
 | ⬜ | Websockets testee: defects found writing the design doc | [client-websockets-defects.md](issues/client-websockets-defects.md) | — |
 
+#### Services
+
+| | Item | Issue | Design doc |
+| --- | --- | --- | --- |
+| ⬜ | MechJeb: defects inherited from KRPC.MechJeb, and settings MechJeb 2.15 reads only under a condition the API cannot set | [mechjeb-inherited-defects.md](issues/mechjeb-inherited-defects.md) | [services/mechjeb.md](design/services/mechjeb.md) |
+
 #### Tests, build and CI
 
 | | Item | Issue | Design doc |
