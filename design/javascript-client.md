@@ -544,13 +544,26 @@ run time:
 | Classes | The service's class, such as `conn.spaceCenter.Vessel` |
 | Enumerations, structures | The generated value, such as `SpaceCenter.SASMode`, or the service's |
 
-- **Null** takes its type from where it is used, as in Python. `undefined` is null.
+- **Null** takes its type from where it is used, as in Python: a parameter, the other branch of
+  a `?:`, another assignment to the variable, or an argument. `undefined` is null.
 - **An array** is a tuple where the position is a tuple, such as an argument for a vector, and a
   list otherwise.
 - **An empty array, `Set` or `Map`** takes its element type from its first use that types it: a
-  push, an element assignment, another assignment to the variable, or an argument. With none, it
-  is a `CompilationError` asking for a typed empty value from `types`, such as
-  `t.list(t.double).empty()` with `t` captured.
+  push, an element assignment, another assignment to the variable, or an argument.
+- **`cast`** types a value no use types, such as a function's only `return []`, or a state
+  variable that starts empty and is only read. Each type value has a `cast(value)` method, used
+  with `types` captured. It covers empty collections and nulls alike, as Python's `typing.cast`
+  does, and returns its argument on the client, so the code keeps its JavaScript meaning:
+
+  ```js
+  ({ engines, t }) => {
+    if (engines.length === 0) return t.list(t.double).cast([]);
+    ...
+  }   // captures: { engines, t: types }
+  ```
+
+  An untyped value is a `CompilationError` that suggests this form. `types` is an import, which a
+  minifier renames, so it is a capture and not a builtin global.
 - **Truth** follows JavaScript: `false`, `0`, `NaN`, `""`, `0n` and null are false. An empty array
   is true.
 - **Equality.** `===` and `!==` compare numbers, strings, booleans, enumeration values and remote
@@ -715,12 +728,11 @@ Each step is mergeable on its own.
   JavaScript cannot overload `>`, `+` or `?:`, which expressions need most.
 - **Tagged templates**, `` conn.fn`vessel.flight().meanAltitude > ${limit}` ``. They capture
   values and survive minifiers, but an editor cannot check or complete the string.
+- **Other forms of typed empty values.** `t.list(T).empty()` covers collections and not null. A
+  `result` option on `compile` covers only the function's result. An empty array carrying its type
+  in a hidden property types captures only, and a spread or `structuredClone` drops the property.
 - **A separate entry point**, `@krpc-org/krpc/compiler`, passed to `connect`. `import()` gives the
   same split with no step for the program.
-
-#### Open items
-
-- **Typed empty values.** Whether `t.list(t.double).empty()` reads well, or a `cast` helper does.
 
 ## Pages and TLS
 
