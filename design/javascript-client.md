@@ -2,10 +2,9 @@
 
 **Status:** in progress. Phases 1 to 6 are complete and implemented locally, with flags
 enumerations, deprecation signals and a web browser control panel tutorial. They are not yet
-submitted. The later phases (pages served by the mod, TLS, Node.js transports) are not started,
-and the [open items](#open-items) are unresolved. The client's current design is on the docs
-site, in `doc/src/client-design/js.rst`, and the "as built" sections below record how each
-phase landed.
+submitted. Phase 7 is the rest of the 0.8 work. The later phases are not scheduled. The client's
+current design is on the docs site, in `doc/src/client-design/js.rst`, and the "as built"
+sections below record how each phase landed.
 
 ## Goal
 
@@ -100,20 +99,23 @@ the default server is TCP. The client guide says so.
 
 ## Phases
 
-Each phase is implementable and mergeable on its own.
+Each phase is implementable and mergeable on its own. Phases 1 to 7 ship in 0.8. The later
+phases are not scheduled, and the release plan lists them as one item.
 
-| Phase | Adds | Conformance profiles |
-| --- | --- | --- |
-| 1 | Browser, WebSockets, unary calls, dynamic stubs | `core`, `dynamic`, `defaults`, `connections`, `concurrency`, `websockets` |
-| 2 | Error types, named arguments. Structures become classes | `error-types`, `named-arguments` |
-| 3 | Generated stubs with TypeScript declarations, docs API reference | — |
-| 3b | Enumerations, structures and exceptions importable with no connection | — |
-| 4 | Streams, events, callbacks | `streams`, `events`, `callbacks` |
-| 5 | Server side functions built with the `KRPC.Expression` API: streams, events and runs | `functions` |
-| 6 | A compiler from JavaScript functions to server side functions, in three steps | — |
-| later | Server: pages served by the mod, an origin check | — |
-| later | Server: TLS (`wss://`), with a user's certificate or a generated one | — |
-| later | Node.js transports (TCP, local socket) at `@krpc-org/krpc/node`, browser test runs | `tcpip`, `localsocket` |
+| Phase | Adds | Conformance profiles | Release |
+| --- | --- | --- | --- |
+| 1 | Browser, WebSockets, unary calls, dynamic stubs | `core`, `dynamic`, `defaults`, `connections`, `concurrency`, `websockets` | 0.8 |
+| 2 | Error types, named arguments. Structures become classes | `error-types`, `named-arguments` | 0.8 |
+| 3 | Generated stubs with TypeScript declarations, docs API reference | — | 0.8 |
+| 3b | Enumerations, structures and exceptions importable with no connection | — | 0.8 |
+| 4 | Streams, events, callbacks | `streams`, `events`, `callbacks` | 0.8 |
+| 5 | Server side functions built with the `KRPC.Expression` API: streams, events and runs | `functions` | 0.8 |
+| 6 | A compiler from JavaScript functions to server side functions, in three steps | — | 0.8 |
+| 7 | Release: links in the server forms, npm publishing, a first Windows CI run, phases 1 to 7 submitted as PRs | — | 0.8 |
+| later | Browser test runs: a headless browser in Bazel | — | Not scheduled |
+| later | Server: pages served by the mod, an origin check | — | Not scheduled |
+| later | Server: TLS (`wss://`), with a user's certificate or a generated one | — | Not scheduled |
+| later | Node.js transports (TCP, local socket) at `@krpc-org/krpc/node`, after checking the local socket on Windows | `tcpip`, `localsocket` | Not scheduled |
 
 `races` and `ordering` stay out: see [Concurrency](#concurrency), and JavaScript has no ordering
 of objects.
@@ -874,10 +876,10 @@ Ruled out:
 - **Origin check.** The server ignores the `Origin` header of a WebSocket upgrade, so any web page
   open in the player's browser can connect to the game. Until the pages phase, the guide
   recommends the server's connection approval for a game with a browser open.
-- **Windows CI.** The client's job is in the Windows matrix, but has not run yet. `rules_js`
-  supports Windows with caveats.
-- **npm publishing.** The release builds the tarball as a GitHub asset. Publishing it to npm under
-  `@krpc-org` is a release step still to add.
-- **Links in the server forms.** The server forms of 6c reuse the client's documentation comments,
-  so a link to a property names its getter, as `Vessel.getMass`. Clientgen parses each comment once,
-  for the client form.
+- **Windows CI, phase 7.** The client's job is in the Windows matrix, but has not run yet.
+  `rules_js` supports Windows with caveats.
+- **npm publishing, phase 7.** The release builds the tarball as a GitHub asset. Publishing it to
+  npm under `@krpc-org` is a release step still to add.
+- **Links in the server forms, phase 7.** The server forms of 6c reuse the client's documentation
+  comments, so a link to a property names its getter, as `Vessel.getMass`. Clientgen parses each
+  comment once, for the client form.
