@@ -65,3 +65,5 @@ With #1227, the attribute takes a `ModAPI` type (`[RequiresMod (typeof (KerbalAl
 which supplies the name, the availability and the reason in the message. The first argument goes away.
 
 Design: [partial-loading.md](https://github.com/krpc/krpc-docs/blob/main/design/server/partial-loading.md)
+
+Phase 5 of [mod-integration-framework.md](https://github.com/krpc/krpc-docs/blob/main/design/services/mod-integration-framework.md), which lands `ModAPI` first, so the attribute takes the `ModAPI` form from the start.

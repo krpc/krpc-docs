@@ -3,6 +3,9 @@
 **Status:** in progress, for 0.8. Issue: [#1227](https://github.com/krpc/krpc/issues/1227). A first
 implementation of the scanner part (2026-10-31, never a PR) predates the best-effort binding of mod
 members, and is stale. Best-effort binding is implemented with no PR yet. The rest is designed.
+The mod integration part is scheduled as phases 3 and 4 of
+[mod-integration-framework.md](../services/mod-integration-framework.md), which lists the
+integrations added since.
 
 What kRPC does when part of it cannot load: a service definition that breaks a
 [service definition rule](../protocol/service-definition-rules.md), including a name clash, or a mod
