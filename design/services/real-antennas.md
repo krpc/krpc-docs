@@ -1,6 +1,6 @@
 # RealAntennas support
 
-**Status:** proposal (2026-11-10). Issue: [issues/real-antennas.md](../../issues/real-antennas.md).
+**Status:** implemented, PR not yet opened (2026-11-10). All four phases, verified in game. Issue: [issues/real-antennas.md](../../issues/real-antennas.md).
 
 ## Context
 
@@ -86,9 +86,32 @@ an azimuth and elevation, or orbit-relative. `AntennaTarget` is a `MonoBehaviour
 subclasses and its own config format. Reading the target is simple; setting it needs one method
 per mode. Left until phases 1 to 3 are in use.
 
-## Open Questions
+## As Built
 
-* Whether `TransmitPower` and `TechLevel` should also be settable in flight. The menu allows
-  the editor only, and RealAntennas recomputes mass and cost from them there.
-* Whether `Comms` gets a vessel-level best data rate, or scripts take it from the first link of
-  `ControlPath`.
+* **Setters are editor only**, as the menu sets them. They go through `PartField`, so the
+  module's `onFieldChanged` handlers recompute the link budget, mass and cost.
+* **`MaxTechLevel`** is the smaller of the module's `maxTechLevel` (10 in sandbox) and the
+  highest level the RealAntennas configs define (9 in the stock pack). RealAntennas clamps
+  higher settings.
+* **Targeting** reads and writes the mod's own `TARGET` node through `AntennaTarget.Save` and
+  `LoadFromConfig`. Read back: `TargetMode` (None, Vessel, Body, Position, AzimuthElevation,
+  OrbitRelative), `TargetVessel`, `TargetBody`, `TargetDirection`. A body's center is a
+  position at the center, as the mod's window stores it. `TargetMode` reads it as `Body`
+  within a tolerance relative to the radius: the altitude is saved as a float, which is off by
+  up to 32 m for the RSS Sun.
+* **Link antennas resolve to the exact module.** The mod supports several `ModuleRealAntenna`
+  per part, so `Parts.Antennas` lists one entry per transmitter module and
+  `CommLink.StartAntenna`/`EndAntenna` wrap the module carrying the link. `Part.Antenna` stays
+  the first. No installed part has two, so this path has no game test.
+* **An unloaded vessel's link antenna is `null`**, as for a ground station. The mod builds it
+  from the module snapshot, with no part module behind it.
+* **`CanTarget` is "is a dish"** (`Shape` is not `Omni`). The mod's own `CanTarget` also needs
+  a target already set.
+* **Phase 4 was done with the rest** rather than later.
+* **`Comms`** gets no vessel-level data rate; scripts read the first link of `ControlPath`.
+* **Dependencies:** RealAntennas needs ToolbarControl as well as ClickThroughBlocker, which
+  fails to load without it.
+* **Test craft must be saved with RealAntennas installed.** A craft without `ModuleRealAntenna`
+  nodes launches with the module never configured: no default dish target, and link antennas
+  with no part module. A quickload fixes it. This is how the mod behaves for any craft saved
+  before it was installed.
