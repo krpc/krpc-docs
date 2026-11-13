@@ -565,7 +565,9 @@ Where the build departs from the design above.
 - **Lua.** It has no `StreamError` class, as it has no streams. A server error names
   `Service.Name:` in its message when the service definitions leave the exception out, as the
   other clients do for an exception they have no type for. A local socket path too long is a
-  string in Lua's form, from luasocket's own check.
+  string in Lua's form, from luasocket's own check. The other argument errors stay strings as
+  they were, with the client's own source position. Only `run` and `get_call` raise in Lua's
+  form at the caller's level, and `connect_local` in Lua's form with no position.
 - **Misuse.** Java throws `IllegalArgumentException` when `addStream` or `getCall` finds no method,
   and `IllegalStateException` when a stub's type information cannot be read. C# throws
   `ConnectionException` for a call after `Dispose`, in place of `ObjectDisposedException`.

@@ -25,3 +25,11 @@ Still open from the client API parity audit (2026-07-21) and the client guide re
 * **A `uint64` above the `sint64` range reads as negative** (`test_default_values[uint64-extremes]`), as Lua integers are signed 64-bit. This is a limit of the language, so it belongs in `unsupported.txt`, not `expected-failures.txt`. The guide's Numeric Limits note describes it.
 * **No stall timeout** (`test_stall`). The guide leaves it out until the API exists.
 * **A refusal's status and a disconnect's reason are only in the message** (`test_handshake_refused[*]`, `test_handshake_disconnect[known]`), and RPC errors carry only a message (`test_exception_name`). The guide already describes the fixed behavior.
+
+## From the client errors review
+
+Found reviewing the `client-errors` branch (2026-11-11). Each predates it.
+
+* **A structure defined twice in the service definitions is accepted** (`test_malformed_definitions[structure-twice]`). Python raises the connection error at connect.
+* **A failed transport connect leaves the socket open.** `connect_using` in `krpc/init.lua` closes the transport when the handshake fails, but not when `transport:connect()` fails, so the socket lasts until the garbage collector finalizes it.
+* **The reason for `test_undefined_type[enumeration-default]` in `conformance/expected-failures.txt` is stale.** It says connecting raises the connection error, and with `--runxfail` the test fails as the member using the undefined enumeration is exposed.
