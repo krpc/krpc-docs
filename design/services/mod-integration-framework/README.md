@@ -447,7 +447,7 @@ The phase also merges the `ImageFormat` copies:
 * It is StdLib's first enumeration. Every client generates and builds it as any service's enum,
   and the docs list it with StdLib's structs.
 
-Implemented on branch `mod-binding`, not yet merged or checked in game.
+Implemented on branch `mod-binding`, not yet merged. Checked in game on 2026-11-12: every integration's tests at its pinned version, 337 passed, with no stub warning in the logs. The negative control, one misspelled member in each of the 13 integrations, failed only the tests that use those members, each with the stub's message, and logged one warning per member.
 
 ### Phase 4: `ModAPI`, loaded at startup
 
