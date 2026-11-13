@@ -22,7 +22,7 @@ Finished items are collapsed under **Done** in each section.
 | | Release | Theme | Progress |
 | --- | --- | --- | --- |
 | ✅ | [0.7](#07-server-side-functions-streams-and-events-service-improvements) | Server-side functions, streams and events, protocol additions, service improvements | Tagged 2026-10-21 |
-| 🚧 | [0.8](#08-single-connection-client-codegen-then-client-conformance-and-thread-safety) | Single connection, client codegen, then client conformance testing and thread safety | 19 of 26 features done |
+| 🚧 | [0.8](#08-single-connection-client-codegen-then-client-conformance-and-thread-safety) | Single connection, client codegen, then client conformance testing and thread safety | 19 of 27 features done |
 | ⬜ | [1.0](#10-remaining-protocol-improvements-server-side-function-follow-ups) | Remaining protocol improvements (#906), server side function follow-ups | 0 of 9 done; tick control has a 0.7 stopgap |
 
 ## 0.7: server-side functions, streams and events, service improvements
@@ -106,6 +106,7 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 | 🚧 | Python: build every service from the server's definitions, with generated declarations for type checking; removes `use_pregenerated_stubs` and replaces the Python part of #1195. Phases 1 to 2b merged, and three phase 3 follow-ups: typed function compiler, `definitions` and `declarations` conformance profiles, pyright on the generated modules. Open: `<Service>Client` escaped, `--bundle`, a connect per game | [python-declarations.md](issues/python-declarations.md), PRs #1298, #1302, #1303, #1304, #1305, #1306, #1307 | [python-declarations.md](design/python-declarations.md) |
 | 🚧 | JavaScript client for the browser, on WebSockets, in phases. Phases 1 to 6, the function compiler included, implemented, not yet submitted. Phase 7: links in the server forms and npm publishing done; a first Windows CI run and the submission to do | — | [javascript-client.md](design/javascript-client.md) |
 | 🚧 | Server side functions: `Match` and `Switch` statements, before the JavaScript compiler's statements; then Python `match`. The statements in #1334; Python `match` to do | [switch-statements.md](issues/switch-statements.md) | [server-side-functions/switch.md](design/server-side-functions/switch.md) |
+| ⬜ | Name case conversion: one specified algorithm per case style, followed and tested by every client, so `UInt64` is `uint64` and Java enumeration constants match the docs. Breaking renames, so in 0.8 | — | [protocol/name-case-conversion.md](design/protocol/name-case-conversion.md) |
 | 🚧 | Trajectories service; a PR from an outside contributor | PR #1253, **add milestone** | [services/trajectories-service.md](design/services/trajectories-service.md) |
 | 🚧 | Kerbal Engineer Redux service | [#288](https://github.com/krpc/krpc/issues/288), **add milestone** | [services/kerbal-engineer-redux.md](design/services/kerbal-engineer-redux.md) |
 

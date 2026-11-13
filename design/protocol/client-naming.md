@@ -7,7 +7,8 @@ proposal with the member key rule, [#1237](https://github.com/krpc/krpc/issues/1
 How each client turns the names in a service definition into its own, and why two names the
 [service definition rules](service-definition-rules.md) allow never become one. Clashes with a
 client's own names, such as keywords and library types, are in
-[client reserved names](client-reserved-names.md).
+[client reserved names](client-reserved-names.md). How a name is split into words for each case is
+in [name case conversion](name-case-conversion.md).
 
 ## Mappings
 
