@@ -186,21 +186,20 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 
 | | Item | Issue | Design doc |
 | --- | --- | --- | --- |
-| ⬜ | Scanner rules for service, type, parameter and enumeration value names, and the C++ helper names | [clientgen-qualified-names.md](issues/clientgen-qualified-names.md) | [protocol/service-definition-rules.md](design/protocol/service-definition-rules.md) |
+| 🚧 | Scanner rules for service, type, parameter and enumeration value names, and the C++ helper names. Service and type names done by PRs #1324, #1325; parameters, enumeration values and helper keys open | [clientgen-qualified-names.md](issues/clientgen-qualified-names.md) | [protocol/service-definition-rules.md](design/protocol/service-definition-rules.md) |
 | ⬜ | Clients: escape a service or type name that meets a client's own name | [client-name-escapes.md](issues/client-name-escapes.md) | [protocol/client-reserved-names.md](design/protocol/client-reserved-names.md) |
 | 🚧 | Clients: use `Connection` for the entry point in every client, with `Transport` for the layer under it and `Remote<Kind>` for the generated bases. Built on branch `client-naming`, not yet submitted | [client-class-names.md](issues/client-class-names.md) | — |
 | 🚧 | Clients: one shape for errors, with a `RemoteError` base and a subclass per category. Type ids merged (#1324); E1 to E5 built on branch `client-errors`, which follows `client-naming`, not yet submitted | [client-errors.md](issues/client-errors.md) | [client-errors.md](design/client-errors.md) |
 | ⬜ | Server side functions: name types, exceptions and fields by id, and the C-nano examples with them | [function-api-by-id.md](issues/function-api-by-id.md) | [client-errors.md](design/client-errors.md#type-ids) |
 | ⬜ | Clients: calls that cannot go in a server side function | [calls-a-function-cannot-make.md](issues/calls-a-function-cannot-make.md) | — |
 | ⬜ | Clients: check whether a per-element function needs a real instance | [call-with-arguments-template.md](issues/call-with-arguments-template.md) | [server-side-functions/server-side-functions.md](design/server-side-functions/server-side-functions.md) |
-| ⬜ | Lua: `platform.sleep` busy-waits, to whole seconds | [lua-platform-sleep.md](issues/lua-platform-sleep.md) | — |
 | ⬜ | In-game tests for websockets, serial IO and local sockets, for what `TestServer` and the unit tests do not reach | [ingame-protocol-tests.md](issues/ingame-protocol-tests.md) | — |
 | 🚧 | Update the `krpc` and `krpc-cnano` vcpkg ports for 0.8.0: MIT licenses, copyright files, every C-nano transport (done in the repo: #1275, #1281; publishing waits on the release) | [vcpkg-ports-0-8.md](issues/vcpkg-ports-0-8.md) | — |
 | ⬜ | Docs: refresh the third-party projects page: a community note, listings by PR or Discord, a one-time prune | [docs-third-party-page.md](issues/docs-third-party-page.md) | — |
 | ⬜ | Docs: service index pages without the "API" suffix, each with an example showing the service's name in each client, and one page for a small service | [docs-service-index-pages.md](issues/docs-service-index-pages.md) | — |
 
 <details>
-<summary>Done (22)</summary>
+<summary>Done (23)</summary>
 
 | | Item | Issue | Design doc |
 | --- | --- | --- | --- |
@@ -226,6 +225,7 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 | ✅ | DockingCamera: `Camera.Image` becomes a method taking an image format, PNG or JPEG, and a JPEG quality; breaking | [dockingcam-image-format.md](issues/dockingcam-image-format.md), done by PR #1317 | — |
 | ✅ | SpaceCenter: setting the IVA camera mode waits for the crew after a launch, stays in IVA when already there, and throws for an uncrewed vessel | [camera-iva-mode-setter.md](issues/camera-iva-mode-setter.md), done by PR #1318 | — |
 | ✅ | In-game tests for Firespitter, KerbalActuators and Procedural Fairings, the last mod compatibility gap | [mod-compat-tests.md](issues/mod-compat-tests.md), done by PR #1319 | [services/mod-compat-test-coverage.md](design/services/mod-compat-test-coverage.md) |
+| ✅ | Lua: `platform.sleep` calls `socket.sleep` in place of a busy-wait to whole seconds, and is deprecated; the doc examples call `socket.sleep` | [lua-platform-sleep.md](issues/lua-platform-sleep.md), done by PR #1323 | — |
 
 </details>
 

@@ -2,7 +2,8 @@
 
 **Status:** partly done. The identifier, shape, duplicate and id rules are implemented. The member
 key rule is a proposal, [#1237](https://github.com/krpc/krpc/issues/1237). The service and type name
-rules are built, on the local branches `type-ids` and `service-names`. The rules for parameters
+rules are done, [PR #1324](https://github.com/krpc/krpc/pull/1324) and
+[PR #1325](https://github.com/krpc/krpc/pull/1325). The rules for parameters
 and enumeration values are a proposal with no PR yet
 ([issue](../../issues/clientgen-qualified-names.md)).
 
@@ -19,8 +20,8 @@ as [partial loading](../server/partial-loading.md) describes. The problem is rep
 | [Ids](#ids), hashed or set by hand | Implemented, [PR #1265](https://github.com/krpc/krpc/pull/1265) |
 | [Member keys](#member-keys): case-insensitive, with accessor keys | Proposal, #1237. The `ConfigNode` clashes are removed ([PR #1261](https://github.com/krpc/krpc/pull/1261), [PR #1273](https://github.com/krpc/krpc/pull/1273)) |
 | [Helper keys](#helper-keys) for the C++ `_stream` and `_call` functions | Proposal |
-| [Service and type names](#service-and-type-names) unique case-insensitively | Built. Type names with type ids, phase E0 of [client-errors.md](../client-errors.md#type-ids), on branch `type-ids`. Service names, types named as their service, and one class per service on branch `service-names`, stacked on it |
-| [Type ids](#ids), hashed or set by hand | Built, phase E0 of [client-errors.md](../client-errors.md#type-ids), on branch `type-ids` |
+| [Service and type names](#service-and-type-names) unique case-insensitively | Implemented. Type names with type ids, phase E0 of [client-errors.md](../client-errors.md#type-ids), [PR #1324](https://github.com/krpc/krpc/pull/1324). Service names, types named as their service, and one class per service, [PR #1325](https://github.com/krpc/krpc/pull/1325) |
+| [Type ids](#ids), hashed or set by hand | Implemented, phase E0 of [client-errors.md](../client-errors.md#type-ids), [PR #1324](https://github.com/krpc/krpc/pull/1324) |
 | [Parameters and enumeration values](#parameters-and-enumeration-values) | Proposal |
 
 ## What the rules guarantee

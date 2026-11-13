@@ -15,7 +15,7 @@ Each was confirmed by running it against a TestServer, except where marked as re
 * `compat.tointeger` returns its argument on Lua 5.1 and 5.2. A fractional value for an integer parameter is truncated and sent, where 5.3 and 5.4 raise an error. Confirmed on Lua 5.1.
 * On Lua 5.1, `_encode_varint` writes `math.huge` as 2^63 - 1 for any unsigned parameter, and `_decode_varint` reads a real 2^63 - 1 as `inf`. Confirmed on Lua 5.1.
 * A `__gc` finalizer that makes a call can run between the write and the read of another call. The finalizer's call reads the wrong response, and the connection ends with `Response with an unknown id`. Confirmed with a collection forced at that point.
-* `krpc.platform.sleep` spins on `os.time()`, holds a CPU core and rounds to whole seconds. The Lua doc scripts use it with fractions such as `0.1`. Read from code.
+* `krpc.platform.sleep` spins on `os.time()`, holds a CPU core and rounds to whole seconds. The Lua doc scripts use it with fractions such as `0.1`. Read from code. Fixed by PR #1323.
 
 ## From the parity audit and the client guide rewrite
 
