@@ -180,8 +180,10 @@ the one place that names the connection, as a service object is, so the rule abo
   object, so `connection.AddStream(() => e.Not(x))` works unchanged. Java's
   `addStream(Expression.Bound.class, "not", x)` works the same way. C++ gets calls only, as
   streaming an expression builder has no use, and its `_stream` forms stay on the static method.
-* **Name clashes.** No class has a static method named `Bind` or a member named `Bound`. clientgen
-  fails if one ever does.
+* **Name clashes.** No class has a static method named `Bind` or a member named `Bound`. If one
+  ever does, the client escapes it, as
+  [client reserved names](protocol/client-reserved-names.md#service-and-type-escapes-proposal)
+  describes.
 * **Docs.** The server side functions guide uses the bound form in its C#, Java and C++ examples.
   Each client guide's "Static Methods" section (phase 3) shows it in one sentence and one example.
   The API reference comes from the service definitions, so it does not list `Bound` classes.

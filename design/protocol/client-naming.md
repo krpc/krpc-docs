@@ -39,8 +39,11 @@ From #1237. A generator may only:
 * prefix a property accessor with `get`, `set` or `is`, in any case;
 * add a suffix containing `_` to a keyword or a name the client reserves, e.g. `in_`. Source names
   never contain `_`, so an escaped name cannot clash with another;
-* add a helper name the [service definition rules](service-definition-rules.md) reserve, or one with
-  a leading `_`.
+* add a helper name with a leading `_`, or one of the C++ helpers the
+  [helper keys](service-definition-rules.md#helper-keys) reserve.
+
+Any other name a client adds, and a clash with it, is the client's to keep apart, see
+[client reserved names](client-reserved-names.md).
 
 It must also:
 
@@ -62,7 +65,7 @@ construction.
 | Merge | Example | Prevented by |
 | --- | --- | --- |
 | Case conversion | `RCSEnabled` and `RcsEnabled` become `rcs_enabled` | [Member keys](service-definition-rules.md#member-keys), and the type and parameter rules, compare case-insensitively |
-| Property accessor | `GetValues` beside `Values` becomes `getValues` | Member keys: a property reserves `GetFoo`, `SetFoo`, `IsFoo` |
+| Property accessor | `GetValues` beside `Values` becomes `getValues` | Member keys: a property reserves `GetFoo` and `SetFoo` |
 | C++ helper | `FooStream` beside `Foo` becomes `foo_stream` | [Helper keys](service-definition-rules.md#helper-keys) |
 | Escape suffix | `Class` becomes `class_`. No source name ends in `_` | The identifier rule |
 | Java enumeration constants | `Foo_` and `Foo` become `FOO` | The [enumeration value rule](service-definition-rules.md#parameters-and-enumeration-values) |
@@ -81,9 +84,10 @@ Some clients put services on an object of their own, beside its members:
 | C# | `conn.SpaceCenter()`, an extension method of `IConnection` | `Dispose`: the instance method wins |
 | C++, C-nano, Java | A constructor, function prefix or `newInstance` | None |
 
-The [reserved names](service-definition-rules.md#reserved-names) keep services off these members.
+Each client escapes a service named as one of these members, see
+[client reserved names](client-reserved-names.md#service-and-type-escapes-proposal). No client does yet.
 
-The Python client does not check this itself. `Client._load_services` sets each service with
+The Python client does not check this today. `Client._load_services` sets each service with
 `setattr(self, snake_case(service.name), ...)`, so a server whose definitions break the rule, such
 as a service named `Close` or `Stream`, replaces the `Client` method of that name.
 

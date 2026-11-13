@@ -2,8 +2,8 @@
 
 **Status:** partly done. The identifier, shape, duplicate and id rules are implemented. The member
 key rule is a proposal, [#1237](https://github.com/krpc/krpc/issues/1237), and the rules for
-services, types, parameters, enumeration values and reserved names are a proposal with no issue
-yet ([draft](../../issues/clientgen-qualified-names.md)).
+services, types, parameters and enumeration values are a proposal with no PR yet
+([issue](../../issues/clientgen-qualified-names.md)).
 
 What the scanner accepts in a service definition, and why. Clients name things after these rules and
 may assume them, see [client naming](client-naming.md). A definition that breaks a rule is left out
@@ -20,7 +20,22 @@ as [partial loading](../server/partial-loading.md) describes. The problem is rep
 | [Helper keys](#helper-keys) for the C++ `_stream` and `_call` functions | Proposal |
 | [Service and type names](#service-and-type-names) unique case-insensitively | Proposal |
 | [Parameters and enumeration values](#parameters-and-enumeration-values) | Proposal |
-| [Reserved names](#reserved-names) | Proposal |
+
+## What the rules guarantee
+
+A clash between a service and a client can't be ruled out entirely. A new client, or a new feature
+of an existing one, brings names that can't be predicted today. The rules therefore rule out one
+kind of clash, and leave the other to the clients:
+
+| Clash | Example | Kept apart by |
+| --- | --- | --- |
+| Two names of one definition merge under the [contract](client-naming.md#the-contract)'s conversions | `RCSEnabled` and `RcsEnabled`, `GetValues` and `Values` | These rules. The contract bounds what a generator may do, so the scanner can rule these out |
+| A name of a definition meets a client's own name | A type `SpaceCenterClient`, a service `Close`, a member `Bind` | The client, as [client reserved names](client-reserved-names.md) describes. The scanner keeps no list of client names |
+
+Client names use a form a definition can't produce, such as a leading `_`, or the client escapes the
+definition's name. An escape depends on the client release alone, never on another member, unlike
+the rejected [renaming on a clash](#rejected). A clash that neither covers is a documented limitation
+of that client.
 
 ## Identifiers
 
@@ -64,7 +79,7 @@ ids 1 to 255 are reserved for the services that ship with kRPC. See
 From #1237. Each member reserves keys, and two members of one scope that share a key clash:
 
 * A method, static method, enumeration value or structure field reserves its name.
-* A property `Foo` reserves `Foo`, `GetFoo`, `SetFoo` and `IsFoo`.
+* A property `Foo` reserves `Foo`, `GetFoo` and `SetFoo`.
 * Keys compare case-insensitively.
 
 | Scope | Members |
@@ -76,8 +91,8 @@ From #1237. Each member reserves keys, and two members of one scope that share a
 
 This closes every case merge, e.g. `RCSEnabled` and `RcsEnabled` both becoming `rcs_enabled`, and
 every accessor clash, e.g. a method `GetValues` beside a property `Values` both becoming Java's
-`getValues`. `IsFoo` is reserved now for a future client with Java bean boolean getters. Reserving it
-later would break a service that loaded before.
+`getValues`. The keys cover the accessors of the clients that ship. A future client with Java bean
+boolean getters, `isFoo`, escapes a clash with a method `IsFoo`.
 
 Types are outside this rule. A property `Camera` beside a class `Camera` is common, with 12 pairs in
 the bundled services, and every client keeps types and members apart.
@@ -99,8 +114,10 @@ gains:
 The rule is C++ specific, unlike the rest of the member keys. The alternative, a helper name no
 member can take, renames the public `_stream` and `_call` functions.
 
-[Static method binding](../static-method-binding.md) (#1195) plans a static method `Bind` and a
-nested class `Bound` in some clients. If it lands, a class reserves `Bind` and `Bound` the same way.
+Helper keys cover only the C++ helpers that ship. A later client name is kept apart by the client,
+see [what the rules guarantee](#what-the-rules-guarantee). For example,
+[static method binding](../static-method-binding.md) (#1195) plans a static method `Bind` and a nested
+class `Bound` in some clients, and those clients escape a member of either name.
 
 ## Service and type names
 
@@ -125,25 +142,6 @@ nested class `Bound` in some clients. If it lands, a class reserves `Bind` and `
 
 Every parameter and value in the bundled and test services already meets both.
 
-## Reserved names
-
-Names a client generator cannot keep clear of, for each client listed in
-[client naming](client-naming.md#client-objects):
-
-| Kind | Reserved | Why |
-| --- | --- | --- |
-| Type | `Service`, `ExtensionMethods` | The C# classes generated in each service's namespace |
-| Service | `Close`, `Stream`, `AddStream`, `AddEvent`, `Run`, `Compile`, `GetCall`, `StreamUpdateCondition`, `WaitForStreamUpdate`, `AddStreamUpdateCallback`, `RemoveStreamUpdateCallback` | Python and Lua put a service on the client object as an attribute, beside these members |
-| Service | `Dispose` | C# reaches a service through an extension method on the connection, and `IConnection.Dispose` wins |
-| Service | `Error`, `Callback`, `Return`, `Bytes`, `Size`, `Type` | A C-nano enumeration value constant `KRPC_<SERVICE>_<ENUM>_<VALUE>` would match a library name, e.g. `KRPC_ERROR_CONNECTION_FAILED` |
-
-A client that adds a member or a library name must add it here, which then rejects a service that
-loaded before. Two client changes would shrink the list:
-
-* The C-nano `KRPC_TYPE_` include guards take a lower case letter, which no enumeration value constant
-  contains. `Type` then leaves the list.
-* Python and Lua reach a service through a separate attribute. This breaks every script.
-
 ## Checks
 
 | Where | Check | Result |
@@ -151,10 +149,11 @@ loaded before. Two client changes would shrink the list:
 | Scanner (`core`) | Every rule, extension members included | Left out, see [partial loading](../server/partial-loading.md) |
 | `tools/ServiceDefinitions` | Every rule, as the scanner with no error list | Build failure, naming both members |
 | clientgen | The member and helper keys | Build failure, naming both members |
-| clientgen test | `TestService` members named after the names the clients reserve, and the clashes the rules allow, e.g. a property `Foo` beside a type `Foo` | Generates and compiles in every client |
+| clientgen test | `TestService` members named after the names the clients escape, and the clashes the rules allow, e.g. a property `Foo` beside a type `Foo` | Generates and compiles in every client |
 
 **No deprecation exemption, and no warning period.** A clash is a bug that should never ship. A
-third-party mod with one loses those members at once. Every bundled and test service meets every
+third-party mod with one loses those members at once. A clash with a client's own name is the
+client's to fix, in a client release. Every bundled and test service meets every
 rule above, checked 2026-11-05 against the service definitions.
 
 ## Phases
@@ -166,14 +165,17 @@ Each phase merges on its own.
    [client contract](client-naming.md#the-contract) in the client specification.
 3. **Service and type names, parameters and enumeration values, helper keys.** Scanner checks and
    extending docs.
-4. **Reserved names.** The scanner list, and the C-nano include guard change that shrinks it.
-5. **Tool checks.** `ServiceDefinitions` and clientgen, and the test service.
+4. **Tool checks.** `ServiceDefinitions` and clientgen, and the test service.
+
+The escapes for client names are client work, in
+[client name escapes](../../issues/client-name-escapes.md).
 
 ## Rejected
 
 | Option | Why not |
 | --- | --- |
 | Renaming per client, on a clash | Adding a member renames an existing one, e.g. a new property `Foo` renames Java's `getFoo()` |
+| Reserving each name a client uses, in the scanner | No bound: each new client or client feature adds names, and each addition rejects a service that loaded before. Python's `<Service>Client`, `Bind` and `Bound`, and `IsFoo` were already queued |
 | Per-language name overrides on the attributes | Services would carry knowledge of every client, and a new client would need edits to existing services |
 | Types and members in one scope | Rejects 12 existing property and type pairs, for no client that needs it |
 | A warning in 0.8, an error from 1.0, with deprecated members exempt | Each client needs a rule for the exempt pairs, for a bug that should never ship |

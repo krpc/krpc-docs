@@ -215,8 +215,8 @@ The client is planned to split into a base package and a stub package per game. 
 | Two bases of a client type declare one service | A type error. At run time the first in the MRO picks the module |
 | Two connections typed differently | Each uses its own type's modules |
 | A module imported after connecting | Its enumeration values convert by number. `==`, `is`, and `except` with its exception classes, do not hold |
-| A service named as a `Client` member, such as `Close` or `Stream` | The [reserved names](protocol/service-definition-rules.md#reserved-names) keep services off them |
-| A class named `<Service>Client` in its own service | Clashes with the client type. To reserve in the service definition rules, as a follow-up |
+| A service named as a `Client` member, such as `Close` or `Stream` | To escape, as `conn.close_`, see [client reserved names](protocol/client-reserved-names.md#service-and-type-escapes-proposal) |
+| A class named `<Service>Client` in its own service | Clashes with the client type. The generator escapes the class, as `SpaceCenterClient_`, as a follow-up |
 
 ### Static methods
 
@@ -319,7 +319,7 @@ Each a pull request stacked on phase 2, merged in turn.
 
  * Done: [#1306](https://github.com/krpc/krpc/pull/1306). Type the function compiler's expressions. The `KRPC.Expression` declaration is typed, unlike the stub's `StaticMethod`, which shows the places where a value was looser than the call it reached.
  * Run pyright on the generated modules, which no check covers, so that a module a user generates type checks.
- * Reserve `<Service>Client` as a type name in the service definition rules.
+ * Escape a class named `<Service>Client` in its own module, as `SpaceCenterClient_`. The scanner keeps no list of client names, see [what the rules guarantee](protocol/service-definition-rules.md#what-the-rules-guarantee).
  * `krpc-clientgen python --bundle`, to generate a combined client type with a set of modules, as for a whole newer server.
  * A connect per game, or another fix for `krpc.connect()` defaulting to `KSPClient`, before the KSA client types and the package split. See [Client types](#client-types).
  * Done: [#1305](https://github.com/krpc/krpc/pull/1305). Conformance: split a `definitions` profile out of `dynamic`, for building the services at connect, and add a `declarations` profile for the generated types. Python has both, and Lua takes `declarations` with [lua-type-hints.md](../issues/lua-type-hints.md).

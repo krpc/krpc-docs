@@ -14,9 +14,6 @@ depend on them:
 * **Enumeration value names** match `^[A-Z][A-Za-z0-9]*$`.
 * **Helper keys.** A member `Foo` also reserves `FooStream` and `FooCall`, and a property `Foo` also
   reserves `SetFooCall`, as C++ generates `foo_stream`, `foo_call` and `set_foo_call`.
-* **Reserved names.** No type is named `Service` or `ExtensionMethods`, the C# classes of every
-  service. No service is named as a member of the Python or Lua client object, e.g. `Stream` or
-  `Close`, as C#'s `Dispose`, or as a C-nano library name prefix, e.g. `Error`.
 
 Every bundled and test service already meets these rules.
 

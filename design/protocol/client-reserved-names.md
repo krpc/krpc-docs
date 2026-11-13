@@ -1,6 +1,8 @@
 # Client reserved names
 
 **Status:** implemented in every client, with no PR yet (2026-11-05). Keyword escaping predates it.
+The [service and type escapes](#service-and-type-escapes-proposal) are a proposal,
+[client name escapes](../../issues/client-name-escapes.md).
 
 How each client keeps a name from a service definition clear of the names the client itself uses:
 its language's keywords, the library and standard types it names, the members of its base classes,
@@ -13,10 +15,16 @@ Two techniques, chosen per name:
 
 * **Qualify the client's names.** A library, standard or runtime type is written from a root no
   service name can shadow, e.g. C++ `::std::string`. This changes no name a user sees.
-* **Escape the service's name.** A member or parameter whose converted name the client cannot
-  qualify, such as a keyword, a base class method or a local, takes a trailing `_`, e.g. `class_`.
+* **Escape the service's name.** A service, type, member or parameter whose converted name the
+  client cannot qualify, such as a keyword, a base class method or a local, takes a trailing `_`,
+  e.g. `class_`.
   No source name ends in `_`, so an escaped name never meets another
   ([identifiers](service-definition-rules.md#identifiers)).
+
+The scanner keeps no list of client names, as a new client or client feature can always add one.
+See [what the rules guarantee](service-definition-rules.md#what-the-rules-guarantee). A new client
+name takes a leading `_` where it can, and otherwise the client escapes the definition's name. A clash
+that neither covers is a documented limitation, as [platform macros](#platform-macros) are.
 
 Qualifying is preferred, as escaping renames a member. Parameters escape against the locals and
 helper parameters of a generated function, and members against the client's base classes. An escape
@@ -63,7 +71,7 @@ are at risk.
 | A member named as the type that holds it, e.g. a procedure `Service` | Escaped, as C# allows no such member |
 | Parameters named `_args`, `_result`, `connection`, `nameof` | Escaped |
 | Structure constructor parameters | The field name in lower camel case, escaped, so a field `Class` gives `class_` |
-| `Service`, `ExtensionMethods` | Cannot be escaped: public classes of every service. [Reserved](service-definition-rules.md#reserved-names) |
+| Types named `Service`, `ExtensionMethods` | To escape, see [service and type escapes](#service-and-type-escapes-proposal) |
 
 ### Java
 
@@ -104,6 +112,22 @@ run-time client should escape it.
 
 A member named `cast` or `catch` replaces those Penlight methods on its class. The client calls
 neither, and `KRPC.Expression.cast` is a shipped name, so they are not escaped.
+
+## Service and type escapes (proposal)
+
+Names a client puts beside a service or a type, where the client's name is public and fixed. Today
+these clashes break the client. Each escape gives the definition's name a trailing `_`.
+
+| Client | Name | Clash | Escaped as |
+| --- | --- | --- | --- |
+| Python, Lua | A service named as a public client member: `Close`, `Stream`, `AddStream`, `AddEvent`, `Run`, `Compile`, `GetCall`, `StreamUpdateCondition`, `WaitForStreamUpdate`, `AddStreamUpdateCallback`, `RemoveStreamUpdateCallback` | The service replaces the member on the client object | `conn.close_` |
+| Python | A type `<Service>Client` in its own service, e.g. `SpaceCenterClient` | The generated module's [client type](../python-declarations.md#client-types) | `SpaceCenterClient_` |
+| C# | A service named `Dispose` | `IConnection.Dispose` wins over the extension method | `conn.Dispose_()` |
+| C# | A type named `Service` or `ExtensionMethods` | The classes generated in each service's namespace | `Service_` |
+| C-nano | A service named `Error`, `Callback`, `Return`, `Bytes`, `Size` or `Type` | An enumeration value constant `KRPC_<SERVICE>_<ENUM>_<VALUE>` matches a library name, e.g. `KRPC_ERROR_CONNECTION_FAILED` | `KRPC_ERROR__<ENUM>_<VALUE>` |
+| C#, C++, Java | A member `Bind` or `Bound`, once [static method binding](../static-method-binding.md) lands | The bound form's static method and nested class | `Bind_`, `bind_` |
+
+A client that adds a public name beside a service or type adds a row here.
 
 ## Platform macros
 

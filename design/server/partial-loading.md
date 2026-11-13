@@ -85,8 +85,7 @@ clashing extension.
 | Two members of a scope that share a [member key](../protocol/service-definition-rules.md#member-keys) or a helper key | Both members |
 | Two types of a service, compared case-insensitively | Both types, and the cascade |
 | Two services, compared case-insensitively | Both services, their types, and extension members that target them |
-| A type named as its service or a [reserved name](../protocol/service-definition-rules.md#reserved-names) | That type, and the cascade |
-| A service with a reserved name | That service |
+| A type named as its service | That type, and the cascade |
 | Two parameters of a procedure, or a parameter name that breaks the rule | That procedure |
 | An enumeration value name that breaks the rule | The enumeration, and the cascade |
 | A shared or 0 id | Both members, see [procedure ids](../protocol/procedure-ids.md#collisions) |
