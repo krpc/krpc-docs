@@ -1,6 +1,6 @@
 # SCANsat service
 
-**Status:** in progress, phase 1. From the [mod integrations index](../../issues/mod-integrations-index.md).
+**Status:** in progress. Phase 1 done, in PR #1328; phase 2 not scheduled. From the [mod integrations index](../../issues/mod-integrations-index.md).
 
 ## Context
 

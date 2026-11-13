@@ -1,6 +1,6 @@
 # MechJeb2 service
 
-**Status:** in progress. Phase 1, the port, is implemented, with no PR yet. Issues [#288](https://github.com/krpc/krpc/issues/288) (MechJeb2 and Kerbal
+**Status:** in progress. Phase 1, the port, done in PR #1326; phases 2 and 3 not scheduled. Issues [#288](https://github.com/krpc/krpc/issues/288) (MechJeb2 and Kerbal
 Engineer Redux services; KER is in [kerbal-engineer-redux.md](kerbal-engineer-redux.md)) and
 [#311](https://github.com/krpc/krpc/issues/311) (stage stats), from the
 [mod integrations index](../../issues/mod-integrations-index.md).

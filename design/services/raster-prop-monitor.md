@@ -1,6 +1,6 @@
 # Raster Prop Monitor service
 
-**Status:** implemented on branch `raster-prop-monitor`, unmerged. Issues [#375](https://github.com/krpc/krpc/issues/375) (RPM integration) and
+**Status:** done, in PR #1335. Issues [#375](https://github.com/krpc/krpc/issues/375) (RPM integration) and
 [#424](https://github.com/krpc/krpc/issues/424) (camera views), from the
 [mod integrations index](../../issues/mod-integrations-index.md).
 

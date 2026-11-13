@@ -1,6 +1,6 @@
 # Client errors
 
-**Status:** in progress. Phases E1 to E5 are built, in PR #1333, and the build departs from
+**Status:** done. Phases E1 to E5 merged in PR #1333, and the build departs from
 this design as [Deviations](#deviations) lists. [Type ids](#type-ids), phase E0, merged in
 #1324. Issue: [client-errors.md](../issues/client-errors.md).
 

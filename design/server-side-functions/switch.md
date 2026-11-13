@@ -1,6 +1,6 @@
 # Match and switch statements in server side functions
 
-**Status:** in progress. `Match` and `Switch` are implemented as designed, in PR #1334, and the
+**Status:** in progress. `Match` and `Switch` are implemented as designed, merged in PR #1334, and the
 JavaScript compiler compiles `switch` to `Switch`. They were first named `Switch` and
 `SwitchWithFallThrough`, renamed before release as [Naming](#naming) explains. The Python
 compiler compiles `match` on branch `python-match`, with the simple patterns only: literal, value,
