@@ -1,8 +1,8 @@
 # Client errors
 
-**Status:** in progress. Phases E1 to E4 are built, with no PR yet, and the build departs from
-this design as [Deviations](#deviations) lists. [Type ids](#type-ids), phase E0, and
-[C-nano](#c-nano), phase E5, are a proposal. Issue: [client-errors.md](../issues/client-errors.md).
+**Status:** in progress. Phases E1 to E5 are built, with no PR yet, and the build departs from
+this design as [Deviations](#deviations) lists. [Type ids](#type-ids), phase E0, merged in
+#1324. Issue: [client-errors.md](../issues/client-errors.md).
 
 The errors each client raises grew one client at a time. They differ in their names, their bases,
 which situations raise which error, and whether a program can catch a whole category. The
@@ -574,3 +574,29 @@ Where the build departs from the design above.
   `ValueError` subclasses.
 - **Java connection endings.** A stream or event that a close or a connection failure ends throws
   the connection's own `ConnectionException`, one instance for every stream.
+- **C-nano takes `error-types` with no remote error type.** Its conventions set `remote_error` to
+  `null`. The spec treats such a client as one whose errors are codes: `test_remote_error` skips
+  it, a mapped exception is checked by its service and name, and the `Service.Name:` prefix
+  stays on a server error's message, as for a client without error types.
+- **C-nano's testee types.** It reports the `KRPC_EXCEPTION_` macro of a server error as its
+  native type, and the code's name for every other error.
+- **`KRPC_ERROR_CONNECTION_REFUSED` stays.** A program retries a garbled handshake on a serial
+  line and gives up on a refusal, so the two take separate codes, at every detail level. A refusal
+  is `DENIED`, `WRONG_PROTOCOL_VERSION`, or an unsupported protocol version in an `OK` response,
+  and closes the connection. Any other status is `KRPC_ERROR_CONNECTION`, which leaves a resumable
+  link open for a retry. The testee reports a refusal as the connection error.
+- **A null address, path or port in a C-nano opener is `KRPC_ERROR_ARGUMENT`.** "No address" in
+  the situations table is an address that does not resolve, which stays `KRPC_ERROR_CONNECTION`.
+- **C-nano's sentences compile when the library prints errors,** as well as at Messages, so
+  `KRPC_PRINT_ERRORS_TO_STDERR` prints them at every level.
+- **A C-nano callback's code.** A nanopb callback returns only false, so it stores its code in
+  `krpc_callback_error`. The function that ran nanopb returns it in place of
+  `KRPC_ERROR_ENCODING`. This gives `KRPC_ERROR_ARGUMENT` for an unfilled argument and a null
+  string, and `KRPC_ERROR_NO_MEMORY` for a result with no memory, which is skipped to the end of
+  its message so the session survives.
+- **No Uno measurement.** The guide states the 16 bytes of the record, from its layout. The flash
+  of each level is not measured, as no AVR toolchain is set up.
+- **The scripted serial line drains before it closes.** It stopped socat as its script ended,
+  and the pty hangup discarded bytes the client had not read. C-nano, which reads a size prefix a
+  byte at a time, lost a refusal or a disconnect now and then. The line now waits for the
+  client's end to empty first.
