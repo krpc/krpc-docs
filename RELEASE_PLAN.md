@@ -361,6 +361,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | In-game tests for local sockets and server restarts, for what `TestServer` and the unit tests do not reach | [ingame-protocol-tests.md](issues/ingame-protocol-tests.md) | — |
 | ⬜ | In-game tests: keep each game's log in a folder per run, in place of the one `KSP.log` each launch overwrites | [ingame-test-saved-logs.md](issues/ingame-test-saved-logs.md) | — |
 | ⬜ | In-game tests: fewer scene loads per test class, as most classes reload the save and then launch, about 10 s each | [ingame-test-scene-loads.md](issues/ingame-test-scene-loads.md) | — |
+| ⬜ | Flaky tests: SCANsat `test_state_out_of_range`, the FAR wrench reference frames test and C++ conformance `test_wait_on_condition_object` each failed once and passed on rerun | [flaky-tests.md](issues/flaky-tests.md) | — |
 
 ### Negative results
 
