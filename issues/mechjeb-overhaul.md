@@ -1,7 +1,24 @@
-# MechJeb: defects inherited from KRPC.MechJeb, and settings MechJeb 2.15 gates
+# MechJeb: overhaul the service after the port
 
-The MechJeb service is a port of Genhis' KRPC.MechJeb 0.7.1 to MechJeb 2.15.4.0. A review of the
-port found these defects in the original code. The port keeps each one as it was.
+The MechJeb service in 0.8 (#1326) is a minimal port of Genhis' KRPC.MechJeb 0.7.1 to MechJeb
+2.15.4.0: the 0.7.1 API, minus the members MechJeb removed, with the fixes needed to run. This
+issue is the overhaul that follows it. Design: [services/mechjeb.md](../design/services/mechjeb.md).
+
+## Scope
+
+| Part | Work |
+| --- | --- |
+| API layout | Decide between Genhis' window layout (KRPC.MechJeb #22), KRPC.MechJeb #29's flat ascent autopilot, and the 0.7.1 layout with members added. Deprecate what the new layout replaces, rather than remove it |
+| Members from KRPC.MechJeb #29 | Take the members the design's "Phase 2: follow-up from #29" table marks "Take", crediting darchambault in `LICENSE` |
+| New modules | `OperationEccentricity`, which 0.7.1 never wrapped, and KRPC.MechJeb's to-do list: advanced transfer, attitude adjustment, rover, spaceplane autoland |
+| Inherited defects | The defects and gated settings below, kept unchanged by the port |
+
+Stage stats from MechJeb's fuel-flow simulation (#311) are separate, as they wait on MechJeb
+sharing the simulation.
+
+## Inherited defects
+
+A review of the port found these defects in the original code. The port keeps each one as it was.
 
 | Member | Defect | Failure |
 | --- | --- | --- |
@@ -15,7 +32,7 @@ port found these defects in the original code. The port keeps each one as it was
 | `ThrustController.ManageIntakes` | Undocumented: MechJeb reads it only when `LimitToPreventFlameout` is on. Its siblings carry a "Requires" remark | A script sets `ManageIntakes` alone, with no effect |
 | `NodeExecutor.ExecuteOneNode`, `ExecuteAllNodes` | No check for a maneuver node | With no node, MechJeb's `Init` throws `ArgumentOutOfRangeException` after the module is enabled. `Enabled` reads true until MechJeb's next `OnFixedUpdate` aborts it |
 
-## Settings MechJeb 2.15 gates
+### Settings MechJeb 2.15 gates
 
 MechJeb 2.15 reads these settings only under a condition the API cannot set. With older MechJeb,
 0.7.1 set them with effect.
@@ -25,7 +42,7 @@ MechJeb 2.15 reads these settings only under a condition the API cannot set. Wit
 | `AscentAutopilot.LimitAoA`, `MaxAoA`, `AoALimitFadeoutPressure` | MechJeb applies the AoA limiter only when `LimitQaEnabled` is off. It defaults to on, and only MechJeb's ascent windows set it, to `AscentType == PVG` | A script on the classic path, with no ascent window ever drawn for the craft, gets the PVG Qα limiter. `MaxAoA` has no effect, and `LimitAoA = False` does not turn limiting off |
 | `AscentPVG.FixedCoast`, `FixedCoastLength` | MechJeb reads them only when a coast stage is set (`CoastStageFlag`), which the API does not expose | A script sets a fixed coast with no effect |
 
-## Proposal
+### Fixes
 
 * Throw an `MJServiceException` with a clear message when the target or node is missing, on
   each member above. Document each throw with "Throws an exception if ...".
@@ -37,4 +54,4 @@ MechJeb 2.15 reads these settings only under a condition the API cannot set. Wit
 * Apply the Smart A.S.S. axis settings after `Engage`, and add the missing "Requires" remarks.
 * Add a test case for each fix to `service/MechJeb/test/test_mechjeb.py`.
 
-None of these changes the API.
+None of these fixes changes the API, so they can land before the layout is decided.

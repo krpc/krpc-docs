@@ -27,7 +27,8 @@ be shared with other mods outside MechJeb.
 
 1. **Port** KRPC.MechJeb into `service/MechJeb`, built, documented and tested as the other mod
    services, and listed under GPLv3 in `LICENSE`.
-2. **Improve** it to current kRPC and fill its to-do list. What changes is decided when porting.
+2. **Overhaul** it: the API layout, the members from #29, the to-do list and the inherited
+   defects, in [mechjeb-overhaul.md](../../issues/mechjeb-overhaul.md).
 3. **Stage stats** from the fuel-flow simulation (#311), once MechJeb can share it.
 
 ## Phase 1: the port

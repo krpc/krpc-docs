@@ -300,7 +300,8 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | 🚧 | RemoteTech API bindings and KAC alarm actions | [remotetech-kac-api.md](issues/remotetech-kac-api.md) | [services/kac-remotetech-tests-and-api.md](design/services/kac-remotetech-tests-and-api.md) |
 | ⬜ | InfernalRobotics input linking and sun tracking | [infernal-robotics-input-linking.md](issues/infernal-robotics-input-linking.md) | [services/infernal-robotics-input-linking.md](design/services/infernal-robotics-input-linking.md) |
 | 🚧 | Principia support; phase 1 shipped as a docs page, phases 2 and 3 wait on upstream | [#767](https://github.com/krpc/krpc/issues/767) | [services/principia-service.md](design/services/principia-service.md) |
-| ⬜ | MechJeb2 service follow-ups, after the port in #1326: phase 2 from KRPC.MechJeb #29, then stage stats from MechJeb's fuel-flow simulation | [#311](https://github.com/krpc/krpc/issues/311) | [services/mechjeb.md](design/services/mechjeb.md) |
+| ⬜ | MechJeb2 service overhaul, after the minimal port in #1326: the API layout, members from KRPC.MechJeb #29, `OperationEccentricity` and the to-do list modules, and the defects inherited from KRPC.MechJeb | [mechjeb-overhaul.md](issues/mechjeb-overhaul.md) | [services/mechjeb.md](design/services/mechjeb.md) |
+| ⬜ | MechJeb2 stage stats from MechJeb's fuel-flow simulation, once MechJeb can share it | [#311](https://github.com/krpc/krpc/issues/311) | [services/mechjeb.md](design/services/mechjeb.md) |
 | ⬜ | SCANsat phase 2: science experiments, background scanning, Breaking Ground surface features, survey waypoints | [mod-integrations-index.md](issues/mod-integrations-index.md) | [services/scansat.md](design/services/scansat.md) |
 | ⛔ | Per-thruster RCS control through IndividualRCS; a PR from an outside contributor | PR #1245 | — |
 
@@ -348,12 +349,6 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | C#: close the socket when a TCP/IP connect fails | [csharp-connect-socket-leak.md](issues/csharp-connect-socket-leak.md) | — |
 | ⬜ | C-nano: follow-ups to server side functions: generated functions, heap use, header opt-out, examples, testee cleanups | [cnano-functions-follow-ups.md](issues/cnano-functions-follow-ups.md) | — |
 | ⬜ | Websockets testee: defects found writing the design doc | [client-websockets-defects.md](issues/client-websockets-defects.md) | — |
-
-#### Services
-
-| | Item | Issue | Design doc |
-| --- | --- | --- | --- |
-| ⬜ | MechJeb: defects inherited from KRPC.MechJeb, and settings MechJeb 2.15 reads only under a condition the API cannot set | [mechjeb-inherited-defects.md](issues/mechjeb-inherited-defects.md) | [services/mechjeb.md](design/services/mechjeb.md) |
 
 #### Tests, build and CI
 
