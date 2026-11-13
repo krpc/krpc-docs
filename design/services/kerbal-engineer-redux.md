@@ -83,9 +83,9 @@ as TWR and time to atmosphere.
 
 | Struct | Fields |
 | --- | --- |
-| `Impact` | `UT`, `TimeTo`, `Latitude`, `Longitude`, `Altitude`, `Biome` |
+| `Impact` | `UT`, `TimeTo`, `Latitude`, `Longitude`, `Elevation`, `Biome` |
 | `SuicideBurn` | `UT`, `TimeTo`, `Altitude`, `DeltaV`, `Distance`, `Duration` |
-| `Stage` | `Number`, `DeltaV`, `TotalDeltaV`, `SpecificImpulse`, `Thrust`, `AvailableThrust`, `TWR`, `AvailableTWR`, `MaxTWR`, `StartMass`, `MassLost`, `ResourceMass`, `BurnTime`, `TotalBurnTime`, `MaxThrustTorque`, `ThrustOffsetAngle`, `RCSSpecificImpulse`, `RCSThrust`, `RCSStartDeltaV`, `RCSEndDeltaV`, `RCSStartTWR`, `RCSEndTWR`, `RCSBurnTime`, `StartCost`, `CostLost`, `StartPartCount`, `DroppedPartCount` |
+| `Stage` | `Number`, `DeltaV`, `TotalDeltaV`, `SpecificImpulse`, `Thrust`, `AvailableThrust`, `TWR`, `AvailableTWR`, `MaxTWR`, `StartMass`, `MassLost`, `ResourceMass`, `BurnTime`, `TotalBurnTime`, `AvailableThrustTorque`, `ThrustOffsetAngle`, `RCSSpecificImpulse`, `RCSThrust`, `RCSStartDeltaV`, `RCSEndDeltaV`, `RCSStartTWR`, `RCSEndTWR`, `RCSBurnTime`, `StartCost`, `CostLost`, `StartPartCount`, `DroppedPartCount` |
 | `BurnTime` | `Duration`, `HalfDuration` |
 | `Rendezvous` | `PhaseAngle`, `InterceptAngle`, `TimeToInterceptAngle`, `AngleToAscendingNode`, `AngleToDescendingNode`, `TimeToAscendingNode`, `TimeToDescendingNode` |
 
