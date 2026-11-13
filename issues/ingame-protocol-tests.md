@@ -12,7 +12,7 @@ Add a small in-game suite for these. It covers what `TestServer`, the conformanc
 |---|---|---|
 | The net472 transports on KSP's Mono: `System.Net.Sockets` and unix sockets | Mono's class libraries, not .NET's. For example, Mono leaves a socket file behind when a bound unix socket closes, and .NET removes it | TCP only |
 | `ConfigurationFile` loading `settings.cfg`, then `Configuration.Server.Create` | `TestServer` builds its servers directly from its command line, so the settings keys and their parsing are unused | TCP only |
-| `Addon` auto-starting several servers and accepting clients | `TestServer` has its own loop and always accepts. `Core.StartAll` stops at the first server that fails, so one bad server blocks the ones listed after it | One server |
+| `Addon` auto-starting several servers and accepting clients | `TestServer` has its own loop and always accepts. `Core.StartAll` tries every server since #1330, so one bad server no longer blocks the ones listed after it | One server |
 | Servers across scene changes | `Addon` is created again at each scene change, and the servers it holds statically keep running | Over TCP only |
 | `NoGameAddon` stopping the servers at the main menu, and `Addon` starting them on the next load | Each server stops and binds again on Mono. A local socket binds over its stale socket file | None |
 

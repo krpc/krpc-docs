@@ -29,4 +29,4 @@ Only the Python guide says that the procedures of the `KRPC` service cannot be c
 ## Questions
 
 * Should a run-time client's `get_call` be split from the call `add_stream` uses, so that it can raise on the client? The server's error already names the procedure and the reason, so this proposal leaves it as is.
-* Does dropping the C++ functions count as a breaking change? They compile today, and only ever produce a call the server rejects in a function.
+* Does dropping the C++ functions count as a breaking change? They compile today, and only ever produce a call the server rejects in a function. Ruled 2026-11-13: a clean break, with a `**Breaking:**` changelog entry and no deprecation, in C++ and C-nano alike. A program that uses one already fails at run time, and now fails to compile. The C-nano functions ship in 0.8 for the same reason.

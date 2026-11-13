@@ -22,7 +22,7 @@ Finished items are collapsed under **Done** in each section.
 | | Release | Theme | Progress |
 | --- | --- | --- | --- |
 | ✅ | [0.7](#07-server-side-functions-streams-and-events-service-improvements) | Server-side functions, streams and events, protocol additions, service improvements | Tagged 2026-10-21 |
-| 🚧 | [0.8](#08-single-connection-client-codegen-then-client-conformance-and-thread-safety) | Single connection, client codegen, then client conformance testing and thread safety | 24 of 31 features done |
+| 🚧 | [0.8](#08-single-connection-client-codegen-then-client-conformance-and-thread-safety) | Single connection, client codegen, then client conformance testing and thread safety | 26 of 31 features done |
 | ⬜ | [1.0](#10-remaining-protocol-improvements-server-side-function-follow-ups) | Remaining protocol improvements (#906), server side function follow-ups | 0 of 9 done; tick control has a 0.7 stopgap |
 
 ## 0.7: server-side functions, streams and events, service improvements
@@ -100,16 +100,14 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 
 | | Feature | Issue | Design doc |
 | --- | --- | --- | --- |
-| 🚧 | Client name collisions: a scanner rule banning clashing member names, a contract for client naming, the clashing `ConfigNode` methods removed (done: #1261, #1273) | [#1237](https://github.com/krpc/krpc/issues/1237) | [protocol/service-definition-rules.md](design/protocol/service-definition-rules.md), [protocol/client-naming.md](design/protocol/client-naming.md) |
 | 🚧 | Scanner errors disable only the broken members, listed in one popup with the mods the mod integration framework disabled | [#1227](https://github.com/krpc/krpc/issues/1227) | [server/partial-loading.md](design/server/partial-loading.md), [server/problem-reporting.md](design/server/problem-reporting.md) |
 | 🚧 | Mod integration framework, refactoring first: one registry in `service/` for the services and mods, a build macro, test helpers in krpctools, one binding layer, `ModAPI` loaded at startup, `RequiresMod` in place of `CheckAPI`, tested mod versions in the docs. All seven phases built and checked in game, as three stacked branches for three PRs: `service-registry` (phases 1, 2), `mod-api` (3, 4), `requires-mod` (5 to 7); not yet submitted | [mod-integration-framework.md](issues/mod-integration-framework.md) | [services/mod-integration-framework/](design/services/mod-integration-framework/README.md) |
-| 🚧 | Python: build every service from the server's definitions, with generated declarations for type checking; removes `use_pregenerated_stubs` and replaces the Python part of #1195. Phases 1 to 2b merged, and three phase 3 follow-ups: typed function compiler, `definitions` and `declarations` conformance profiles, pyright on the generated modules. Open: `<Service>Client` escaped, `--bundle`, a connect per game | [python-declarations.md](issues/python-declarations.md), PRs #1298, #1302, #1303, #1304, #1305, #1306, #1307 | [python-declarations.md](design/python-declarations.md) |
 | 🚧 | JavaScript client for the browser, on WebSockets, in phases. Phases 1 to 6, the function compiler included, implemented, not yet submitted. Phase 7: links in the server forms and npm publishing done; a first Windows CI run and the submission to do | — | [javascript-client.md](design/javascript-client.md) |
 | 🚧 | Server side functions: `Match` and `Switch` statements, before the JavaScript compiler's statements; then Python `match`. The statements merged in #1334; Python `match` built on branch `python-match`, not yet submitted | [switch-statements.md](issues/switch-statements.md) | [server-side-functions/switch.md](design/server-side-functions/switch.md) |
 | 🚧 | Name case conversion: one specified algorithm per case style, followed and tested by every client, so `UInt64` is `uint64` and Java enumeration constants match the docs. Breaking renames, so in 0.8. Phases 1 to 4 built on branch `name-casing`, not yet submitted; phase 5 waits for the JavaScript client | — | [protocol/name-case-conversion.md](design/protocol/name-case-conversion.md) |
 
 <details>
-<summary>Done (24)</summary>
+<summary>Done (26)</summary>
 
 | | Feature | Issue | Design doc |
 | --- | --- | --- | --- |
@@ -137,6 +135,8 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 | ✅ | Kerbal Engineer Redux service: impact, suicide burn, staged simulation in flight and the editor, burn times, rendezvous angles; service id 15 by #1329 | [#288](https://github.com/krpc/krpc/issues/288), fixed by #1327 | [services/kerbal-engineer-redux.md](design/services/kerbal-engineer-redux.md) |
 | ✅ | SCANsat service: coverage, readouts, anomalies, scanners, maps; service id 16 by #1329. Phase 2 is not scheduled | [mod-integrations-index.md](issues/mod-integrations-index.md), done by PR #1328 | [services/scansat.md](design/services/scansat.md) |
 | ✅ | Raster Prop Monitor service: persistent variables, variable reads, monitor pages, buttons, text and images, script-drawn displays, camera views | [#424](https://github.com/krpc/krpc/issues/424), fixed by #1335; [#375](https://github.com/krpc/krpc/issues/375), **close** | [services/raster-prop-monitor.md](design/services/raster-prop-monitor.md) |
+| ✅ | Client name collisions: the clashing `ConfigNode` methods removed, and a contract for client naming. The member key rule is not scheduled | [#1237](https://github.com/krpc/krpc/issues/1237), **remove milestone**; done by #1261, #1273 | [protocol/service-definition-rules.md](design/protocol/service-definition-rules.md), [protocol/client-naming.md](design/protocol/client-naming.md) |
+| ✅ | Python: build every service from the server's definitions, with generated declarations for type checking; removes `use_pregenerated_stubs` and replaces the Python part of #1195. Phases 1 to 2b, and three phase 3 follow-ups: typed function compiler, `definitions` and `declarations` conformance profiles, pyright on the generated modules. The other follow-ups are not scheduled | [python-declarations.md](issues/python-declarations.md), done by PRs #1298, #1302, #1303, #1304, #1305, #1306, #1307 | [python-declarations.md](design/python-declarations.md) |
 
 </details>
 
@@ -193,21 +193,15 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 
 | | Item | Issue | Design doc |
 | --- | --- | --- | --- |
-| 🚧 | Scanner rules for service, type, parameter and enumeration value names, and the C++ helper names. Service and type names done by PRs #1324, #1325; parameters, enumeration values and helper keys open | [clientgen-qualified-names.md](issues/clientgen-qualified-names.md) | [protocol/service-definition-rules.md](design/protocol/service-definition-rules.md) |
-| 🚧 | Clients: escape a service or type name that meets a client's own name. Member names kept clear of the names in generated code built on branch `generated-object-name`, not yet submitted; service and type escapes open | [client-name-escapes.md](issues/client-name-escapes.md) | [protocol/client-reserved-names.md](design/protocol/client-reserved-names.md) |
-| ⬜ | Clients: calls that cannot go in a server side function | [calls-a-function-cannot-make.md](issues/calls-a-function-cannot-make.md) | — |
 | ⬜ | Clients: check whether a per-element function needs a real instance | [call-with-arguments-template.md](issues/call-with-arguments-template.md) | [server-side-functions/server-side-functions.md](design/server-side-functions/server-side-functions.md) |
-| ⬜ | In-game tests for local sockets and server restarts, for what `TestServer` and the unit tests do not reach | [ingame-protocol-tests.md](issues/ingame-protocol-tests.md) | — |
 | 🚧 | Update the `krpc` and `krpc-cnano` vcpkg ports for 0.8.0: MIT licenses, copyright files, every C-nano transport (done in the repo: #1275, #1281; publishing waits on the release) | [vcpkg-ports-0-8.md](issues/vcpkg-ports-0-8.md) | — |
 | ⬜ | Docs: refresh the third-party projects page: a community note, listings by PR or Discord, a one-time prune | [docs-third-party-page.md](issues/docs-third-party-page.md) | — |
 | ⬜ | Docs: service index pages without the "API" suffix, each with an example showing the service's name in each client, and one page for a small service | [docs-service-index-pages.md](issues/docs-service-index-pages.md) | — |
 | 🚧 | Testing tools: `--load-craft` launches with the craft's default crew, in place of none. Built on branch `service-registry` (mod integration framework part 2a) and checked in game, not yet submitted | [testing-tools-load-craft-crew.md](issues/testing-tools-load-craft-crew.md) | — |
-| ⬜ | In-game tests: keep each game's log in a folder per run, in place of the one `KSP.log` each launch overwrites | [ingame-test-saved-logs.md](issues/ingame-test-saved-logs.md) | — |
-| ⬜ | In-game tests: fewer scene loads per test class, as most classes reload the save and then launch, about 10 s each | [ingame-test-scene-loads.md](issues/ingame-test-scene-loads.md) | — |
 | ⬜ | SpaceCenter: `Vessel.Name` returns the display name, in place of a localization key for stock craft | [vessel-name-localization.md](issues/vessel-name-localization.md) | — |
 
 <details>
-<summary>Done (26)</summary>
+<summary>Done (27)</summary>
 
 | | Item | Issue | Design doc |
 | --- | --- | --- | --- |
@@ -237,6 +231,7 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 | ✅ | Clients: `Connection` for the entry point in every client, with `Transport` for the layer under it and `Remote<Kind>` for the generated bases; breaking | [client-class-names.md](issues/client-class-names.md), done by PR #1332 | — |
 | ✅ | Clients: one shape for errors, with a `RemoteError` base and a subclass per category; type ids (E0) in #1324; breaking | [client-errors.md](issues/client-errors.md), done by PR #1333 | [client-errors.md](design/client-errors.md) |
 | ✅ | Server side functions: name types, exceptions and fields by id, and the C-nano examples with them | [function-api-by-id.md](issues/function-api-by-id.md), done by PR #1336 | [client-errors.md](design/client-errors.md#type-ids) |
+| ✅ | Scanner rules for service and type names: unique case-insensitively, and no type named as its service. The parameter, enumeration value and helper key rules are not scheduled | [clientgen-qualified-names.md](issues/clientgen-qualified-names.md), done by PRs #1324, #1325 | [protocol/service-definition-rules.md](design/protocol/service-definition-rules.md) |
 
 </details>
 
@@ -290,6 +285,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | Lua: pre-generated type hints, LuaCATS annotations first, as the Python declarations | [lua-type-hints.md](issues/lua-type-hints.md) | [python-declarations.md](design/python-declarations.md) |
 | ⬜ | MicroPython client, for boards such as the Raspberry Pi Pico; first check that generated stubs fit | [micropython-client.md](issues/micropython-client.md) | — |
 | ⬜ | JavaScript client after 0.8: browser test runs, pages served by the mod with an origin check, TLS (`wss://`), Node.js transports after checking the local socket on Windows | — | [javascript-client.md](design/javascript-client.md) |
+| ⬜ | Python declarations follow-ups: escape a class named `<Service>Client`, `krpc-clientgen python --bundle`, a connect per game before the KSA client types | [python-declarations.md](issues/python-declarations.md) | [python-declarations.md](design/python-declarations.md) |
 
 #### Services and mod integrations
 
@@ -316,6 +312,8 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | Find out what users see with a mismatched client, server or service, per client; document the symptoms in the docs | [client-server-mismatch.md](issues/client-server-mismatch.md) | [protocol-compatibility.md](design/protocol-compatibility.md) |
 | ⬜ | Release what a yielded call holds when its client disconnects; `ScanSat.Map` leaks a map | [yielded-call-cleanup.md](issues/yielded-call-cleanup.md) | — |
 | ⬜ | Compiled delegates for the KSA control inputs; waits on a `KRPC.Core` release with `Accessor` | [ksa-control-inputs-delegates.md](issues/ksa-control-inputs-delegates.md) | — |
+| ⬜ | Scanner rules for parameter names, enumeration value names and C++ helper keys; no bundled service breaks them | [clientgen-qualified-names.md](issues/clientgen-qualified-names.md) | [protocol/service-definition-rules.md](design/protocol/service-definition-rules.md) |
+| ⬜ | Scanner rule for member keys, compared case-insensitively; no bundled service breaks it | [#1237](https://github.com/krpc/krpc/issues/1237) | [protocol/service-definition-rules.md](design/protocol/service-definition-rules.md) |
 
 #### Client spec and conformance
 
@@ -349,6 +347,8 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | C#: close the socket when a TCP/IP connect fails | [csharp-connect-socket-leak.md](issues/csharp-connect-socket-leak.md) | — |
 | ⬜ | C-nano: follow-ups to server side functions: generated functions, heap use, header opt-out, examples, testee cleanups | [cnano-functions-follow-ups.md](issues/cnano-functions-follow-ups.md) | — |
 | ⬜ | Websockets testee: defects found writing the design doc | [client-websockets-defects.md](issues/client-websockets-defects.md) | — |
+| ⬜ | Clients: calls that cannot go in a server side function | [calls-a-function-cannot-make.md](issues/calls-a-function-cannot-make.md) | — |
+| 🚧 | Clients: escape a service or type name that meets a client's own name; no official client collides today. Member names kept clear of the names in generated code built on branch `generated-object-name`, not yet submitted; service and type escapes open | [client-name-escapes.md](issues/client-name-escapes.md) | [protocol/client-reserved-names.md](design/protocol/client-reserved-names.md) |
 
 #### Tests, build and CI
 
@@ -358,6 +358,9 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | NUnit 5 | [nunit-5-migration.md](issues/nunit-5-migration.md) | [build-tools/nunit-5-migration.md](design/build-tools/nunit-5-migration.md) |
 | ⬜ | Windows CI: C-nano serial transport tests, over a named pipe | [#1200](https://github.com/krpc/krpc/issues/1200) | — |
 | ⬜ | Build `KRPC.IO.Ports` from source in the net472 `KRPC.Core`, in place of the prebuilt DLL | [core-serial-ports.md](issues/core-serial-ports.md) | — |
+| ⬜ | In-game tests for local sockets and server restarts, for what `TestServer` and the unit tests do not reach | [ingame-protocol-tests.md](issues/ingame-protocol-tests.md) | — |
+| ⬜ | In-game tests: keep each game's log in a folder per run, in place of the one `KSP.log` each launch overwrites | [ingame-test-saved-logs.md](issues/ingame-test-saved-logs.md) | — |
+| ⬜ | In-game tests: fewer scene loads per test class, as most classes reload the save and then launch, about 10 s each | [ingame-test-scene-loads.md](issues/ingame-test-scene-loads.md) | — |
 
 ### Negative results
 

@@ -1,6 +1,6 @@
 # Python: generated declarations and dynamic services
 
-**Status:** in progress, for 0.8. Phase 1 in #1298, phase 2 in #1302, phase 2b in #1303 and #1304, and two phase 3 follow-ups in #1305 and #1306; the other follow-ups are open. Issue: [python-declarations.md](../issues/python-declarations.md).
+**Status:** in progress. In 0.8: phase 1 in #1298, phase 2 in #1302, phase 2b in #1303 and #1304, and three phase 3 follow-ups in #1305, #1306 and #1307. The other follow-ups are not scheduled. Issue: [python-declarations.md](../issues/python-declarations.md).
 
 The Python client has two implementations of every service: generated stubs and services built from `GetServices`. A stub that lacks a member has a third path, `merge_service`, which adds the member to a per-client subclass. This doc replaces them with one implementation, always built from the server's definitions, plus generated modules that carry the type information.
 
