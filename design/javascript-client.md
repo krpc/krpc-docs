@@ -876,3 +876,6 @@ Ruled out:
   supports Windows with caveats.
 - **npm publishing.** The release builds the tarball as a GitHub asset. Publishing it to npm under
   `@krpc-org` is a release step still to add.
+- **Links in the server forms.** The server forms of 6c reuse the client's documentation comments,
+  so a link to a property names its getter, as `Vessel.getMass`. Clientgen parses each comment once,
+  for the client form.

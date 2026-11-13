@@ -1,6 +1,8 @@
 # Switch statements in server side functions
 
-**Status:** proposal. A follow-up to server side functions, which merged in #1124 to #1130. Issue:
+**Status:** in progress. `Switch` and `SwitchWithFallThrough` are implemented as designed, not yet
+submitted, and the JavaScript compiler compiles `switch` to `SwitchWithFallThrough`. Python `match`
+is still to do. A follow-up to server side functions, which merged in #1124 to #1130. Issue:
 [switch-statements.md](../../issues/switch-statements.md). Needed by phase 6 of the
 [JavaScript client](../javascript-client.md#phase-6-function-compiler), and lands before it.
 
