@@ -194,22 +194,15 @@ Written as fixed, though the client still fails the test:
 
 ## Drafted issues
 
-- [spec-callback-thread-per-connection.md](../../issues/spec-callback-thread-per-connection.md):
-  guarantee one callback thread per connection.
+- [conformance-spec-rulings.md](../../issues/conformance-spec-rulings.md): one callback thread per
+  connection, with the other open spec rulings.
 - [client-api-reference-autodoc.md](../../issues/client-api-reference-autodoc.md): generate each
   client's API reference from its source.
-
-The conformance review (2026-10-29) left four driver items, each drafted as an issue:
-
-- [conformance-serial-settle-time.md](../../issues/conformance-serial-settle-time.md): wait for
-  the serial link instead of a fixed second.
-- [conformance-wait-until-polls.md](../../issues/conformance-wait-until-polls.md): wake waits on
-  the testee's notifications.
-- [conformance-settle-sleeps.md](../../issues/conformance-settle-sleeps.md): race points for a value
-  queued during a first call, now with the other guessed sleeps.
-- [conformance-self-removing-callback.md](../../issues/conformance-self-removing-callback.md): a
-  driver helper for a callback that runs a command on itself.
-
+- The conformance review (2026-10-29) left four driver items. The serial link, the notification
+  waits and the self-removing callback are in
+  [conformance-driver.md](../../issues/conformance-driver.md). The race points for a value queued
+  during a first call, with the other guessed sleeps, are in
+  [conformance-race-points.md](../../issues/conformance-race-points.md).
 
 ## C-nano Decoder Tests Patch
 

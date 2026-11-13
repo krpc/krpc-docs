@@ -71,4 +71,4 @@ Serial accepts one client at a time, so its tests run in sequence and each close
 
 [core-serial-ports.md](core-serial-ports.md) moves `KRPC.IO.Ports` into `KRPC.Core`. Landing this suite first gives that move a test of its behavior in the game. It also needs to settle the socat question that issue raises: the stock serial class is expected to fail on a pty, and this suite would show it.
 
-[conformance-serial-settle-time.md](conformance-serial-settle-time.md) has an open question about what a serial client must wait for, and the serial tests here may hit the same wait.
+[conformance-driver.md](conformance-driver.md) has an open question about what a serial client must wait for, and the serial tests here may hit the same wait.

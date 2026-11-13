@@ -292,15 +292,10 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 
 | | Item | Issue | Design doc |
 | --- | --- | --- | --- |
-| ⬜ | Conformance: coverage gaps found writing the client design docs, and the tracker for the other conformance items | [conformance-coverage-gaps.md](issues/conformance-coverage-gaps.md) | [client-conformance/](design/client-conformance/README.md) |
-| ⬜ | Client spec: rule on the behavior clients differ on | [conformance-spec-rulings.md](issues/conformance-spec-rulings.md) | [client-conformance/spec.md](design/client-conformance/spec.md) |
-| ⬜ | Client spec: one callback thread per connection | [spec-callback-thread-per-connection.md](issues/spec-callback-thread-per-connection.md) | [client-conformance/spec.md](design/client-conformance/spec.md) |
-| ⬜ | Conformance: skipped arguments in a call built for a server side function, after [#1267](https://github.com/krpc/krpc/issues/1267) | [conformance-skipped-arguments-get-call.md](issues/conformance-skipped-arguments-get-call.md) | — |
-| ⬜ | Race points for the C# and Python clients, for the conformance `races` profile | [conformance-forced-races.md](issues/conformance-forced-races.md) | [client-conformance/harness.md](design/client-conformance/harness.md) |
-| ⬜ | Conformance: a driver helper for a callback that runs a command on itself | [conformance-self-removing-callback.md](issues/conformance-self-removing-callback.md) | [client-conformance/harness.md](design/client-conformance/harness.md) |
-| ⬜ | Conformance: replace guessed sleeps with forced orders | [conformance-settle-sleeps.md](issues/conformance-settle-sleeps.md) | [client-conformance/harness.md](design/client-conformance/harness.md) |
-| ⬜ | Conformance: wake waits on the testee's notifications | [conformance-wait-until-polls.md](issues/conformance-wait-until-polls.md) | [client-conformance/harness.md](design/client-conformance/harness.md) |
-| ⬜ | Conformance: wait for the serial link instead of a fixed second | [conformance-serial-settle-time.md](issues/conformance-serial-settle-time.md) | [client-conformance/harness.md](design/client-conformance/harness.md) |
+| ⬜ | Client spec: rule on the behavior clients differ on, starting with one callback thread per connection, and add the tests | [conformance-spec-rulings.md](issues/conformance-spec-rulings.md) | [client-conformance/spec.md](design/client-conformance/spec.md) |
+| ⬜ | Conformance: coverage gaps, including skipped arguments in a call built for a server side function | [conformance-coverage-gaps.md](issues/conformance-coverage-gaps.md) | [client-conformance/](design/client-conformance/README.md) |
+| ⬜ | Conformance: race points in C# and Python, then forced orders in place of guessed sleeps | [conformance-race-points.md](issues/conformance-race-points.md) | [client-conformance/harness.md](design/client-conformance/harness.md) |
+| ⬜ | Conformance driver: notification waits, the serial link wait, a self-removing callback helper | [conformance-driver.md](issues/conformance-driver.md) | [client-conformance/harness.md](design/client-conformance/harness.md) |
 
 #### Clients
 
