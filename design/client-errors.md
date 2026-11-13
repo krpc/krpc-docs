@@ -1,8 +1,8 @@
 # Client errors
 
 **Status:** in progress. Phases E1 to E4 are built, with no PR yet, and the build departs from
-this design as [Deviations](#deviations) lists. Issue:
-[client-errors.md](../issues/client-errors.md).
+this design as [Deviations](#deviations) lists. [Exception ids](#exception-ids), phase E0, and
+[C-nano](#c-nano), phase E5, are a proposal. Issue: [client-errors.md](../issues/client-errors.md).
 
 The errors each client raises grew one client at a time. They differ in their names, their bases,
 which situations raise which error, and whether a program can catch a whole category. The
@@ -170,7 +170,7 @@ Two of `StreamError`'s situations are narrow:
 | C# | `System.Exception` | .NET has no runtime and logic split, and its guidance is to derive `Exception`, not `ApplicationException` |
 | JavaScript, planned | `Error` | Custom errors extend `Error` |
 | Lua | none, a `pl.class` class | Lua errors are any value, see below |
-| C-nano | none | Error codes, unchanged, see below |
+| C-nano | none | Error codes, see [C-nano](#c-nano) |
 
 Java's `krpc.client.RemoteException` shares its name with the checked `java.rmi.RemoteException`.
 The package tells them apart, and kRPC programs do not use RMI.
@@ -212,13 +212,6 @@ program tells the categories apart only by matching the text. It raises objects 
 
 Strings with a category prefix were the alternative. They keep string handling working, but leave
 `status`, `reason` and the cause as text to parse.
-
-### C-nano: no change
-
-C-nano returns a distinct `krpc_error_t` per category already: the connection codes,
-`KRPC_ERROR_RPC_FAILED` and the encoding and decoding codes. `KRPC_ERROR_BUFFER_TOO_SMALL` and
-`KRPC_ERROR_NO_RESULTS` report the program's use of the API, and stay. It has no streams, so it
-needs no stream error. Streams in C-nano would add a stream code, which is additive.
 
 ### Messages
 
@@ -279,6 +272,183 @@ What each situation raises under this proposal, against the spec's kind today.
 | A wait that times out | returns false | returns false |
 | A deprecated member | a warning, no error | a warning |
 
+## C-nano
+
+C-nano returns a `krpc_error_t` from every function. It follows the pattern above with codes in
+place of types: one code per category, and a last-error record for what an error object carries.
+Each detail costs flash or RAM on a microcontroller, so the program picks how much the library
+keeps.
+
+### What C-nano does today
+
+- **Categories span several codes.** A connection error is any of four codes, and an encoding
+  error either of two.
+- **A server error is only text.** The service, name and description share one message buffer,
+  kept only under `KRPC_ERROR_MESSAGES`. A program tells exceptions apart by parsing it.
+- **Connection details are lost.** A refused status, a disconnect reason and the server's message
+  go only to `KRPC_PRINT_ERROR`. A transport's failure carries no text.
+- **Some situations take the wrong code.** A failed handshake write is `KRPC_ERROR_ENCODING_FAILED`,
+  a local socket path too long is `KRPC_ERROR_IO`, and a failed allocation is an encoding or
+  decoding failure.
+- **Default builds still parse a server error.** With no messages, the `Error` is decoded with
+  no callbacks, which links its descriptor for nothing.
+
+### Codes
+
+| Code | Category | Replaces |
+| --- | --- | --- |
+| `KRPC_ERROR_CONNECTION` | `ConnectionError` | `_CONNECTION_FAILED`, `_CONNECTION_REFUSED`, `_NO_RESULTS`, and `_IO` and `_EOF` from a library function |
+| `KRPC_ERROR_SERVER` | `ServerError`, and every server exception, mapped or not | `_RPC_FAILED` |
+| `KRPC_ERROR_ENCODING` | `EncodingError` | `_ENCODING_FAILED`, `_DECODING_FAILED` |
+| `KRPC_ERROR_ARGUMENT` | native argument error | `_IO` for a path too long, `_ENCODING_FAILED` for a null or missing argument |
+| `KRPC_ERROR_NO_MEMORY` | native out of memory error | `_ENCODING_FAILED` and `_DECODING_FAILED` for a failed allocation |
+| `KRPC_ERROR_BUFFER_TOO_SMALL` | native argument error, kept apart | unchanged |
+| `KRPC_ERROR_IO`, `KRPC_ERROR_EOF` | transport only | unchanged |
+
+- **One code per category a program handles differently** (principle 3). A program reconnects on
+  `KRPC_ERROR_CONNECTION`, in place of testing four codes.
+- **`_IO` and `_EOF` belong to transports.** A transport's `read`, `write` and `close` return
+  them, as do `krpc_read` and `krpc_write`. A library function that gets one returns
+  `KRPC_ERROR_CONNECTION`, with the transport's code as the cause. Custom transports stay as they
+  are.
+- **A response without one result is a protocol error.** It ends the session as an unexpected
+  message does, so `_NO_RESULTS` goes.
+- **`_BUFFER_TOO_SMALL` stays apart from the argument error.** A program handles it by retrying
+  with a larger buffer.
+- **A mapped server exception is a server error.** C has no native error types, so its service
+  and exception ids tell it apart, as for any other exception.
+- **No remote error base.** Every code other than `KRPC_OK` is an error of the library, so the
+  conventions file names no remote error type, as today.
+- **A clean break** (principle 6). The old names go, with no aliases, and the values are
+  renumbered from -2. Programs use the names. -1 is no code, so it can mark a field of the
+  [last error](#the-last-error) that does not apply.
+
+### The last error
+
+```c
+typedef struct {
+  krpc_error_t code;   /* The code the failing function returned */
+  krpc_error_t cause;  /* KRPC_ERROR_IO or KRPC_ERROR_EOF behind a connection error, else -1 */
+  uint32_t service;    /* The id of the service of the server's exception, else 0 */
+  uint32_t exception;  /* The id of the exception within its service, else 0 */
+  int16_t status;      /* The ConnectionResponse status of a refused connection, else -1 */
+  int16_t reason;      /* The Disconnect reason of an ended connection, else -1 */
+} krpc_error_info_t;
+
+const krpc_error_info_t* krpc_get_error_info(void);
+const char* krpc_get_error_message(void);
+```
+
+- **One record, filled on each failure,** as `errno` is. A success leaves it as it was. C-nano
+  runs one session at a time on the calling thread, so one static record serves.
+- **The fields are those of the other clients' errors.** `status` and `reason` as they are,
+  `service` and `exception` for the service and name, and `cause` for the chained error.
+- **A field that does not apply is -1.** `KRPC_OK` and the `OK` status would read as a cause or a
+  status of success, and `CLOSED`, the reason 0, is a real reason. `service` and `exception`
+  are unsigned, and 0 is never an id, so they take 0.
+- **Values the protocol does not define are kept,** so an unknown status or reason reaches the
+  program as its number.
+
+A program checks for one exception after a failed call:
+
+```c
+krpc_error_t error = krpc_SpaceCenter_Load(conn, "missing");
+if (error == KRPC_ERROR_SERVER && KRPC_IS_EXCEPTION(KRPC_EXCEPTION_KRPC_ARGUMENTEXCEPTION))
+  printf("No such save\n");
+```
+
+### Exception ids
+
+The server names an exception by its `service` and `name` strings. Comparing them would put the
+names in flash, which [procedure-ids.md](protocol/procedure-ids.md) avoided for calls. Exceptions
+get ids by the same rule:
+
+- **id = the first 4 bytes of SHA-256 of the exception's name,** read as a little-endian
+  `uint32`, as for a procedure. An `Id` on `[KRPCException]` sets one by hand.
+- **Ids are per service,** as procedure ids are. Third party services name exceptions
+  independently, so one id space for the server could clash between them. The service id
+  scopes the exception id, and a clash within one service is fixed by that service's author.
+- **A shared id or an id of 0 within a service is a scanner error,** as for procedures.
+- **`KRPC.Exception` gains `uint32 id = 6`,** which `GetServices` reports, so clientgen never
+  hashes. **`KRPC.Error` gains `uint32 service_id = 5` and `uint32 exception_id = 6`,** 0 for an
+  error with no exception. The fields are additive under protocol version 2. The other clients
+  ignore them, and keep matching by name.
+- **clientgen defines the ids per exception,** as the pair `service_id, exception_id` in
+  `KRPC_EXCEPTION_<SERVICE>_<NAME>`. `KRPC_IS_EXCEPTION(KRPC_EXCEPTION_...)` compares the pair
+  with the last error's `service` and `exception`.
+
+Hashing the strings in the client, with a small hash such as FNV-1a, was the alternative. It needs
+no protocol change, but puts a hash routine and two string callbacks in flash. It also adds a
+second hash rule, against the ruling that consumers never hash.
+
+### Detail levels
+
+| Level | Define | The library keeps | Cost |
+| --- | --- | --- | --- |
+| Codes | `KRPC_ERROR_CODES_ONLY` | the returned code | none. A response's error is skipped unparsed, so the `Error` descriptor is not linked |
+| Details | none, the default | the last-error record | the record, 16 bytes of RAM on AVR, and a few stores at each failure |
+| Messages | `KRPC_ERROR_MESSAGES` | the record and the message | `KRPC_ERROR_MESSAGE_LENGTH` bytes of RAM, and each sentence in flash |
+
+- **Details is the default.** An Uno sketch nearly always has 16 bytes to spare, and a sketch
+  that needs them defines `KRPC_ERROR_CODES_ONLY`.
+- **The library reads the level when it compiles,** as it reads `KRPC_ERROR_MESSAGES` today. The
+  `KRPC_CHECK` options are unchanged.
+- **One macro at each failure site,** `KRPC_FAIL(CONNECTION, "Connection failed")`, fills what
+  the level keeps. Below Messages, the sentence is not compiled. `KRPC_PRINT_ERRORS_TO_STDERR`
+  prints the same sentence, so the library has one set of strings.
+- **On AVR, the sentences stay in flash.** A plain literal is copied to RAM at startup, so they
+  are `PSTR` strings, copied into the buffer with `strcpy_P`.
+- **The phase measures each level** in flash and RAM for an Uno build, and the guide states the
+  figures.
+
+### Messages in C-nano
+
+Under `KRPC_ERROR_MESSAGES`, the [message rule](#messages) applies: a sentence, then the cause's
+text after a colon.
+
+- **A server error** is `Service.Name: description`, then the stack trace, as now. C has no type
+  to name the exception, so the qualified name stays in front. An empty description keeps the
+  `: ` after the name, which today is dropped.
+- **A refused connection or a disconnect** is the sentence, then the server's message.
+- **A transport gives its failure's text** with `krpc_set_error_cause(const char* message)`,
+  before it returns `KRPC_ERROR_IO`. The bundled transports pass the system's text on hosted
+  targets, from `strerror` or `FormatMessage`. The function is empty below Messages, and is
+  always defined, as a custom transport compiles apart from the library.
+- **The buffer cuts a long message,** as now. `test_whole_message` stays an expected failure for
+  that reason.
+
+### Situations in C-nano
+
+| Situation | Code | Details |
+| --- | --- | --- |
+| An open fails: no address, no endpoint, a port that will not open | `KRPC_ERROR_CONNECTION` | `cause` |
+| A local socket path too long for a socket address | `KRPC_ERROR_ARGUMENT` | – |
+| The server refuses the connection | `KRPC_ERROR_CONNECTION` | `status` |
+| A `disconnect` from the server, in the handshake or during a call | `KRPC_ERROR_CONNECTION` | `reason` |
+| A read or write fails, or the connection ends, including in the handshake | `KRPC_ERROR_CONNECTION` | `cause` |
+| A call after the session ended, or on a connection whose open failed | `KRPC_ERROR_CONNECTION` | – |
+| An unexpected or malformed message, or a response without one result | `KRPC_ERROR_CONNECTION` | – |
+| A server error | `KRPC_ERROR_SERVER` | `service` and `exception`, 0 for an error of the whole request |
+| An argument or result that fails to encode or decode | `KRPC_ERROR_ENCODING` | – |
+| A null string or bytes argument, or an argument index the call lacks or left unset | `KRPC_ERROR_ARGUMENT` | – |
+| A failed allocation | `KRPC_ERROR_NO_MEMORY` | – |
+| Bytes longer than the program's buffer | `KRPC_ERROR_BUFFER_TOO_SMALL` | – |
+
+### Testing C-nano
+
+- **The testee maps codes to kinds:** the connection, server and encoding codes to their kinds,
+  and the argument and buffer codes to `ARGUMENT`. It reports `status` and `reason` from the
+  record, and the service and name from a table of the generated `KRPC` and `TestService` macros.
+- **C-nano takes the `error-types` profile.** The testee reports the generated macro of an
+  exception as its type. A test the profile holds that C cannot express goes in
+  `unsupported.txt`.
+- **The testee builds at Messages,** as it does today. A native test builds the library at Codes,
+  and checks the code of a failed call.
+- **Expected failures this clears:** `test_exception_name`, `test_handshake_refused[*]`,
+  `test_handshake_unknown_status`, `test_handshake_disconnect`, `test_lost[disconnect]`,
+  `test_failed_write`, `test_handshake_failed_write`, `test_description[empty]` and
+  `test_null_for_non_nullable[string]`.
+
 ## What each client does today
 
 From an audit of the clients on 2026-11-10, and a review against the code. **Bold** is where a
@@ -300,19 +470,22 @@ client differs from the proposal.
 
 Lua raises strings, which [Lua: error objects](#lua-error-objects) replaces. Its errors carry the
 caller's source position in front, which about 30 expected failures list. C-nano returns error
-codes, which stay.
+codes, see [What C-nano does today](#what-c-nano-does-today).
 
 ## Phases
 
-Each phase is one commit, with its conformance tests. The phases land together with the work
-that makes the clients consistent in naming and structure, in one pull request.
+Each phase is one commit, with its conformance tests. E0 lands first, in a pull request of its
+own off `main`. E1 to E5 land together with the work that makes the clients consistent in naming
+and structure, in one pull request.
 
 | Phase | Change |
 | --- | --- |
+| E0 | Exception ids. The hash, the `Id` on `[KRPCException]` and the scanner error for a shared or 0 id within a service. `KRPC.Exception.id` in `GetServices`, `KRPC.Error.service_id` and `exception_id` on every server error, and the servicedefs JSON. The protocol and extending docs |
 | E1 | Spec and testees. The categories, which situations raise which, the argument and encoding split, `StreamError` for every removal, the message rule, and no raw internal error. Tests narrowed from "encoding or argument" (`test_codec.py`, `test_values.py`), from "connection or argument" (`test_localsocket_path_too_long`), and from "a type of its own" in `test_mapped_exceptions`. A conventions section naming each client's `RemoteError` type, which the testees report in `native_types`; the Python testee reports kRPC types as well as builtins. Each testee classifies by the new types. The `TIMEOUT` kind goes, its number reserved. Clients that fail a narrowed test list it until their phase |
 | E2 | Python and C++. `RemoteError` under `RuntimeError` and `std::runtime_error`. `RPCError` renamed `ServerError`, the base of every generated exception with no native type. `FunctionCompilationError` renamed `CompilationError`. C++ mapped exceptions raised as the native type, with an alias as the generated name; Python keeps its classes. `StreamRemovedException` translated to `StreamError`. Python's encoder raises the argument error for a wrong length, a negative unsigned value and a null key or element. Python's decoding leaks wrapped. Python's `StreamError` for a function with arguments becomes `ValueError`. Python's service definition errors as in the situations table. C++'s null function result as `EncodingError` |
 | E3 | C# and Java. `RemoteException`, unchecked in Java, and `throws IOException` dropped. `RPCException` renamed `ServerException`, `FunctionCompilationException` renamed `CompilationException`, `StreamException` added in C#. The generated classes of mapped exceptions removed, except those with no native type; C#'s mapping moves to `lang/csharp.py`, for every service. C#'s "Stream has no value" and Java's connection endings and interrupts as above. The connection error during and after a call. Decoding errors as `EncodingException`, with their cause's message. C#'s mismatched function type and Java's null object id as the argument error |
 | E4 | Lua. Error objects in place of strings, with no source position, and the `error-types` profile. Misuse stays a string in Lua's form |
+| E5 | C-nano. The codes, the last-error record, the detail levels, `KRPC_FAIL`, `krpc_set_error_cause`, the `KRPC_EXCEPTION_` macros and `KRPC_IS_EXCEPTION`. The situations as tabled, the testee's mapping, the `error-types` profile, and a native test at the Codes level |
 
 ## Consequences
 
@@ -322,7 +495,13 @@ Each phase carries these for the clients it changes.
   `ServerException`, `FunctionCompilationError`/`Exception` to `CompilationError`/`Exception`.
   Python's server exceptions and errors under new bases. C++ mapped exceptions becoming aliases.
   C# and Java generated classes of mapped exceptions removed. Java errors unchecked, and
-  `throws IOException` dropped. Lua errors as objects. Each change of the error a situation raises.
+  `throws IOException` dropped. Lua errors as objects. C-nano's renamed and merged codes, and
+  its default level keeping the last error. Each change of the error a situation raises.
+- **C-nano pages.** `doc/src/cnano.rst` (configuration, handling errors, the transport API and the
+  code reference), `doc/src/client-design/cnano.rst` (errors and the spec mapping), and the
+  examples `Errors.c` and `ConnectingCustom.c`. The C-nano row of `client-design.rst`.
+- **Protocol and extending docs, for E0.** `communication-protocols/` for the two fields, and
+  `extending/` for the exception id rule and its `Id`.
 - **Client guides.** `doc/src/python.rst` (errors, server side functions, streams and the API
   reference), `doc/src/cpp.rst`, `doc/src/csharp.rst`, `doc/src/java.rst` and `doc/src/lua.rst`
   ("The error is a string").
@@ -330,8 +509,8 @@ Each phase carries these for the clients it changes.
   exceptions), `csharp.rst` and `lua.rst`, and the comparison table in `client-design.rst`.
 - **Java doc examples.** About 60 files under `doc/src/scripts` declare or catch `RPCException`
   or `StreamException`, and the build compiles them.
-- **clientgen and its goldens.** `python.tmpl`, `cpp.tmpl`, `csharp.tmpl` and `java.tmpl`, the
-  `lang/*.py` tables, and the KRPC and TestService goldens.
+- **clientgen and its goldens.** `python.tmpl`, `cpp.tmpl`, `csharp.tmpl`, `java.tmpl` and, for
+  E5, `cnano.tmpl`, the `lang/*.py` tables, and the KRPC and TestService goldens.
 - **docgen.** It ignores `mapped_type` today. Naming the raised type of each mapped exception is new
   work, and C# and Java need a reference target for an exception with no generated class.
 - **Service tests.** `service/SpaceCenter/test/test_server_side_functions.py` asserts the type is
