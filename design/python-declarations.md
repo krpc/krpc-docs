@@ -1,6 +1,6 @@
 # Python: generated declarations and dynamic services
 
-**Status:** in progress, for 0.8. Phase 2 and 2b are implemented, not yet in a pull request. Issue: [python-declarations.md](../issues/python-declarations.md), not yet filed.
+**Status:** in progress, for 0.8. Phase 1 in #1298, phase 2 in #1302, phase 2b in #1303 and #1304, and two phase 3 follow-ups in #1305 and #1306; the other follow-ups are open. Issue: [python-declarations.md](../issues/python-declarations.md), not yet filed.
 
 The Python client has two implementations of every service: generated stubs and services built from `GetServices`. A stub that lacks a member has a third path, `merge_service`, which adds the member to a per-client subclass. This doc replaces them with one implementation, always built from the server's definitions, plus generated modules that carry the type information.
 
@@ -317,12 +317,12 @@ On the same pull request as phase 2, from its review, as phase 2 made `krpc.Clie
 
 Each a pull request stacked on phase 2, merged in turn.
 
- * Type the function compiler's expressions. The `KRPC.Expression` declaration is typed, unlike the stub's `StaticMethod`, which shows the places where a value was looser than the call it reached.
+ * Done: [#1306](https://github.com/krpc/krpc/pull/1306). Type the function compiler's expressions. The `KRPC.Expression` declaration is typed, unlike the stub's `StaticMethod`, which shows the places where a value was looser than the call it reached.
  * Run pyright on the generated modules, which no check covers, so that a module a user generates type checks.
  * Reserve `<Service>Client` as a type name in the service definition rules.
  * `krpc-clientgen python --bundle`, to generate a combined client type with a set of modules, as for a whole newer server.
  * A connect per game, or another fix for `krpc.connect()` defaulting to `KSPClient`, before the KSA client types and the package split. See [Client types](#client-types).
- * Conformance: split a `definitions` profile out of `dynamic`, for building the services at connect, and add a `declarations` profile for the generated types. Python has both, and Lua takes `declarations` with [lua-type-hints.md](../issues/lua-type-hints.md).
+ * Done: [#1305](https://github.com/krpc/krpc/pull/1305). Conformance: split a `definitions` profile out of `dynamic`, for building the services at connect, and add a `declarations` profile for the generated types. Python has both, and Lua takes `declarations` with [lua-type-hints.md](../issues/lua-type-hints.md).
 
 ## Alternatives Considered
 

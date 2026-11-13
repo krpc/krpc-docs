@@ -17,7 +17,7 @@ The **GitHub** column says how the issue on GitHub stands against this plan:
 | | Release | Theme | Progress |
 | --- | --- | --- | --- |
 | ✅ | [0.7](#07-server-side-functions-streams-and-events-service-improvements) | Server-side functions, streams and events, protocol additions, service improvements | Tagged 2026-10-21 |
-| 🚧 | [0.8](#08-single-connection-client-codegen-then-client-conformance-and-thread-safety) | Single connection, client codegen, then client conformance testing and thread safety | 16 of 23 features done |
+| 🚧 | [0.8](#08-single-connection-client-codegen-then-client-conformance-and-thread-safety) | Single connection, client codegen, then client conformance testing and thread safety | 16 of 24 features done |
 | ⬜ | [1.0](#10-remaining-protocol-improvements-server-side-function-follow-ups) | Remaining protocol improvements (#906), server side function follow-ups | 0 of 9 done; tick control has a 0.7 stopgap |
 
 ## 0.7: server-side functions, streams and events, service improvements
@@ -95,7 +95,7 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 | ✅ | Client thread safety: define and document what is thread-safe | [#427](https://github.com/krpc/krpc/issues/427), fixed by #1225 | docs | — |
 | ✅ | C-nano: every transport compiled in, chosen at run time, so vcpkg ships them all; a custom transport is a table of functions | [#1176](https://github.com/krpc/krpc/issues/1176), fixed by #1275 | feature, client, cnano | [cnano-transports.md](design/cnano-transports.md) |
 | ✅ | Streams of calls and server side functions that return no value, run for their side effects | [#1198](https://github.com/krpc/krpc/issues/1198), fixed by #1272 | feature, server, protocol, client | — |
-| ✅ | Lua and C-nano: compile and run server side functions built with the expression API, which the internal `KRPC` procedures left them without | [#1267](https://github.com/krpc/krpc/issues/1267), C-nano in #1295 | feature, client, lua, cnano | — |
+| ✅ | Lua and C-nano: compile and run server side functions built with the expression API, which the internal `KRPC` procedures left them without | [#1267](https://github.com/krpc/krpc/issues/1267), fixed by #1297, C-nano in #1295 | feature, client, lua, cnano | — |
 | ✅ | `GetStatus` returns a kRPC struct in place of the `KRPC.Status` protobuf message | [#1197](https://github.com/krpc/krpc/issues/1197), fixed by #1244 | enhancement, server, protocol, client | — |
 | ✅ | DockingCamera on the public Docking Camera (KURS) release; with the LIDAR deprecation, supersedes #674 | [#1232](https://github.com/krpc/krpc/issues/1232), fixed by #1264 | feature, mods, service, ksp | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ✅ | Deprecate LIDAR in favor of `SpaceCenter.RaycastDistance`, and raycasts ignore trigger colliders; makes #1181 moot | [#1233](https://github.com/krpc/krpc/issues/1233), fixed by #1263 | enhancement, mods, service, ksp | [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
@@ -106,9 +106,9 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 | ✅ | Java: publish the client to Maven Central | [#1231](https://github.com/krpc/krpc/issues/1231), fixed by #1276 | feature, client, java | — |
 | ⬜ | Flags enumerations, for `SpaceCenter.MapFilter`, with conformance tests; breaking for `MapFilterType.All`; follows #1280, which rejects a combination until then | **To file**: [krpc-enum-flags.md](issues/krpc-enum-flags.md) | feature, server, protocol, service, client, tools | — |
 | ⬜ | `RequiresMod` attribute: the server checks that a service's mod is available before each RPC | **To file**: [requires-mod-attribute.md](issues/requires-mod-attribute.md) | enhancement, server, service | [server/partial-loading.md](design/server/partial-loading.md) |
-| ⬜ | Python: build every service from the server's definitions, with generated declarations for type checking; removes `use_pregenerated_stubs` and replaces the Python part of #1195 | **To file**: [python-declarations.md](issues/python-declarations.md) | enhancement, client, tools, python | [python-declarations.md](design/python-declarations.md) |
-| ⬜ | clientgen: a Python `--include` given as a file path makes a wrong import; take a module name only; follows the Python declarations | **To file**: [clientgen-python-include-paths.md](issues/clientgen-python-include-paths.md) | bug, client, tools, python | [python-declarations.md](design/python-declarations.md) |
+| 🚧 | Python: build every service from the server's definitions, with generated declarations for type checking; removes `use_pregenerated_stubs` and replaces the Python part of #1195. Phases 1 to 2b merged, and two phase 3 follow-ups: typed function compiler, `definitions` and `declarations` conformance profiles. Open: pyright on generated modules, `<Service>Client` reserved, `--bundle`, a connect per game | PRs #1298, #1302, #1303, #1304, #1305, #1306, no issue; draft [python-declarations.md](issues/python-declarations.md) | enhancement, client, tools, python | [python-declarations.md](design/python-declarations.md) |
 | 🚧 | JavaScript client for the browser, on WebSockets, in phases. Phases 1 to 3 implemented, not yet submitted | **To draft** | feature, client | [javascript-client.md](design/javascript-client.md) |
+| ⬜ | MechJeb2 and Kerbal Engineer Redux services | [#288](https://github.com/krpc/krpc/issues/288), **add milestone** | feature, mods, service, ksp | — |
 
 * **Single connection first.** It changes connection setup and threading in every client, so the
   conformance suite is written against it rather than rewritten after it.
@@ -165,6 +165,8 @@ Everything merged since v0.6.0, PRs #1015 to #1163 on milestone 0.7.0. Tagged 20
 | ✅ | Client design pages on the docs site; guides corrected on when a stream ends and a connection stays open | #1287 | — |
 | ✅ | Conformance: `Rate` testee command renamed `GetRate`, `TestService2` and `ConformanceService` definitions shipped in krpctools, more flaky tests listed | #1282, #1284, #1288 | — |
 | ✅ | Build and CI: service imports sorted in generated Python stubs, tool package tests started once the Python client is built | #1292, #1293 | — |
+| ✅ | C# tools: System.CommandLine and System.Text.Json replace NDesk.Options and Newtonsoft.Json; `krpc-testserver` and `krpc-servicedefs` reject unknown options, service definitions written in a fixed order | #1296 | — |
+| ✅ | Python: an `RPCError` for a server error naming a class that is not an exception, and a deprecated procedure keeps its signature | #1300, #1301 | — |
 
 ### Fixes and smaller items
 
@@ -185,7 +187,7 @@ conformance suite, and the scanner rules build on #1237.
 | ✅ | Strict argument decoding: fail a call with an argument the server cannot decode in full, each call failing on its own; breaking | #1280 | bug, server, protocol, service | — |
 | ✅ | Publish the bundled TestServer and ServiceDefinitions for every platform, so `krpc-conformance` and `servicedefs` run on Windows; the TestServer ships only in krpctools, as `krpc-testserver` | [#1228](https://github.com/krpc/krpc/issues/1228), fixed by #1271 | feature, tools | [ksa/build-and-test-tools.md](design/ksa/build-and-test-tools.md), "Service definitions" |
 | ✅ | Run clang-format and clang-tidy over every C and C++ source | [#1177](https://github.com/krpc/krpc/issues/1177), fixed by #1277 | enhancement, client, build, cpp, cnano | — |
-| ⬜ | Audit how each client binds static methods and streams to a connection | [#1195](https://github.com/krpc/krpc/issues/1195) | enhancement, client, python, cpp, cnano, csharp, java, lua | [static-method-binding.md](design/static-method-binding.md) |
+| 🚧 | Audit how each client binds static methods and streams to a connection; the Python part done by #1302 | [#1195](https://github.com/krpc/krpc/issues/1195) | enhancement, client, python, cpp, cnano, csharp, java, lua | [static-method-binding.md](design/static-method-binding.md) |
 | ✅ | C++: hold the client strongly, so objects never dangle, add `close()`, and take the client by reference in the public API; breaking | #1285, #1286 | bug, client, cpp | — |
 | ✅ | Clients: scope streams and events with each language's scoping construct, with a conformance test for events; removes Python's `Client.stream`, breaking | #1291 | enhancement, client, python, csharp, java, cpp | — |
 | ✅ | Documentation crefs use the C# service name | [#1188](https://github.com/krpc/krpc/issues/1188), fixed by #1243 | bug, server | — |
@@ -199,6 +201,9 @@ conformance suite, and the scanner rules build on #1237.
 | ⬜ | Scanner rules for service, type, parameter and enumeration value names, the C++ helper names, and reserved names | **To file**: [clientgen-qualified-names.md](issues/clientgen-qualified-names.md) | enhancement, server | [protocol/service-definition-rules.md](design/protocol/service-definition-rules.md) |
 | ⬜ | Clients: calls that cannot go in a server side function | **To file**: [calls-a-function-cannot-make.md](issues/calls-a-function-cannot-make.md) | enhancement, client, tools | — |
 | ⬜ | Clients: check whether a per-element function needs a real instance | **To file**: [call-with-arguments-template.md](issues/call-with-arguments-template.md) | question, client | [server-side-functions/server-side-functions.md](design/server-side-functions/server-side-functions.md) |
+| ⬜ | In-game tests for websockets, serial IO and local sockets, for what `TestServer` and the unit tests do not reach | **To file**: [ingame-protocol-tests.md](issues/ingame-protocol-tests.md) | enhancement, server, tools, ksp | — |
+| ⬜ | Lua: `platform.sleep` busy-waits, to whole seconds | **To file**: [lua-platform-sleep.md](issues/lua-platform-sleep.md) | bug, client, lua | — |
+| ⬜ | Clients: use `Connection` for the entry point in every client | **To file**: [client-class-names.md](issues/client-class-names.md) | enhancement, client | — |
 
 ## 1.0: remaining protocol improvements, server side function follow-ups
 
@@ -245,7 +250,6 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ✅ | More communication protocols; local sockets landed in 0.7, gRPC moved to #1187 | [#899](https://github.com/krpc/krpc/issues/899) | enhancement, protocol | [protocol/local-transports.md](design/protocol/local-transports.md) |
 | ⬜ | gRPC support, possibly through an external bridge; the game's runtime cannot host it | [#1187](https://github.com/krpc/krpc/issues/1187) | feature, server, protocol, ksp | [protocol/grpc-support.md](design/protocol/grpc-support.md) |
 | 🚧 | Principia support; phase 1 shipped as a docs page, phases 2 and 3 wait on upstream | [#767](https://github.com/krpc/krpc/issues/767) | feature, mods, service, ksp | [services/principia-service.md](design/services/principia-service.md) |
-| ⬜ | MechJeb2 and Kerbal Engineer Redux services | [#288](https://github.com/krpc/krpc/issues/288) | feature, mods, service, ksp | — |
 | ⬜ | Raster Prop Monitor integration and camera views | [#375](https://github.com/krpc/krpc/issues/375), [#424](https://github.com/krpc/krpc/issues/424) | feature, mods, service, ksp | — |
 | ⬜ | Index of mod integrations: existing work, plus SCANsat, Kerbalism, Near Future Solar and compatibility checks | **To file**: [mod-integrations-index.md](issues/mod-integrations-index.md) | feature, mods, service, ksp | — |
 | ⬜ | Vessel state and staging prediction; parts may be covered by the stage API | [#311](https://github.com/krpc/krpc/issues/311) | feature, service, ksp | — |
@@ -263,7 +267,6 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | 🚧 | Mod compatibility tests | **To file**: [mod-compat-tests.md](issues/mod-compat-tests.md) | enhancement, mods, tools | [services/mod-compat-test-coverage.md](design/services/mod-compat-test-coverage.md), [services/dockingcam-lidar-tests.md](design/services/dockingcam-lidar-tests.md) |
 | ⬜ | NUnit 5 | **To file**: [nunit-5-migration.md](issues/nunit-5-migration.md) | enhancement, tools | [build-tools/nunit-5-migration.md](design/build-tools/nunit-5-migration.md) |
 | ⬜ | Build `KRPC.IO.Ports` from source in the net472 `KRPC.Core`, in place of the prebuilt DLL | **To file**: [core-serial-ports.md](issues/core-serial-ports.md) | enhancement, server, build, ksp | — |
-| ⬜ | In-game tests for websockets, serial IO and local sockets, for what `TestServer` and the unit tests do not reach | **To file**: [ingame-protocol-tests.md](issues/ingame-protocol-tests.md) | enhancement, server, tools, ksp | — |
 | ⬜ | Race points for the C# and Python clients, for the conformance `races` profile | **To file**: [conformance-forced-races.md](issues/conformance-forced-races.md) | enhancement, client, tools, python, csharp | [client-conformance/harness.md](design/client-conformance/harness.md) |
 | ⬜ | Conformance: wait for the serial link instead of a fixed second | **To file**: [conformance-serial-settle-time.md](issues/conformance-serial-settle-time.md) | enhancement, tools | [client-conformance/harness.md](design/client-conformance/harness.md) |
 | ⬜ | Conformance: wake waits on the testee's notifications | **To file**: [conformance-wait-until-polls.md](issues/conformance-wait-until-polls.md) | enhancement, tools | [client-conformance/harness.md](design/client-conformance/harness.md) |
@@ -285,16 +288,15 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⛔ | luasocket release pin, blocked upstream on lunarmodules/luasocket#469 | [#1203](https://github.com/krpc/krpc/issues/1203) | bug, blocked, client, lua | [build-tools/lua-socket-unix-on-windows.md](design/build-tools/lua-socket-unix-on-windows.md) |
 | ⬜ | Generate the client API references from the client sources | **To file**: [client-api-reference-autodoc.md](issues/client-api-reference-autodoc.md) | enhancement, client, tools, docs | — |
 | ⬜ | Client spec: one callback thread per connection | **To file**: [spec-callback-thread-per-connection.md](issues/spec-callback-thread-per-connection.md) | feature, client | [client-conformance/spec.md](design/client-conformance/spec.md) |
-| ⬜ | Lua: `platform.sleep` busy-waits, to whole seconds | **To file**: [lua-platform-sleep.md](issues/lua-platform-sleep.md) | bug, client, lua | — |
 | ⬜ | Lua 5.1: `math.huge` stands for the largest integer, so 2^63 - 1 reads as infinity | **To file**: [lua-51-math-huge.md](issues/lua-51-math-huge.md) | bug, client, lua | — |
 | ⬜ | Compiled delegates for the KSA control inputs; waits on a `KRPC.Core` release with `Accessor` | **To file**: [ksa-control-inputs-delegates.md](issues/ksa-control-inputs-delegates.md) | enhancement, service, ksa | — |
 | ⬜ | C-nano: retry POSIX serial reads and writes interrupted by a signal, and loop short writes | **To file**: [cnano-serial-eintr.md](issues/cnano-serial-eintr.md) | bug, client, cnano | — |
 | ⬜ | Raise the default receive timeout | **To file**: [recv-timeout-default.md](issues/recv-timeout-default.md) | enhancement, server | [server/recv-timeout-cliff.md](design/server/recv-timeout-cliff.md) |
 | ⬜ | Python: Ctrl-C during a call on Windows, with the single connection | **To file**: [python-ctrl-c-windows.md](issues/python-ctrl-c-windows.md) | bug, client, python | [protocol/single-connection.md](design/protocol/single-connection.md) |
 | ⬜ | Python: trim client frames from server error tracebacks | **To file**: [python-traceback-trim.md](issues/python-traceback-trim.md) | enhancement, client, python | — |
-| ⬜ | Clients: use `Connection` for the entry point in every client | **To file**: [client-class-names.md](issues/client-class-names.md) | enhancement, client | — |
 | ⬜ | C-nano: follow-ups to server side functions: generated functions, heap use, header opt-out, examples, testee cleanups | **To file**: [cnano-functions-follow-ups.md](issues/cnano-functions-follow-ups.md) | enhancement, client, cnano | — |
 | ⬜ | C#: keep the `.csproj` package versions in step with the Bazel lock files; follows the `nuget_repo` import | **To file**: [csproj-package-versions.md](issues/csproj-package-versions.md) | enhancement, build | — |
+| ⬜ | clientgen: a Python `--include` given as a file path makes a wrong import; take a module name only; follows the Python declarations | **To file**: [clientgen-python-include-paths.md](issues/clientgen-python-include-paths.md) | bug, client, tools, python | [python-declarations.md](design/python-declarations.md) |
 
 ### Negative results
 
