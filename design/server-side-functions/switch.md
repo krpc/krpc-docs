@@ -107,9 +107,12 @@ the node is built:
 | Python | Compiles to |
 | --- | --- |
 | A literal of a type the subject does not compare with, such as `case "a":` on an `int` | A compile error, as in JavaScript. Python would never match it |
+| `case 1:` on a `bool`, or `case True:` on an `int` | A compile error, as `Equal` rejects `bool` against `int`. Python matches it, as `True == 1` |
 | `case None` | A test value of `ConstantNull`, on a nullable subject. A compile error otherwise |
-| `case True`, `case False` | A test value on a `bool` subject. A compile error otherwise, where Python's `is` would never match | A class pattern naming a subclass would need a run-time type test,
-which waits for class inheritance ([#905](https://github.com/krpc/krpc/issues/905)).
+| `case True`, `case False` | A test value on a `bool` subject. A compile error otherwise, where Python's `is` would never match |
+
+A class pattern naming a subclass would need a run-time type test, which waits for class
+inheritance ([#905](https://github.com/krpc/krpc/issues/905)).
 
 ## Testing and docs
 
