@@ -1,6 +1,6 @@
 # Name case conversion
 
-**Status:** phases 1 to 4 done, on a local branch. Phase 5 waits for the JavaScript client branch to rebase onto it.
+**Status:** phases 1 to 4 done, on a local branch, and reviewed. Phase 5 done on the JavaScript client branch, rebased onto it.
 
 Clients and generators convert the names in a service definition, such as `ActiveVessel`, to their
 own case: `active_vessel`, `activeVessel`, `ACTIVE_VESSEL`. [Client naming](client-naming.md) says
@@ -66,25 +66,27 @@ matches gives the next word:
 | 2. Plural acronym | Two or more capitals and an `s`, not followed by a lower case letter | `EVAs`, `IDs` |
 | 3. Acronym | The longest run of capitals not followed by a lower case letter | `RCS`Thrust, `SAS`Mode, Mean Anomaly At `UT`, `DEFAULT` |
 | 4. Word | An optional capital, then lower case letters | `Active` `Vessel`, `reset`PID |
-| 5. Number | Digits, and the acronym after them by rule 3, if there is one | `32` To String, Vector `3D`, Get `2D` Position |
+| 5. Number | Digits, and the acronym after them by rule 3 or the lower case letters after them | `32` To String, Vector `3D`, `3rd` Party |
 | 6. Other | Any other character, so a name outside the identifier rule loses no character | |
 
-Rules 1 to 4 also take the digits that follow the word, unless an acronym follows the digits:
-`UInt64`, `UTF8`, `Atan2`, `Axis01`, `Int32`, `UTF8`String. Digits followed by an acronym are a word
+Rules 1 to 4 also take the digits that follow the word and the lower case letters after the digits,
+unless an acronym follows the digits: `UInt64`, `UTF8`, `Atan2`, `Axis01`, `Int32s`, `Get3rd`Party,
+`UTF8`String. Lower case letters after digits stay with them, as in `Vector3d` and `Get2ndStage`,
+which read as one word with their digits. Digits followed by an acronym are a word
 of their own by rule 5: `Vector3D` is `vector_3d`, and `Get2DPosition` is `get_2d_position`.
 
 Rule 3 ends a run of capitals before its last capital when a lower case letter follows, as
 that capital starts the next word: `RCSThrust` is `RCS`, `Thrust`.
 
 As a regular expression, tried at each position in turn, where `D` stands for
-`(?:[0-9]+(?![0-9])(?![A-Z]+(?![a-z])))?`, the digits a word takes:
+`(?:[0-9]+(?![0-9])(?![A-Z]+(?![a-z]))[a-z]*)?`, the digits a word takes:
 
 ```
 (?:UInt|ULong|SInt|FoV)(?![a-z])D
 |[A-Z]{2,}s(?![a-z])D
 |[A-Z]+(?![a-z])D
 |[A-Z]?[a-z]+D
-|[0-9]+(?:[A-Z]+(?![a-z]))?
+|[0-9]+(?:[A-Z]+(?![a-z])|[a-z]+)?
 |.
 ```
 
@@ -209,8 +211,8 @@ lowerCamel, in Java members, parameters and fields, and C# constructor parameter
 | `RCSThrust`, `RCSBurnTime`, `RCSSpecificImpulse`, `RCSStartDeltaV`, `RCSEndDeltaV`, `RCSStartTWR`, `RCSEndTWR` | `rCSThrust`, ... | `rcsThrust`, ... | `KerbalEngineerRedux` structure fields |
 | `UInt32ToString`, `UInt64ToString` | `uInt32ToString`, `uInt64ToString` | `uint32ToString`, `uint64ToString` | `TestService` only |
 
-UPPER_SNAKE, in Java enumeration constants. All of these are bugs today, and the proposed names
-match the Java docs:
+UPPER_SNAKE, in Java enumeration constants. All of these are bugs today. The Java docs show most of
+the proposed names, but give `EV_AS`, `U_INT32` and `S_INT32` for the last rows:
 
 | Today | Proposed |
 | --- | --- |
