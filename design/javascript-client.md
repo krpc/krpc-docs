@@ -106,8 +106,8 @@ Each phase is implementable and mergeable on its own.
 | 2 | Error types, named arguments. Structures become classes | `error-types`, `named-arguments` |
 | 3 | Generated stubs with TypeScript declarations, docs API reference | — |
 | 3b | Enumerations, structures and exceptions importable with no connection | — |
-| 4 | Streams, events, callbacks, conditions | `streams`, `events`, `callbacks`, `conditions` |
-| 5 | Server side functions built with the `KRPC.Expression` API: streams, events and runs | `functions`, `function-types` |
+| 4 | Streams, events, callbacks | `streams`, `events`, `callbacks` |
+| 5 | Server side functions built with the `KRPC.Expression` API: streams, events and runs | `functions` |
 | 6 | A compiler from JavaScript functions to server side functions | — |
 | later | Server: pages served by the mod, an origin check | — |
 | later | Server: TLS (`wss://`), with a user's certificate or a generated one | — |
@@ -367,6 +367,83 @@ function setMode(vessel, mode = SpaceCenter.SASMode.prograde) { ... }
   definition matches, so `===` and `instanceof` work on imported types. Otherwise it builds its
   own, and `equals` compares service, name and value.
 - **Classes and services** are unchanged: declarations, built per connection.
+
+### Phase 3b as built
+
+- **Generated values.** Each enumeration, structure and exception is a type and a `const` of the
+  same name, such as `export const SASMode = declareEnumeration<Service["SASMode"]>(...)`. The
+  `const` takes its type from the service interface, so its values keep their documentation.
+- **Registry.** `declareEnumeration`, `declareStruct` and `declareException` register each type by
+  service and name. A later registration replaces an earlier one. The package exports the
+  functions, for mods' modules.
+- **Matching** follows Python: an enumeration on its flags, names and numbers, a structure on its
+  field names in order, an exception on the JavaScript error it extends. A matched type is also
+  the service's member, so `conn.spaceCenter.SASMode === SpaceCenter.SASMode`.
+- **Structures** split into a `StructDeclaration` (field names, value class), which connections
+  share, and a per-connection `Struct` with the field types from the server.
+- **Differing definitions.** A generated enumeration value passes by its number, and `equals`
+  compares by number. A structure passes only with the same field names.
+- **Import path.** The package's own modules import `../declarations.js`, through a new clientgen
+  option `--client-module`. Importing `@krpc-org/krpc` from inside the package would cycle through
+  `index.ts`, and `tsc` does not rewrite `paths`. A mod's module imports from `@krpc-org/krpc`.
+- **Deprecation.** Generated values warn once per process, as they belong to no connection.
+- **Bundle size.** Every shipped service's values add 3.7 KB gzipped to a bundle of the client
+  (28.7 KB to 32.4 KB with esbuild).
+- **Conformance.** The testee joins the `declarations` profile, with the generated `TestService`
+  module compiled into it.
+
+### Phase 4 as built
+
+```js
+const altitude = await conn.addStream(() => flight.getMeanAltitude());
+console.log(await altitude.get());
+altitude.addCallback((x) => draw(x));
+await altitude.remove();
+```
+
+| Item | Decision |
+| --- | --- |
+| Stream form | `conn.addStream(() => member(...))`, as C#'s lambda. The client runs the function in a capture mode: a member builds its call and returns a `Promise` that never settles. TypeScript infers `Stream<T>` from the member's `Promise<T>` |
+| Reads | `await stream.get()` waits for the first value. The `value` getter reads the latest one at once, for a render loop, and throws a `StreamError` before the first value |
+| Waits | `wait(timeout)` in milliseconds, resolving `false` at the deadline. An event's wait returns at once for a firing since the last wait on that `Event` |
+| Rate | The `rate` getter, and `setRate(rate)`, which returns a `Promise` |
+| Callbacks | Run in a microtask after the message handler. Each callback runs one call at a time: one that returns a `Promise` is busy until it settles, and a newer value replaces a waiting one. The first call is made before `addCallback` returns |
+| End callbacks | A remove or a close calls them itself. A server ending waits for the value callbacks, so a value before the ending reaches them first. A failure calls them in a microtask |
+| Callback errors | Reported with `reportError`, or `console.error`. No fatal kind, so the five fatal-error tests are unsupported |
+| Registration | The session's `call` takes a function it runs on the result in the message handler, which registers the stream before its first update |
+| Events | A procedure returning an event resolves with an `Event`. `KRPC.StreamRemovedException` is `StreamError`, at run time and in the generated module |
+| Scoping | `Symbol.asyncDispose` on `Stream` and `Event`, for `await using` |
+| Dropped handles | Leave the stream on the server, as in the other clients. A collection at no predictable time would stop a stream kept only for its callbacks. `test_drop_last_handle` is an expected failure |
+| `conditions` | Left out. A run of reads with no `await` between them already sees one state |
+
+- **Conformance.** The testee joins `streams`, `events` and `callbacks`: 592 pass, from 452.
+  Hashes of handles and interrupted waits are unsupported, as for objects and calls.
+- **Shipped services** have no procedure that returns an event. Events from conditions wait for
+  the server side functions of phase 5, as `KRPC.AddEvent` is internal.
+
+### Phase 5 as built
+
+```js
+const { Expression } = conn.krpc;
+const altitude = await Expression.call(conn.getCall(() => flight.getMeanAltitude()));
+const above = await Expression.greaterThan(altitude, await Expression.constantDouble(1000));
+const event = await conn.addEvent(above);
+console.log(await conn.run(above));
+```
+
+| Item | Decision |
+| --- | --- |
+| API | `getCall`, `compile`, `run(fn, ...args)` and `addEvent` on `Connection`, as the other clients. `addStream` takes a `KRPC.Expression` in place of a function |
+| `getCall` | The capture of `addStream`, returning the `ProcedureCall`. Synchronous, as nothing is sent |
+| Types | Read from the `KRPC.Expression` on the server, once per function, as in Lua. `run<T>` and `addStream<T>` name a type the client cannot check, as TypeScript erases it |
+| `function-types` | Left out, as the client has no type a program names to check. As Python and Lua |
+| Parameters | A stream or event of a function with parameters is a `TypeError` before the call |
+| Messages | A protobuf message is a plain object, so `isMessage` keeps a trailing `ProcedureCall` from being read as named arguments |
+
+- **Conformance.** The testee joins `functions`: 682 pass, from 592. A null at a type named
+  without `nullable` is unsupported, as in Python and Lua.
+- **Docs.** The server side functions guide gains a JavaScript tab beside each Lua one, the first
+  JavaScript tabs on a shared page.
 
 ### Phase 6: function compiler
 
