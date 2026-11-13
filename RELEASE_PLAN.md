@@ -21,7 +21,7 @@ Finished items are collapsed under **Done** in each section.
 | | Release | Theme | Progress |
 | --- | --- | --- | --- |
 | ✅ | [0.7](#07-server-side-functions-streams-and-events-service-improvements) | Server-side functions, streams and events, protocol additions, service improvements | Tagged 2026-10-21 |
-| 🚧 | [0.8](#08-single-connection-client-codegen-then-client-conformance-and-thread-safety) | Single connection, client codegen, then client conformance testing and thread safety | 18 of 25 features done |
+| 🚧 | [0.8](#08-single-connection-client-codegen-then-client-conformance-and-thread-safety) | Single connection, client codegen, then client conformance testing and thread safety | 19 of 26 features done |
 | ⬜ | [1.0](#10-remaining-protocol-improvements-server-side-function-follow-ups) | Remaining protocol improvements (#906), server side function follow-ups | 0 of 9 done; tick control has a 0.7 stopgap |
 
 ## 0.7: server-side functions, streams and events, service improvements
@@ -109,7 +109,7 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 | 🚧 | Kerbal Engineer Redux service | [#288](https://github.com/krpc/krpc/issues/288), **add milestone** | [services/kerbal-engineer-redux.md](design/services/kerbal-engineer-redux.md) |
 
 <details>
-<summary>Done (18)</summary>
+<summary>Done (19)</summary>
 
 | | Feature | Issue | Design doc |
 | --- | --- | --- | --- |
@@ -131,13 +131,14 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 | ✅ | Java: publish the client to Maven Central | [#1231](https://github.com/krpc/krpc/issues/1231), fixed by #1276 | — |
 | ✅ | Flags enumerations, for `SpaceCenter.MapFilter`, with conformance tests; breaking for `MapFilterType.All` | [krpc-enum-flags.md](issues/krpc-enum-flags.md), done by PR #1311 | — |
 | ✅ | Flags enumerations in server side functions: `Expression.Not`, and the Python and C# compilers' operators | [krpc-enum-flags-functions.md](issues/krpc-enum-flags-functions.md), done by PR #1313 | — |
+| ✅ | RealAntennas: link budget and targeting on `Antenna`, data rates on `CommLink`; `Parts.Antennas` lists one entry per transmitter module | [real-antennas.md](issues/real-antennas.md), done by PR #1320 | [services/real-antennas.md](design/services/real-antennas.md) |
 
 </details>
 
 ### Merged
 
 <details>
-<summary>Done (36)</summary>
+<summary>Done (37)</summary>
 
 | | Item | PRs | Design doc |
 | --- | --- | --- | --- |
@@ -177,6 +178,7 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 | ✅ | Client guides: a Values section with each language's types, holding flags enumerations and Lua null values | #1312 | — |
 | ✅ | B9PartSwitch, Near Future Solar and TweakScale Rescaled support, with in-game tests; `PartField` runs the right-click menu's callbacks, `Part.Cost` adds module costs | #1314 | [services/mod-compat-test-coverage.md](design/services/mod-compat-test-coverage.md) |
 | ✅ | Conformance: more flaky tests listed in Python and C++ | #1315 | — |
+| ✅ | In-game tests: install a mod zip whose folder sits at the archive root, with no `GameData` | #1316 | — |
 
 </details>
 
@@ -188,18 +190,14 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 | ⬜ | Clients: escape a service or type name that meets a client's own name | [client-name-escapes.md](issues/client-name-escapes.md) | [protocol/client-reserved-names.md](design/protocol/client-reserved-names.md) |
 | ⬜ | Clients: use `Connection` for the entry point in every client | [client-class-names.md](issues/client-class-names.md) | — |
 | ⬜ | Clients: one shape for errors, with a `RemoteError` base and a subclass per category | [client-errors.md](issues/client-errors.md) | [client-errors.md](design/client-errors.md) |
-| ⬜ | Deprecation signals for every member kind in every client | [deprecation-all-members.md](issues/deprecation-all-members.md) | — |
-| 🚧 | Audit how each client binds static methods and streams to a connection; the Python part done by #1302. C#, Java and C++ (generated `Bind` for classes with static methods, Java `addStream` and `getCall` taking only a static method's arguments, guide docs) ready for a PR | [#1195](https://github.com/krpc/krpc/issues/1195) | [static-method-binding.md](design/static-method-binding.md) |
 | ⬜ | Clients: calls that cannot go in a server side function | [calls-a-function-cannot-make.md](issues/calls-a-function-cannot-make.md) | — |
 | ⬜ | Clients: check whether a per-element function needs a real instance | [call-with-arguments-template.md](issues/call-with-arguments-template.md) | [server-side-functions/server-side-functions.md](design/server-side-functions/server-side-functions.md) |
 | ⬜ | Lua: `platform.sleep` busy-waits, to whole seconds | [lua-platform-sleep.md](issues/lua-platform-sleep.md) | — |
 | ⬜ | In-game tests for websockets, serial IO and local sockets, for what `TestServer` and the unit tests do not reach | [ingame-protocol-tests.md](issues/ingame-protocol-tests.md) | — |
 | 🚧 | Update the `krpc` and `krpc-cnano` vcpkg ports for 0.8.0: MIT licenses, copyright files, every C-nano transport (done in the repo: #1275, #1281; publishing waits on the release) | [vcpkg-ports-0-8.md](issues/vcpkg-ports-0-8.md) | — |
-| 🚧 | DockingCamera: `Camera.Image` becomes a method taking an image format, PNG or JPEG, and a JPEG quality; breaking. Ready for a PR | [dockingcam-image-format.md](issues/dockingcam-image-format.md) | — |
-| ⬜ | SpaceCenter: setting the IVA camera mode fails silently straight after a launch, and leaves the IVA when already in it | [camera-iva-mode-setter.md](issues/camera-iva-mode-setter.md) | — |
 
 <details>
-<summary>Done (17)</summary>
+<summary>Done (22)</summary>
 
 | | Item | Issue | Design doc |
 | --- | --- | --- | --- |
@@ -220,6 +218,11 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 | ✅ | Publish wheels for krpc and krpctools, in place of sdists | #1289 | — |
 | ✅ | Lua API docs on sphinx-lua-ls, when luadomain breaks on a Sphinx bump | [#1202](https://github.com/krpc/krpc/issues/1202), fixed by #1252 | — |
 | ✅ | Move krpctest into krpctools, as a game-agnostic in-game test runner | PR #1299 | [build-tools/krpctest-in-krpctools.md](design/build-tools/krpctest-in-krpctools.md), [ksa/build-and-test-tools.md](design/ksa/build-and-test-tools.md) |
+| ✅ | Audit how each client binds static methods and streams to a connection: Python by #1302; a generated `Bind` for classes with static methods in C#, Java and C++, Java `addStream` and `getCall` taking only a static method's arguments | [#1195](https://github.com/krpc/krpc/issues/1195), fixed by #1321 | [static-method-binding.md](design/static-method-binding.md) |
+| ✅ | Deprecation signals for every member kind in every client; members inherit their container's deprecation | [deprecation-all-members.md](issues/deprecation-all-members.md), done by PR #1322 | — |
+| ✅ | DockingCamera: `Camera.Image` becomes a method taking an image format, PNG or JPEG, and a JPEG quality; breaking | [dockingcam-image-format.md](issues/dockingcam-image-format.md), done by PR #1317 | — |
+| ✅ | SpaceCenter: setting the IVA camera mode waits for the crew after a launch, stays in IVA when already there, and throws for an uncrewed vessel | [camera-iva-mode-setter.md](issues/camera-iva-mode-setter.md), done by PR #1318 | — |
+| ✅ | In-game tests for Firespitter, KerbalActuators and Procedural Fairings, the last mod compatibility gap | [mod-compat-tests.md](issues/mod-compat-tests.md), done by PR #1319 | [services/mod-compat-test-coverage.md](design/services/mod-compat-test-coverage.md) |
 
 </details>
 
@@ -277,11 +280,10 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | | Feature | Issue | Design doc |
 | --- | --- | --- | --- |
 | ⬜ | Autopilot extensions: bank-to-turn, heterogeneous actuators, output filter knobs, sign convention refactor | — | [autopilot/bank-to-turn.md](design/autopilot/bank-to-turn.md), [autopilot/heterogeneous-actuators.md](design/autopilot/heterogeneous-actuators.md), [autopilot/output-filter-manual-knobs.md](design/autopilot/output-filter-manual-knobs.md), [autopilot/sign-convention-refactor.md](design/autopilot/sign-convention-refactor.md) |
-| 🚧 | Index of mod integrations: existing work, plus SCANsat, Kerbalism and compatibility checks; B9PartSwitch, Near Future Solar and TweakScale Rescaled done by #1314 | [mod-integrations-index.md](issues/mod-integrations-index.md) | — |
+| 🚧 | Index of mod integrations: existing work, plus SCANsat, Kerbalism and compatibility checks; B9PartSwitch, Near Future Solar and TweakScale Rescaled done by #1314, RealAntennas by #1320 | [mod-integrations-index.md](issues/mod-integrations-index.md) | — |
 | 🚧 | RemoteTech API bindings and KAC alarm actions | [remotetech-kac-api.md](issues/remotetech-kac-api.md) | [services/kac-remotetech-tests-and-api.md](design/services/kac-remotetech-tests-and-api.md) |
 | ⬜ | InfernalRobotics input linking and sun tracking | [infernal-robotics-input-linking.md](issues/infernal-robotics-input-linking.md) | [services/infernal-robotics-input-linking.md](design/services/infernal-robotics-input-linking.md) |
 | 🚧 | Principia support; phase 1 shipped as a docs page, phases 2 and 3 wait on upstream | [#767](https://github.com/krpc/krpc/issues/767) | [services/principia-service.md](design/services/principia-service.md) |
-| 🚧 | RealAntennas: link budget and targeting on `Antenna`, data rates on `CommLink`; implemented and verified in game, PR not yet opened | [real-antennas.md](issues/real-antennas.md) | [services/real-antennas.md](design/services/real-antennas.md) |
 | ⬜ | MechJeb2 service, ported from Genhis' KRPC.MechJeb, then stage stats from MechJeb's fuel-flow simulation | [#288](https://github.com/krpc/krpc/issues/288), [#311](https://github.com/krpc/krpc/issues/311) | [services/mechjeb.md](design/services/mechjeb.md) |
 | 🚧 | Raster Prop Monitor integration and camera views, all four phases plus readback outside the IVA, page button captures, video frames and a tutorial on branch `raster-prop-monitor`, unpushed; the stream rate fix it was stacked on merged as #1310 | [#375](https://github.com/krpc/krpc/issues/375), [#424](https://github.com/krpc/krpc/issues/424) | [services/raster-prop-monitor.md](design/services/raster-prop-monitor.md) |
 | ⛔ | Per-thruster RCS control through IndividualRCS; a PR from an outside contributor | PR #1245 | — |
@@ -335,7 +337,6 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | | Item | Issue | Design doc |
 | --- | --- | --- | --- |
 | 🚧 | Autopilot test-plan gaps | [autopilot-test-gaps.md](issues/autopilot-test-gaps.md) | [autopilot/test-plan.md](design/autopilot/test-plan.md) |
-| 🚧 | Procedural Fairings tests, the last mod compatibility gap, with the Firespitter and KerbalActuators thrust reverser tests. Ready for a PR | [mod-compat-tests.md](issues/mod-compat-tests.md) | [services/mod-compat-test-coverage.md](design/services/mod-compat-test-coverage.md) |
 | ⬜ | NUnit 5 | [nunit-5-migration.md](issues/nunit-5-migration.md) | [build-tools/nunit-5-migration.md](design/build-tools/nunit-5-migration.md) |
 | ⬜ | Windows CI: C-nano serial transport tests, over a named pipe | [#1200](https://github.com/krpc/krpc/issues/1200) | — |
 | ⬜ | Build `KRPC.IO.Ports` from source in the net472 `KRPC.Core`, in place of the prebuilt DLL | [core-serial-ports.md](issues/core-serial-ports.md) | — |
