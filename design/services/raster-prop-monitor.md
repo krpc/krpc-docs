@@ -307,6 +307,9 @@ Phase 3 depends on phase 2 for its tests. Phase 4 depends only on phase 1. Phase
 test mod pin, which needs RPM and Module Manager, and the full RPM package so the stock pods have
 RPM IVAs.
 
+Two commits on the same branch follow the phases, from trying the service in game: monitor
+readback in any camera mode, and page button captures with `PressPageButton`.
+
 ## Open Questions
 
 * Player presses of global buttons on pages kRPC does not own. RPM binds them to the page's
