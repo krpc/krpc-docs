@@ -1,11 +1,11 @@
 # Service definition rules
 
-**Status:** partly done. The identifier, shape, duplicate and id rules are implemented. The member
-key rule is a proposal, [#1237](https://github.com/krpc/krpc/issues/1237). The service and type name
-rules are done, [PR #1324](https://github.com/krpc/krpc/pull/1324) and
-[PR #1325](https://github.com/krpc/krpc/pull/1325). The rules for parameters
-and enumeration values are a proposal with no PR yet
-([issue](../../issues/clientgen-qualified-names.md)).
+**Status:** partly done. The identifier, shape, duplicate and id rules are implemented. The service
+and type name rules are done, [PR #1324](https://github.com/krpc/krpc/pull/1324) and
+[PR #1325](https://github.com/krpc/krpc/pull/1325). The member key rule
+([#1237](https://github.com/krpc/krpc/issues/1237)) and the rules for parameters and enumeration
+values are done on the local branch `service-identifiers`, below the name case conversion branch.
+Helper keys and the tool checks are still proposals.
 
 What the scanner accepts in a service definition, and why. Clients name things after these rules and
 may assume them, see [client naming](client-naming.md). A definition that breaks a rule is left out
@@ -18,11 +18,11 @@ as [partial loading](../server/partial-loading.md) describes. The problem is rep
 | [Shapes](#shapes): visibility, nesting, types | Implemented |
 | [Exact duplicates](#exact-duplicates) within a kind | Implemented |
 | [Ids](#ids), hashed or set by hand | Implemented, [PR #1265](https://github.com/krpc/krpc/pull/1265) |
-| [Member keys](#member-keys): case-insensitive, with accessor keys | Proposal, #1237. The `ConfigNode` clashes are removed ([PR #1261](https://github.com/krpc/krpc/pull/1261), [PR #1273](https://github.com/krpc/krpc/pull/1273)) |
+| [Member keys](#member-keys): case-insensitive, with accessor keys | Done on branch `service-identifiers`, #1237. The `ConfigNode` clashes are removed ([PR #1261](https://github.com/krpc/krpc/pull/1261), [PR #1273](https://github.com/krpc/krpc/pull/1273)), and the `Antenna` ones on the branch |
 | [Helper keys](#helper-keys) for the C++ `_stream` and `_call` functions | Proposal |
 | [Service and type names](#service-and-type-names) unique case-insensitively | Implemented. Type names with type ids, phase E0 of [client-errors.md](../client-errors.md#type-ids), [PR #1324](https://github.com/krpc/krpc/pull/1324). Service names, types named as their service, and one class per service, [PR #1325](https://github.com/krpc/krpc/pull/1325) |
 | [Type ids](#ids), hashed or set by hand | Implemented, phase E0 of [client-errors.md](../client-errors.md#type-ids), [PR #1324](https://github.com/krpc/krpc/pull/1324) |
-| [Parameters and enumeration values](#parameters-and-enumeration-values) | Proposal |
+| [Parameters and enumeration values](#parameters-and-enumeration-values) | Done on branch `service-identifiers` |
 
 ## What the rules guarantee
 
@@ -108,6 +108,10 @@ beside the properties `Values` and `Nodes`. `FindValues` and `FindNodes` replace
 ([PR #1261](https://github.com/krpc/krpc/pull/1261)), and the old methods are removed with no
 deprecation cycle ([PR #1273](https://github.com/krpc/krpc/pull/1273)).
 
+**`Antenna`.** The RealAntennas support (PR #1320, unreleased) added methods `SetTargetVessel` and
+`SetTargetBody` beside read-only properties `TargetVessel` and `TargetBody`. The properties gain
+setters in their place, on the `service-identifiers` branch (user's choice, 2026-11-13).
+
 ## Helper keys
 
 C++ generates `foo_stream` and `foo_call` beside each member `foo`, and `set_foo_call` beside each
@@ -141,14 +145,17 @@ class `Bound` in some clients, and those clients escape a member of either name.
 
 ## Parameters and enumeration values
 
-* **A parameter name matches `^[a-z][A-Za-z0-9]*$`.** The parameters of a procedure are unique,
+* **A parameter name matches `^[A-Za-z][A-Za-z0-9]*$`**, as the user ruled 2026-11-13: ASCII only,
+  starting with a letter of either case. The parameters of a procedure are unique,
   compared case-insensitively. `fooBar` and `FooBar` would both become C++, Python and Lua
   `foo_bar`, and Java `fooBar`. The instance parameter of a class member keeps the
   name `this`, which the scanner gives it.
-* **An enumeration value name matches the identifier rule.** A value `Foo_` would become Java `FOO`
-  beside a value `Foo`, as the Java client strips the `_` it adds to a keyword.
+* **An enumeration value name matches `^[A-Za-z][A-Za-z0-9]*$`**, as a parameter name does. A
+  value `Foo_` would become Java `FOO` beside a value `Foo`, as the Java client strips the `_` it
+  adds to a keyword.
 
-Every parameter and value in the bundled and test services already meets both.
+Every parameter and value in the bundled and test services already meets both. Identifiers are
+ASCII only too: the scanner's patterns end in `\z`, as `$` also matches before a final newline.
 
 ## Checks
 
