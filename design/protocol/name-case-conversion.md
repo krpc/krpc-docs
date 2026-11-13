@@ -1,6 +1,6 @@
 # Name case conversion
 
-**Status:** phases 1 and 2 done, on a local branch.
+**Status:** phases 1 to 4 done, on a local branch. Phase 5 waits for the JavaScript client branch to rebase onto it.
 
 Clients and generators convert the names in a service definition, such as `ActiveVessel`, to their
 own case: `active_vessel`, `activeVessel`, `ACTIVE_VESSEL`. [Client naming](client-naming.md) says
