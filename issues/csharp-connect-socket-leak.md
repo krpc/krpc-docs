@@ -18,5 +18,5 @@ Proposal:
 * Test it in the C# client's tests: connect to a port with no listener in a loop, and check that the
   process's open handles do not grow.
 
-The code moved from `Connection.Connect` to `TCPIPTransport` on the `client-consistency` branch
+The code moved from `Connection.Connect` to `TCPIPTransport` on the `client-naming` branch
 unchanged. The leak predates it.

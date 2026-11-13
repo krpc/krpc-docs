@@ -492,8 +492,8 @@ codes, see [What C-nano does today](#what-c-nano-does-today).
 ## Phases
 
 Each phase is one commit, with its conformance tests. E0 lands first, in a pull request of its
-own off `main`. E1 to E5 land together with the work that makes the clients consistent in naming
-and structure, in one pull request.
+own off `main`. E1 to E5 land together in one pull request, after the one that makes the clients
+consistent in naming and structure.
 
 | Phase | Change |
 | --- | --- |
