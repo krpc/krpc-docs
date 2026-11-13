@@ -2,8 +2,10 @@
 
 **Status:** in progress. `Match` and `Switch` are implemented as designed, in PR #1334, and the
 JavaScript compiler compiles `switch` to `Switch`. They were first named `Switch` and
-`SwitchWithFallThrough`, renamed before release as [Naming](#naming) explains. Python `match`
-is still to do. A follow-up to server side functions, which merged in #1124 to #1130. Issue:
+`SwitchWithFallThrough`, renamed before release as [Naming](#naming) explains. The Python
+compiler compiles `match` on branch `python-match`, with the simple patterns only: literal, value,
+`None`, `True`, `False`, or, wildcard, capture, `as` and guards. Sequence, mapping and class
+patterns are a compile error, and wait for a later PR. A follow-up to server side functions, which merged in #1124 to #1130. Issue:
 [switch-statements.md](../../issues/switch-statements.md). Needed by phase 6 of the
 [JavaScript client](../javascript-client.md#phase-6-function-compiler), and lands before it.
 
@@ -74,13 +76,15 @@ need no new node kinds:
 | Client | Uses |
 | --- | --- |
 | JavaScript | Phase 6b compiles `switch` to `Switch`, with JavaScript's full semantics. A case of a type the value does not compare with is a compile error |
-| Python | A later PR compiles `match`, below |
+| Python | Compiles `match`, below. Sequence, mapping and class patterns are not done yet |
 | C# | No change. Its compiler emits no statements, see [csharp-statement-functions.md](csharp-statement-functions.md) |
 | C++, C-nano, Java, Lua | The generated factories, with no client change |
 
 ### Python `match`
 
-Python 3.10 is the client's minimum, so `match` is always available. Only some patterns map onto
+Python 3.10 is the client's minimum, so `match` is always available. A run of unguarded cases is
+one `Match`. A guarded case is an `IfThenElse` whose condition assigns the bindings, then tests
+the guard. The rows below for sequence, mapping and class patterns are not implemented yet. Only some patterns map onto
 `Match`. The rest lower to an `if` chain over nodes the server has:
 
 | Pattern | Lowers to |
