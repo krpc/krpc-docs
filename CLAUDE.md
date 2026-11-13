@@ -10,17 +10,18 @@ and planning notes that do not ship with the mod.
  * `design/` — one doc per feature/issue, filed by area: `autopilot/`, `protocol/`, `services/`,
    `build-tools/`, `ksa/`. Docs spanning all areas (audits, sweeps) sit in `design/` itself.
  * `analysis/` — test plans and results for the tools and clients, with their findings.
- * `RELEASE_PLAN.md` — the authoritative list of planned work, by milestone, with each item's GitHub
-   issue, labels and design doc. GitHub is updated to match it.
- * `issues/` — drafts of issues not yet on GitHub, one per file: the title as the heading, then the
-   body. Milestone and labels live in `RELEASE_PLAN.md`.
+ * `RELEASE_PLAN.md` — the authoritative list of planned work, by milestone, with each item's issue,
+   labels and design doc.
+ * `issues/` — the issues: one work item per file, the title as the heading, then the body.
+   Milestone and labels live in `RELEASE_PLAN.md`. They are not filed on GitHub.
 
 ## Tracking work
 
- * Work is tracked on GitHub — issues and pull requests on [`krpc/krpc`](https://github.com/krpc/krpc).
-   This repo holds the design and the plan (`RELEASE_PLAN.md`), not the status of work in progress.
- * A GitHub issue should point to the relevant design doc if there is one, and each design doc should
-   link its issue or PR.
+ * Planned work is an issue in `issues/`, scheduled in `RELEASE_PLAN.md`. It reaches GitHub as the
+   pull requests on [`krpc/krpc`](https://github.com/krpc/krpc) that do it.
+ * The GitHub issue tracker is for public bug reports, and the occasional issue the maintainer posts.
+   Do not turn an issue in `issues/` into a GitHub issue, or suggest it.
+ * Each design doc links its issue in `issues/`, and the PRs that do the work once they exist.
 
 ## Writing docs here
 

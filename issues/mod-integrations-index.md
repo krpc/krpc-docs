@@ -12,11 +12,11 @@ This issue indexes the mod support that is planned or worth considering. Each op
 | Principia | not on CKAN | #767 | Phase 1 shipped as a docs page. Phases 2 and 3 wait on upstream. |
 | Raster Prop Monitor | 2.05M | #375, #424 | The count likely includes installs as a dependency of IVA packs. |
 | IndividualRCS | - | PR #1245 | Merged. |
-| RemoteTech, Kerbal Alarm Clock | 689k, 1.33M | [`#<remotetech-kac-api>`](remotetech-kac-api.md) | Complete the existing services. |
-| Infernal Robotics | - | [`#<infernal-robotics-input-linking>`](infernal-robotics-input-linking.md) | Input linking and sun tracking. |
-| Procedural Fairings, DockingCamera, LIDAR | 1.19M (Procedural Fairings) | [`#<mod-compat-tests>`](mod-compat-tests.md) | Existing integrations with no in-game tests. |
+| RemoteTech, Kerbal Alarm Clock | 689k, 1.33M | [remotetech-kac-api](remotetech-kac-api.md) | Complete the existing services. |
+| Infernal Robotics | - | [infernal-robotics-input-linking](infernal-robotics-input-linking.md) | Input linking and sun tracking. |
+| Procedural Fairings, DockingCamera, LIDAR | 1.19M (Procedural Fairings) | [mod-compat-tests](mod-compat-tests.md) | Existing integrations with no in-game tests. |
 
-[`#<requires-mod-attribute>`](requires-mod-attribute.md) makes the server check that a service's mod is available before each RPC, which applies to any new service.
+[requires-mod-attribute](requires-mod-attribute.md) makes the server check that a service's mod is available before each RPC, which applies to any new service.
 
 ## New Services
 

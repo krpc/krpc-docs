@@ -1,6 +1,6 @@
 # Conformance: coverage gaps found writing the client design docs
 
-Writing a design doc for each client turned up behavior the conformance suite does not check, including several real client defects it cannot see. Those defects are in the client defects drafts, such as [client-design-shared-defects.md](client-design-shared-defects.md). This issue covers the tests.
+Writing a design doc for each client turned up behavior the conformance suite does not check, including several real client defects it cannot see. Those defects are in the client defects issues, such as [client-design-shared-defects.md](client-design-shared-defects.md). This issue covers the tests.
 
 Each gap below was checked against `client/conformance/tests/`. Where a client is named, its behavior was reported from running it or reading its code. A new test that fails goes in that client's `expected-failures.txt`, with the fix tracked separately.
 

@@ -17,7 +17,7 @@ For each question:
 * Record the ruling as requirement text in the spec, through a conformance test's docstring.
 * Add the test. A client that fails it lists the test in its `expected-failures.txt`.
 
-The client behavior above comes from the client design pages, `doc/src/client-design*`, and the client defects drafts.
+The client behavior above comes from the client design pages, `doc/src/client-design*`, and the client defects issues.
 
 Related: [conformance-coverage-gaps.md](conformance-coverage-gaps.md), and
 [spec-callback-thread-per-connection.md](spec-callback-thread-per-connection.md), which settles a

@@ -251,8 +251,7 @@ expected. Tag each finding:
 - **docs**: the docs are wrong or missing a step.
 - **client**: a defect in this crate, found through the tools.
 
-Findings for `krpc` are drafted as issues in [`issues/`](../issues/), never filed on GitHub without
-approval.
+Findings for `krpc` become issues in [`issues/`](../issues/), not GitHub issues.
 
 ## Order
 
