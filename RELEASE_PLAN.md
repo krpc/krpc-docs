@@ -274,7 +274,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | ⬜ | InfernalRobotics input linking and sun tracking | [infernal-robotics-input-linking.md](issues/infernal-robotics-input-linking.md) | [services/infernal-robotics-input-linking.md](design/services/infernal-robotics-input-linking.md) |
 | 🚧 | Principia support; phase 1 shipped as a docs page, phases 2 and 3 wait on upstream | [#767](https://github.com/krpc/krpc/issues/767) | [services/principia-service.md](design/services/principia-service.md) |
 | ⬜ | MechJeb2 service, ported from Genhis' KRPC.MechJeb, then stage stats from MechJeb's fuel-flow simulation | [#288](https://github.com/krpc/krpc/issues/288), [#311](https://github.com/krpc/krpc/issues/311) | [services/mechjeb.md](design/services/mechjeb.md) |
-| ⬜ | Raster Prop Monitor integration and camera views | [#375](https://github.com/krpc/krpc/issues/375), [#424](https://github.com/krpc/krpc/issues/424) | [services/raster-prop-monitor.md](design/services/raster-prop-monitor.md) |
+| 🚧 | Raster Prop Monitor integration and camera views, all four phases on branch `raster-prop-monitor`, unpushed | [#375](https://github.com/krpc/krpc/issues/375), [#424](https://github.com/krpc/krpc/issues/424) | [services/raster-prop-monitor.md](design/services/raster-prop-monitor.md) |
 | ⛔ | Per-thruster RCS control through IndividualRCS; a PR from an outside contributor | PR #1245 | — |
 
 ### Fixes, tests and tooling
