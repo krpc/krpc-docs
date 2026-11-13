@@ -1,6 +1,7 @@
 # Client errors
 
-**Status:** proposal, every question settled on 2026-11-10, and reviewed against the code. Issue:
+**Status:** in progress. Phases E1 to E4 are built, with no PR yet, and the build departs from
+this design as [Deviations](#deviations) lists. Issue:
 [client-errors.md](../issues/client-errors.md).
 
 The errors each client raises grew one client at a time. They differ in their names, their bases,
@@ -340,3 +341,40 @@ Each phase carries these for the clients it changes.
   and leaves that record as it stands. [javascript-client.md](javascript-client.md) makes
   `instanceof RPCError` hold for every server error, and is updated to match before that client
   is built.
+
+## Deviations
+
+Where the build departs from the design above.
+
+- **A read before the first value blocks.** On a thread holding the stream's condition too, a
+  read waits on the condition, which lets it go, and returns once the first value arrives. Every
+  client does this, and the spec tests it. `StreamError` with "Stream has no value" stays only for
+  a read that races the first value, stored but not yet announced.
+- **The testee's kinds.** `RPC` is renamed `SERVER`, and a new `INTERRUPT` kind reports the
+  native interrupt. `TIMEOUT` goes, its number reserved, as planned.
+- **The remote error test.** One test per category checks the base of the connection, server and
+  encoding errors. The stream error has its own test under the `streams` profile, as Lua has no
+  streams.
+- **`StreamRemovedException` is translated where the exception is built,** not in each stream
+  manager. Its generated name is an alias of `StreamError` in Python and C++. C# and Java register
+  the stream exception for it, and Python's runtime builder of exception types returns
+  `StreamError` for it.
+- **C# registers a factory per exception.** `IConnection.AddExceptionType` takes a
+  `Func<string, Exception>`, so a mapped exception needs no class. The argument exceptions take
+  the parameter name first, which the factory passes as empty.
+- **Reference docs.** docgen keeps an entry for each exception, as the target of references, and
+  each entry says what the client raises for it: the builtin or `ServerError` base in Python, the
+  alias or base in C++, the native type thrown in C# and Java, and a `ServerError` with its
+  `service` and `name` in Lua.
+- **Lua.** It has no `StreamError` class, as it has no streams. A server error names
+  `Service.Name:` in its message when the service definitions leave the exception out, as the
+  other clients do for an exception they have no type for. A local socket path too long is a
+  string in Lua's form, from luasocket's own check.
+- **Misuse.** Java throws `IllegalArgumentException` when `addStream` or `getCall` finds no method,
+  and `IllegalStateException` when a stub's type information cannot be read. C# throws
+  `ConnectionException` for a call after `Dispose`, in place of `ObjectDisposedException`.
+- **Python service definitions.** A malformed set of definitions raises `ConnectionError` at
+  connect, wrapping the error. `UnknownTypeError` and `EnumerationValueError` stay, as
+  `ValueError` subclasses.
+- **Java connection endings.** A stream or event that a close or a connection failure ends throws
+  the connection's own `ConnectionException`, one instance for every stream.
