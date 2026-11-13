@@ -1,6 +1,6 @@
 # Kerbal Engineer Redux service
 
-**Status:** in progress. GitHub #288 (shared with MechJeb2, which this doc leaves out).
+**Status:** in progress. GitHub #288 (shared with MechJeb2, in [mechjeb.md](mechjeb.md)).
 
 ## Context
 

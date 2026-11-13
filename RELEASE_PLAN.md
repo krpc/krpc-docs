@@ -108,7 +108,7 @@ client. A hard break: clients older than 0.8 cannot connect to a 0.8 server.
 | 🚧 | Python: build every service from the server's definitions, with generated declarations for type checking; removes `use_pregenerated_stubs` and replaces the Python part of #1195. Phases 1 to 2b merged, and two phase 3 follow-ups: typed function compiler, `definitions` and `declarations` conformance profiles. Open: pyright on generated modules, `<Service>Client` escaped, `--bundle`, a connect per game | [python-declarations.md](issues/python-declarations.md), PRs #1298, #1302, #1303, #1304, #1305, #1306 | [python-declarations.md](design/python-declarations.md) |
 | 🚧 | JavaScript client for the browser, on WebSockets, in phases. Phases 1 to 3 implemented, not yet submitted | **To write** | [javascript-client.md](design/javascript-client.md) |
 | 🚧 | Trajectories service; a PR from an outside contributor | PR #1253, **add milestone** | [services/trajectories-service.md](design/services/trajectories-service.md) |
-| ⬜ | MechJeb2 and Kerbal Engineer Redux services | [#288](https://github.com/krpc/krpc/issues/288), **add milestone** | — |
+| 🚧 | Kerbal Engineer Redux service | [#288](https://github.com/krpc/krpc/issues/288), **add milestone** | [services/kerbal-engineer-redux.md](design/services/kerbal-engineer-redux.md) |
 
 <details>
 <summary>Done (16)</summary>
@@ -273,6 +273,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 | 🚧 | RemoteTech API bindings and KAC alarm actions | [remotetech-kac-api.md](issues/remotetech-kac-api.md) | [services/kac-remotetech-tests-and-api.md](design/services/kac-remotetech-tests-and-api.md) |
 | ⬜ | InfernalRobotics input linking and sun tracking | [infernal-robotics-input-linking.md](issues/infernal-robotics-input-linking.md) | [services/infernal-robotics-input-linking.md](design/services/infernal-robotics-input-linking.md) |
 | 🚧 | Principia support; phase 1 shipped as a docs page, phases 2 and 3 wait on upstream | [#767](https://github.com/krpc/krpc/issues/767) | [services/principia-service.md](design/services/principia-service.md) |
+| ⬜ | MechJeb2 service, ported from Genhis' KRPC.MechJeb, then stage stats from MechJeb's fuel-flow simulation | [#288](https://github.com/krpc/krpc/issues/288), [#311](https://github.com/krpc/krpc/issues/311) | [services/mechjeb.md](design/services/mechjeb.md) |
 | ⬜ | Raster Prop Monitor integration and camera views | [#375](https://github.com/krpc/krpc/issues/375), [#424](https://github.com/krpc/krpc/issues/424) | [services/raster-prop-monitor.md](design/services/raster-prop-monitor.md) |
 | ⛔ | Per-thruster RCS control through IndividualRCS; a PR from an outside contributor | PR #1245 | — |
 
@@ -338,7 +339,7 @@ Follow-ups to server side functions, which merged in 0.7 (#1124 to #1130).
 
 | Feature | Design doc |
 | --- | --- |
-| Vessel state and staging prediction ([#311](https://github.com/krpc/krpc/issues/311)): the stage API covers the prediction, with each stage's masses, thrust, specific impulse, burn time and delta-v, and fuel flow follows from them. A general "should stage now" check was rejected: when to stage depends on the craft's design, and a server side function runs a script's own rule in one round trip | — |
+| A general "should stage now" check ([#311](https://github.com/krpc/krpc/issues/311)): when to stage depends on the craft's design. Scripts build their own rule on `Engine.Flameout` and the `Stage` API, in one round trip as a server side function. The rest of #311 is in the MechJeb2 service | [services/mechjeb.md](design/services/mechjeb.md) |
 | Service versioning | [services/service-versioning.md](design/services/service-versioning.md) |
 | CI lite and merge queue | [build-tools/ci-lite-merge-queue.md](design/build-tools/ci-lite-merge-queue.md) |
 | CI remote cache | [build-tools/ci-remote-cache.md](design/build-tools/ci-remote-cache.md) |

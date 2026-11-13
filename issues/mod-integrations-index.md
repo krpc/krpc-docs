@@ -6,8 +6,8 @@ This issue indexes the mod support that is planned or worth considering. Each op
 
 | Mod | Downloads | Tracked in | Notes |
 | --- | --- | --- | --- |
-| MechJeb2 | 36k | #288 | The third-party [kRPC.MechJeb](https://genhis.github.io/KRPC.MechJeb) service already exists. Decide whether to link, adopt or replace it. |
-| Kerbal Engineer Redux | 1.92M | #288 | `Vessel.DeltaV` and `Stage` already cover delta-v. Find which stats are missing, and split this from MechJeb2. |
+| MechJeb2 | 36k | #288, #311 | Port the third-party [kRPC.MechJeb](https://genhis.github.io/KRPC.MechJeb) service into kRPC: [design/services/mechjeb.md](../design/services/mechjeb.md). |
+| Kerbal Engineer Redux | 1.92M | #288 | `Vessel.DeltaV` and `Stage` already cover delta-v. Find which stats are missing: [design/services/kerbal-engineer-redux.md](../design/services/kerbal-engineer-redux.md). |
 | Trajectories | 1.11M | PR #1253 | Merged. |
 | Principia | not on CKAN | #767 | Phase 1 shipped as a docs page. Phases 2 and 3 wait on upstream. |
 | Raster Prop Monitor | 2.05M | #375, #424, [design](../design/services/raster-prop-monitor.md) | The count likely includes installs as a dependency of IVA packs. Four phases: persistent variables, monitors, script pages, cameras. |
