@@ -12,3 +12,9 @@ Still open from the client API parity audit (2026-07-21) and the client guide re
 
 * **A stream value is decoded when it is read,** so a value that fails to decode raises on each read, and never ends the stream or calls its end callbacks (`test_undecodable_value`).
 * **`run` and a function stream throw `std::runtime_error` for a null** without `std::optional`, not the encoding error (`test_null_for_non_nullable_type[double]`). The guide already describes the fixed behavior.
+
+## From the client errors review
+
+Found reviewing the `client-errors` branch (2026-11-11). It predates the branch.
+
+* **The testee reports any other `std::exception` as a server error.** `to_error` in `conformance/main.cpp` falls through to `SERVER` for an exception that is not one of the client's error types or `std::invalid_argument`. A client misuse error, such as a `std::logic_error`, or a raw asio error that leaks would pass a test that expects a server error. Naming the server error by `krpc::ServerError` or a mapped standard type, and reporting anything else as unrecognized, would let such a leak fail the test.

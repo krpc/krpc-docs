@@ -22,3 +22,10 @@ Still open from the client API parity audit (2026-07-21) and the client guide re
 * **Ordering a remote object against another type raises `NotImplementedError`** in `ClassBase.__lt__` and the other comparisons, in place of returning `NotImplemented`.
 * **A procedure and a property with one name lose the procedure, and enumeration values that differ only in case collapse** (audit 38, 40). Not re-checked since the client naming contract (#1237).
 * **Docstrings can be lost** when a type is first built from another service (audit 48). Not re-checked.
+
+## From the client errors review
+
+Found reviewing the `client-errors` branch (2026-11-11). Both predate it.
+
+* **A string with a lone surrogate raises `UnicodeEncodeError`.** `Encoder.encode_string` calls `str.encode("utf-8")` unguarded. The error is a `ValueError`, so a program and the testee see an argument error. The client errors design names this case `EncodingError`, a value of the right type the client cannot write. No conformance test covers it.
+* **`run()` turns every argument encoding failure into a `TypeError`.** `Connection._encode_argument` catches `Exception` around the coercion, the check and `Encoder.encode`, so an `EncodingError` and a `ValueError` for a value out of range both reach the program as `TypeError`. A plain call raises them as they are.

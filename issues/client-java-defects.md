@@ -23,3 +23,10 @@ Still open from the client API parity audit (2026-07-21) and the client guide re
   - A stream or event ended by a close or a connection failure ends with `StreamException("Connection closed")`, without the reason (`test_end_callback[connection-failure]`, `test_wake_waiter[close]`).
 * **A server that closes the socket during the handshake makes `newInstance` throw a bare `EOFException`**, not `ConnectionException` (`test_handshake_lost`). `handshake` catches only timeouts and parse errors.
 * **A stream added before any call through its service raises an untyped `RPCException`** for the service's exception, as the types are registered when a service object is made (`test_procedure_exception[first-CustomException]`).
+
+## From the client errors review
+
+Found reviewing the `client-errors` branch (2026-11-11). Both predate it.
+
+* **The testee reports any other exception as a server error.** `toError` in `conformance/krpc/client/conformance/Testee.java` falls through to `SERVER` for an exception that is not one of the client's error types, an `IllegalArgumentException` or a `CancellationException`. A leaked `ClassCastException` or `IllegalStateException` would pass a test that expects a server error.
+* **A tuple or structure of the wrong length throws `EncodingException`.** `Encoder.encodeTuple` and `encodeStruct` check the length, and the client errors design makes a wrong length the argument error. The argument check before a call may catch it first, so this matters only for a direct encode.

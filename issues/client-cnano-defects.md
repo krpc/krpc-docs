@@ -200,3 +200,12 @@ index 000000000..ec7205bf8
 +  krpc_free(list.items);
 +}
 ```
+
+## From the client errors review
+
+Found reviewing the `client-errors` branch (2026-11-11). Each predates it.
+
+* **Some allocations are unchecked.** `krpc_decode_string` in `src/decoder.c` and the generated list and dictionary decoders use the result of `krpc_calloc` or `krpc_recalloc` without checking it. The guide says every failed allocation returns `KRPC_ERROR_NO_MEMORY`.
+* **`krpc_return_value_decoder` leaks its buffer** when `pb_read` fails.
+* **A null client name crashes `krpc_connect`.** `krpc_encode_callback_cstring` calls `strlen` on it.
+* **`krpc_disconnect` after a failed handshake on a non-resumable link closes the handle twice.** The handshake closes it, and the disconnect closes it again.

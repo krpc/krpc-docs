@@ -15,3 +15,9 @@ Still open from the client API parity audit (2026-07-21) and the client guide re
 * **An interrupt does not reach a call reading the socket for its own response** (`test_abandoned_id`).
 * **A type mismatch or a null raises `InvalidOperationException`, not the argument or encoding error.** `Run` and `AddStream` with a `TResult` that cannot hold the value (`test_mismatched_type[...]`), and a stream of a null for a value type (`test_stream_null_for_non_nullable_type[double]`). The guide already describes the fixed behavior.
 * **The address is an `IPAddress`,** so the program resolves a host name itself (`test_unknown_host`). The guide leaves host names out until the API exists.
+
+## From the client errors review
+
+Found reviewing the `client-errors` branch (2026-11-11). It predates the branch.
+
+* **The testee reports any other exception as a server error.** `ToError` in `conformance/Testee.cs` falls through to `Server` for an exception that is not one of the client's error types, an `ArgumentException` or a `ThreadInterruptedException`. A leaked `NullReferenceException` or `InvalidOperationException`, or a `CompilationException`, would pass a test that expects a server error.
