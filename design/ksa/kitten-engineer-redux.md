@@ -3,8 +3,8 @@
 **Status:** in progress. Built and tested locally on a branch off `ksa-v2026.11.10`, no PR yet.
 
 The KSA equivalent of the KSP [Kerbal Engineer Redux service](../services/kerbal-engineer-redux.md).
-It also exercises the best-effort binding of mod members from
-[partial loading](../server/partial-loading.md) in a real integration, ahead of `core`.
+It also exercises the [binding of mod members](../services/mod-integration-framework/binding.md)
+in a real integration, ahead of `core`.
 
 ## Context
 

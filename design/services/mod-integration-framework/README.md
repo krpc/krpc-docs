@@ -1,24 +1,30 @@
 # Mod integration framework
 
 **Status:** proposal (2026-11-12), for 0.8. Issue:
-[mod-integration-framework.md](../../issues/mod-integration-framework.md).
+[mod-integration-framework.md](../../../issues/mod-integration-framework.md).
 
 The entry point for the shared machinery behind kRPC's mod integrations: the build, the binding to
-the mod, the availability check, the in-game tests and the tested mod versions. It summarizes the
-older detailed docs, records where they have gone stale, and orders the work into phases.
-Refactoring comes before new behavior.
+the mod, the availability check, the in-game tests and the tested mod versions. It states the
+problems and orders the work into phases. Refactoring comes before new behavior.
 
 The doc assumes the Raster Prop Monitor service is on main, as the fourteenth integration.
 
-| Detailed doc | Covers | State |
-| --- | --- | --- |
-| [server/partial-loading.md](../server/partial-loading.md), "Mod integrations" | `ModAPI`, `ModBinder`, `MemberBinder`, stubs, load at startup, a failed mod disables only its integration | Designed. Names 7 of the 14 integrations. Best-effort binding built for 4 of them, on an unpushed branch 283 commits behind main |
-| [server/problem-reporting.md](../server/problem-reporting.md) | The popup and log for failed mods and scanner errors | Designed |
-| [issues/requires-mod-attribute.md](../../issues/requires-mod-attribute.md) | `[RequiresMod]` in place of `CheckAPI` | Not started |
-| [issues/trajectories-load-errors.md](../../issues/trajectories-load-errors.md) | Four errors in the log without Trajectories | Not started. Fixed by [phase 3](#phase-3-one-binding-layer) |
-| [services/mod-compat-test-coverage.md](mod-compat-test-coverage.md) | In-game tests per integration | Done (#1319) |
-| `KRPC.Utils.Accessor` (PR #1251, no design doc) | Compiled delegates for reflected members | Merged |
-| [services/service-versioning.md](service-versioning.md) | Per-service API versions | Negative result. Unrelated to the mod versions in [phase 6](#phase-6-tested-mod-versions-in-the-docs) |
+| Doc | Covers |
+| --- | --- |
+| This page | The problems, the phases, and the detail of phases 1, 2, 6 and 7 |
+| [binding.md](binding.md) | Phase 3: `MemberBinder`, stubs for missing members, one binding per mod |
+| [mod-api.md](mod-api.md) | Phase 4: `ModAPI`, loaded at startup, a failed mod disables only its integration |
+| [requires-mod.md](requires-mod.md) | Phase 5: `[RequiresMod]` in place of `CheckAPI` |
+
+Related:
+
+* [Partial loading](../../server/partial-loading.md) and
+  [problem reporting](../../server/problem-reporting.md) (#1227): scanner errors disable only the
+  broken members, and one popup lists them with the failed mods. They follow this work.
+* `KRPC.Utils.Accessor` (PR #1251) and [mod-compat-test-coverage.md](../mod-compat-test-coverage.md)
+  (done, #1319) are what this work builds on.
+* [service-versioning.md](../service-versioning.md) is a negative result about per-service API
+  versions, unrelated to the mod versions in [phase 6](#phase-6-tested-mod-versions-in-the-docs).
 
 ## Inventory
 
@@ -136,7 +142,7 @@ independent of each other and of the rest.
 | 7. No stubs at the pinned version | Test | 4 | Silent breakage on a pin bump |
 
 Scanner partial loading and the popup ([#1227](https://github.com/krpc/krpc/issues/1227)) are not
-mod-specific, and follow this work.
+mod-specific, and follow this work. They report the mod failures phase 4 records.
 
 ### Phase 1: one registry in `service/`, and a build macro
 
@@ -217,47 +223,27 @@ once, in `mods`. Each service's in-game tests run once against the change.
 
 ### Phase 3: one binding layer
 
-Rebase the best-effort binding branch onto main, and extend it to every integration:
+Every integration binds through `MemberBinder`, and a missing member binds a stub that fails only
+the calls that use it. The RemoteTech copy goes, and Trajectories logs nothing when its mod is
+absent. Design: [binding.md](binding.md).
 
-* `MemberBinder` in core binds through `Accessor`. A missing member binds a stub that throws
-  `MissingMemberException` naming the mod and member, and logs one warning at load.
-* MechJeb, KER, SCANsat, Raster Prop Monitor, Trajectories, DockingCamera, RealAntennas and AGExt
-  move to it. Their helper sets and `Value<T>` go. KAC, IR, FAR and RealFuels are on the branch
-  already.
-* The RemoteTech service uses SpaceCenter's binding, and its own copy goes.
-* A mod that is not installed logs one info line, and nothing else. This fixes
-  [trajectories-load-errors](../../issues/trajectories-load-errors.md).
+The phase also merges the `ImageFormat` copies:
+
 * One `ImageFormat` enum, in StdLib beside `ColorRGB` and `ColorRGBA`, and one encoder in the KSP
   server's `Utils`. DockingCamera, SCANsat and Raster Prop Monitor take it, and add `StdLib` to
   their `deps` in `SERVICES`. See [Decisions](#decisions).
-  * The enum is game-agnostic, and the encoder is not: it takes a Unity `Texture2D`. A KSA service
-    with images uses the same enum, once KSA builds against a 0.8 core, with an encoder of its own.
-  * It is StdLib's first enumeration. Each client's StdLib build generates only structs today, so
-    the phase checks the generated StdLib code and docs in every client.
-
-LIDAR is deprecated and keeps its code.
+* The enum is game-agnostic, and the encoder is not: it takes a Unity `Texture2D`. A KSA service
+  with images uses the same enum, once KSA builds against a 0.8 core, with an encoder of its own.
+* It is StdLib's first enumeration. Each client's StdLib build generates only structs today, so
+  the phase checks the generated StdLib code and docs in every client.
 
 ### Phase 4: `ModAPI`, loaded at startup
 
-As [partial-loading.md](../server/partial-loading.md#the-integration-pattern) designs it: one
-`ModAPI` subclass per integration, with its display name, assembly and minimum version.
-
-* Core finds every `ModAPI`, checks the assembly and version, and runs each `Bind` in its own `try`
-  when kRPC loads. A failure disables that integration only.
-* The `Addon.cs` of each service and `APILoader` go. The minimum versions sit in one place per
-  integration.
-* KAC and IR replace their vendored wrappers with a `ModAPI`, binding at startup and reading their
-  live object per scene. These two are the largest part of the phase.
-* MechJeb's `Bind` reports an installed KRPC.MechJeb, as partial-loading.md designs.
-
-The partial-loading.md table of integrations predates MechJeb, KER, SCANsat, Raster Prop Monitor,
-Trajectories, DockingCamera and RealAntennas. Each is one more `ModAPI`. Raster Prop Monitor's
-computers and monitors are part modules, found through the vessel, so it needs no per-scene binding.
+One `ModAPI` class per integration, bound when kRPC loads. A failed mod disables only its own
+integration, and is recorded for reporting. `Addon.cs`, `APILoader` and the vendored KAC and IR
+wrappers go. Design: [mod-api.md](mod-api.md).
 
 ### Phase 5: `RequiresMod`
-
-As [requires-mod-attribute.md](../../issues/requires-mod-attribute.md) proposes, in its `ModAPI`
-form from the start:
 
 ```csharp
 [KRPCService (Id = 16)]
@@ -265,11 +251,9 @@ form from the start:
 public static class ScanSat
 ```
 
-* The server checks the mod before each call, server side functions included, with one message:
-  "SCANsat is not available: <reason>".
-* Every `CheckAPI` goes. Trajectories gains the check it lacks, and class members gain one.
-* SpaceCenter tags the members that need FAR or RealAntennas. Members with a stock fallback keep
-  their branch.
+The server checks the mod before each call, class members and server side functions included.
+Every `CheckAPI` goes, and Trajectories gains the check it lacks. Design:
+[requires-mod.md](requires-mod.md).
 
 ### Phase 6: tested mod versions in the docs
 
@@ -300,9 +284,9 @@ fails in CI, before a player sees it.
 | Tested version | Not recorded | The mod's `version` in the registry, shown in the docs |
 
 The KSA server builds against the released `KRPC.Core`
-([ksa/README.md](../ksa/README.md)). It gets `MemberBinder`, `ModAPI` and `RequiresMod` once it
+([ksa/README.md](../../ksa/README.md)). It gets `MemberBinder`, `ModAPI` and `RequiresMod` once it
 moves to a 0.8 core, ahead of its first mod integration
-([ksa/kitten-engineer-redux.md](../ksa/kitten-engineer-redux.md)).
+([ksa/kitten-engineer-redux.md](../../ksa/kitten-engineer-redux.md)).
 
 ## Decisions
 
@@ -310,7 +294,6 @@ moves to a 0.8 core, ahead of its first mod integration
 | --- | --- |
 | One `ImageFormat` for every service, or one per service | One, in StdLib, the game-agnostic home of `ColorRGB` and `ColorRGBA`, so KSA services can use it too. It must land before 0.8 ships, as the copies are unreleased |
 | `ModAPI` and `RequiresMod` public in core | Yes: a third-party service author uses them as kRPC's own services do. The extending docs gain a page in phase 5 |
-| Keep the vendored IR and KAC wrappers | No, phase 4 replaces them. They bind lazily, and fail differently from every other integration |
 | The registry's format | Starlark, written out as JSON. Bazel cannot read JSON or TOML in a `BUILD` file without a module extension, and Starlark keeps comments on the pins. Python reads the JSON |
 | The C# minimum versions in the registry | No. They are part of each binding, beside the members it needs. The registry holds the tested version |
 | Generate the Python lists and client toctrees from `SERVICES` | No, check them in a test. Generated Python files make the tools harder to read and run outside Bazel |

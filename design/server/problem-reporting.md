@@ -1,6 +1,6 @@
 # Problem reporting
 
-**Status:** in progress, for 0.8, with [partial loading](partial-loading.md). Issue:
+**Status:** proposal, for 0.8, with [partial loading](partial-loading.md). Issue:
 [#1227](https://github.com/krpc/krpc/issues/1227). A first KSP popup (2026-10-31, never a PR) is
 stale against this design.
 
@@ -8,12 +8,12 @@ stale against this design.
 | --- | --- |
 | KSP popup listing scanner problems and disabled mods | Designed; first implementation stale |
 | KSA popup | Deferred: KSA builds against the released `KRPC.Core`, which has no `ServiceProblems` |
-| Log entries for every problem | Designed. Stub warnings implemented with best-effort binding, no PR |
+| Log entries for every problem | Designed. The mod failures are logged by the [mod integration framework](../services/mod-integration-framework/README.md), phases 3 and 4 |
 | Strict checks for mod authors | Implemented: `tools/ServiceDefinitions` fails on any problem |
 | "Ignore" button | Dropped: the popup shows on each launch with a problem |
 
 How the player, the script author and the mod author learn what [partial loading](partial-loading.md)
-left out, and why.
+left out, which mods [`ModAPI`](../services/mod-integration-framework/mod-api.md) disabled, and why.
 
 ## Problem
 
@@ -67,7 +67,7 @@ the log's path.
 A failed integration is listed in its own group, one line per mod: "Kerbal Alarm Clock support is
 disabled: KerbalAlarmClock.APIReady is not available in the installed version".
 
-The exception type of the failure ([partial loading](partial-loading.md#exceptions)) decides how it
+The exception type of the failure ([`ModAPI`](../services/mod-integration-framework/mod-api.md#exceptions)) decides how it
 is reported:
 
 | Exception (`KRPC.Utils`) | Popup | Log |
@@ -78,8 +78,7 @@ is reported:
 | `ModMemberMissingException`, from a stub at a call | No | Warning at load. The client sees the exception |
 | Any other exception from `Bind` | Yes, with the type name | Error, with the stack trace |
 
-`ModMemberMissingException` carries `Mod` and `Member`, so core logs and lists it without parsing the
-message.
+The log entries land with the mod integration framework. This page adds the popup.
 
 ## Mod authors
 

@@ -19,7 +19,7 @@ This issue indexes the mod support that is planned or worth considering. Each op
 | Infernal Robotics | - | [infernal-robotics-input-linking](infernal-robotics-input-linking.md) | Input linking and sun tracking. |
 | Procedural Fairings | 1.19M | [mod-compat-tests](mod-compat-tests.md) | The one existing integration with no in-game tests. |
 
-[requires-mod-attribute](requires-mod-attribute.md) makes the server check that a service's mod is available before each RPC, which applies to any new service.
+The [mod integration framework](mod-integration-framework.md) gives every new service a shared build, binding and availability check.
 
 ## New Services
 

@@ -17,11 +17,11 @@ krpctools; one binding layer with stubs; `ModAPI` loaded at startup; `RequiresMo
 `CheckAPI`; tested mod versions in the docs; an in-game check that each mod binds in full at its
 pinned version.
 
-Absorbs [requires-mod-attribute.md](requires-mod-attribute.md) (phase 5) and
-[trajectories-load-errors.md](trajectories-load-errors.md) (phase 3), and the mod part of
-[#1227](https://github.com/krpc/krpc/issues/1227) (phases 3 and 4).
+Covers the `RequiresMod` attribute (phase 5), the Trajectories errors in the log when its mod is
+absent (phase 3), and the mod failures of [#1227](https://github.com/krpc/krpc/issues/1227)
+(phases 3 and 4). Phases 3, 4 and 5 each have a design doc, linked from the main one.
 
 Labels: `enhancement`, `server`, `service`, `build`, `tools`, `docs`, `ksp`, `mods`, per phase.
 Milestone: `ksp-v0.8.0`.
 
-Design: [mod-integration-framework.md](https://github.com/krpc/krpc-docs/blob/main/design/services/mod-integration-framework.md)
+Design: [mod-integration-framework/README.md](https://github.com/krpc/krpc-docs/blob/main/design/services/mod-integration-framework/README.md)
